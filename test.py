@@ -97,7 +97,6 @@ def sampleInsideConicHullOfRays(rays, nsamples):
 	all_samples=np.empty((dim,0))
 	for i in range(nsamples):
 		mu=np.random.uniform(0.0,2.5,rays.shape[1])
-		print(rays.shape)
 		tmp=(rays@mu).reshape(-1,1);
 		all_samples=np.append(all_samples, tmp, axis=1)
 	return all_samples
