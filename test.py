@@ -2,9 +2,7 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
-import sys
 import cdd
-from pprint import pprint
 
 
 def getVertexesRaysFromGenerators(gen):
