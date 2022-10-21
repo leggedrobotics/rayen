@@ -52,6 +52,20 @@ def plot2DRays(rays):
 		plt.arrow(0, 0, rays[i,0], rays[i,1], length_includes_head=True, width=0.1)
 
 
+#https://www.sharpsightlabs.com/blog/numpy-softmax/
+def softmax_stable(x):
+    return(np.exp(x - np.max(x)) / np.exp(x - np.max(x)).sum())
+
+def softmax(x):
+    return(np.exp(x)/np.exp(x).sum())
+
+#https://stackoverflow.com/questions/65154622/sample-uniformly-at-random-from-a-simplex-in-python
+def runif_in_simplex(n):
+  ''' Return uniformly random vector in the n-simplex '''
+
+  k = np.random.exponential(scale=1.0, size=n)
+  return k / sum(k)
+
 # Partly Taken from https://datascience.stackexchange.com/questions/102096/how-to-visualize-optimization-problems-feasible-region
 
 
@@ -64,6 +78,34 @@ vertices, rays = getVertexesRaysFromAb(A,b)
 plot2DPoints(vertices)
 # plt.show()
 
+# rng = np.random.default_rng()
+# vals = rng.uniform(0.0,1.0,vertices.shape[1])
+# bar_coord=softmax_stable(vals);
+
+def sampleInsideConvexHullOfVertices(vertices, nsamples):
+	dim=vertices.shape[0]
+	all_samples=np.empty((dim,0))
+	for i in range(nsamples):
+		x=runif_in_simplex(vertices.shape[1])
+		tmp=(vertices@x).reshape(-1,1);
+		all_samples=np.append(all_samples, tmp, axis=1)
+	return all_samples
+
+
+def sampleInsideConicHullOfRays(rays, nsamples):
+	dim=rays.shape[0]
+	all_samples=np.empty((dim,0))
+	for i in range(nsamples):
+		mu=np.random.uniform(0.0,2.5,rays.shape[1])
+		print(rays.shape)
+		tmp=(rays@mu).reshape(-1,1);
+		all_samples=np.append(all_samples, tmp, axis=1)
+	return all_samples
+
+
+all_samples=sampleInsideConvexHullOfVertices(vertices, 1000)
+plot2DPoints(all_samples)
+
 #Second example: Polyhedron
 plt.figure(1)
 A=np.array([[0,-1], [2,-4], [-2,1]]);
@@ -73,6 +115,11 @@ vertices, rays = getVertexesRaysFromAb(A,b)
 plot2DPoints(vertices)
 plot2DRays(rays)
 
+nsamples=5000;
+all_samples_convex_hull=sampleInsideConvexHullOfVertices(vertices, nsamples)
+all_samples_conic_hull=sampleInsideConicHullOfRays(rays, nsamples)
+
+plot2DPoints(all_samples_convex_hull+all_samples_conic_hull)
 
 print(f"vertices=\n{vertices}\n\nrays=\n{rays}")
 
