@@ -117,6 +117,26 @@ bs_cps=V*bar_coord;
 % bar_coord=samplePointsSimplex(1,size(Vhat,2));
 % bs_cps=v0 + Vhat*bar_coord;
 
+%NOTE that the paper "Geometrically Constrained Traj Opt for Multicopters"
+%does not guarantee safety along the whole trajectory (only in the
+%intermediate waypoints). They only impose A_i q_j <= b_i, where (A_i, b_i) is the
+%polytope and q_j is a waypoint. This helps A LOT reducing the
+%computational complexity, since there is no dependency between the
+%different waypoints. In other words, the system that has all the
+%constraints can be written as A*q<=b, where A is block-diagonal matrix, and q:=[q1;q2;q3;...]. 
+%First polytope:
+% A1q1<=b1  
+% A1q2<=b1
+% A1q3<=b1
+
+%Second polytope:
+% A2q3<=b2  
+% A2q4<=b2 
+% A2q5<=b2 
+
+%Hence, you need to simply obtain the vertexes of (A1,b1), (A2,b2), and
+%(A1,b1)intersected_with(A2,b2)
+
 bs_cps=reshape(bs_cps,sp.dim,[]);
 
 bs_cps=num2cell(bs_cps,1);
