@@ -1,0 +1,3 @@
+[submodule "deep_panther"]
+	path = deep_panther
+	url = https://github.com/mit-acl/deep_panther
