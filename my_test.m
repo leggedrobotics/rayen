@@ -1,4 +1,7 @@
-close all; clc;clear;rng shuffle;
+close all; clc;clear;
+addpath(genpath('./deep_panther/panther/matlab'))
+addpath(genpath('./deep_panther/submodules/minvo'))
+
 doSetup();
 import casadi.*
 
