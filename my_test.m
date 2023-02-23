@@ -200,59 +200,7 @@ function result=samplePointsSimplex(num_points, dim)
 end
 
 
-function plot2dConvHullAndVertices(V1)
-[k,av] = convhull(V1');
-plot(V1(1,:),V1(2,:),'*')
-hold on
-plot(V1(1,k),V1(2,k))
-end
 
-function result=getAb_Box2D(center,side)
-
-    A1=[1 0;
-        0 1;
-        -1 0;
-        0 -1];
-    
-    of_x=center(1);
-    of_y=center(2);
-
-
-    b1=[side(1)/2.0+of_x;
-        side(2)/2.0+of_y;
-        side(1)/2.0-of_x;
-        side(2)/2.0-of_y];
-    
-    result.A=A1;
-    result.b=b1;
-
-end
-
-
-function result=getAb_Box3D(center,side)
-
-    A1=[1 0 0;
-        0 1 0;
-        0 0 1;
-        -1 0 0;
-        0 -1 0;
-        0 0 -1];
-    
-    of_x=center(1);
-    of_y=center(2);
-    of_z=center(3);
-    
-    b1=[side(1)/2.0+of_x;
-        side(2)/2.0+of_y;
-        side(3)/2.0+of_z;
-        side(1)/2.0-of_x;
-        side(2)/2.0-of_y;
-        side(3)/2.0-of_z];
-    
-    result.A=A1;
-    result.b=b1;
-
-end
 
 function [A,b]=getAbLinearConstraints(opti_tmp)
 
@@ -292,8 +240,6 @@ function [A,b]=getAbLinearConstraints(opti_tmp)
     catch
         error('Are you sure you only have linear constraints?');
     end
-
-   
 
 end
 
