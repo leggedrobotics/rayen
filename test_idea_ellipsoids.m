@@ -10,20 +10,67 @@ V1=[0 5 1 0;
 
 A(abs(A)<1e-10) = 0;
 
+
+
+x0=[1.8;0.4];
 plot2dConvHullAndVertices(V1)
-x0=[2;0.6];
-E=computeDikinEllipsoid(A,b,x0);
-plot_ellipseE_and_center(E, x0)
+% E=computeDikinEllipsoid(A,b,x0);
+% plot_ellipseE_and_center(E, x0)
 
 
+all_x0=[x0];
+
+    E=computeDikinEllipsoid(A,b,x0);
+    plot_ellipseE_and_center(E, x0)
+
+    E=scaleEllipsoid(E,A,b,x0)
+    plot_ellipseE_and_center(E, x0)
+%%
+
+%     new_x0=x0;
+for i=1:1000
+     new_x0=x0;
+    for j=1:1
+        %Note: if you want to sample uniformly from the ellipsoid, then you need a cholescky decomposition: https://github.com/stla/uniformly/blob/master/R/ellipsoid.R
+        E=computeDikinEllipsoid(A,b,x0);
+        scaleEllipsoid(E,A,b)
+        u=uniformSampleInUnitBall(2,1); %random unit vector 
+%         u= -1 + 2.*rand(2,1); %random vector in [-1,1]^2
+%         u=normalize(u);
+        lambda=1/sqrt(u'*E*u);%This is the distance from the center of the ellipsoid to the border of the ellipsoid in the direction of u
+        length=lambda*rand()
+        new_x0=x0+length*u;
+    
+        all_x0=[all_x0 new_x0];
+    %     plot(point(1),point(2),'o')
+    %     my_arrow=[x0 x0+u];
+    %     plot(my_arrow(1,:),my_arrow(2,:))
+    end
+end
+
+plot(all_x0(1,:),all_x0(2,:),'o')
+
+%%
+%c=sym('c',[4,1])
+% eig(A'*diag(c)*A)
+% [E,D]=computeDikinEllipsoid(A,b,x0);
+% 
+% S = svd(A)
+% [U,S,V] = svd(A);
+% [Q,Lambda] = eig(A'*D*A); %A'DA=QLambdaQ'
+% 
+% V*S'*U'*D*U*S*V'
+
+%%
+%%
 [B,x0]=convertErepresentation2Brepresentation(E,x0);
 plot_ellipseB(B,x0)
 
 
-% F=inv(diag((b-A*x0)));
-% x= sym('x', [numel(x0) 1]);
-% FA=F*A;
-% fimplicit((x-x0)'*(FA')*FA*(x-x0)-1,'*')
+F=inv(diag((b-A*x0)));
+x= sym('x', [numel(x0) 1]);
+FA=F*A;
+fimplicit((x-x0)'*(FA')*FA*(x-x0)-1,'*')
 
 
 
@@ -39,13 +86,26 @@ Ax_kp1=F_inv*sample_ball + Ax_k
 assert(all(Ax_kp1<=b)) %Assert that we are still inside the polytope
 
 %Just for visualization
-point_in_polytope=linsolve(A,Ax_kp1);
+point_in_polytope=linsolve(A,Ax_kp1)
+inside_polytope=A*point_in_polytope<=b
+assert(all(inside_polytope))
 
 all_points_in_polytope=[all_points_in_polytope point_in_polytope];
 
 end
 
 plot(all_points_in_polytope(1,:),all_points_in_polytope(2,:),'o')
+
+
+%%
+%Want to solve A*x=c
+x=linsolve(A,c)%This system does not have a solution --> linsolve returns the least squares solution
+A*x-c
+lsqr(A,c)
+
+% linsolve([1;1],[2;5])
+
+%%
 
 %     for j=1:10
 %         [E,F,F_inv]=computeDikinEllipsoidGivenAx0(A,b,Ax_k)
@@ -72,8 +132,32 @@ samples=uniformSampleInUnitBall(2,4000);
 plot(samples(1,:),samples(2,:),'o')
 
 %%
+figure; hold on;axis equal;
+samples=uniformSampleInUnitBall(3,4000);
+plot3(samples(1,:),samples(2,:),samples(3,:),'o'); axis equal;
+% sphere
+
+%%
 % [E, F, F_inv]=computeDikinEllipsoidGivenAx0(A,b,Ax_k)
 
+function E=scaleEllipsoid(E,A,b,x0)
+    %See https://math.stackexchange.com/questions/340233/transpose-of-inverse-vs-inverse-of-transpose
+    %Note that here we have an ellipsoid not centered in the origin. 
+    minimum=Inf;
+    inv_E=inv(E);
+    for i=1:numel(b)
+        a_i=A(i,:)';
+        tmp=(b(i)-a_i'*x0)^2/(a_i'*inv_E*a_i);
+        minimum=min(minimum,tmp);
+    end
+
+    E=E/minimum;
+
+end
+
+function result=normalize(u)
+    result=u/norm(u);
+end
 
 function result=uniformSampleInUnitBall(dim,num_points)
 %Method 20 of http://extremelearning.com.au/how-to-generate-uniformly-random-points-on-n-spheres-and-n-balls/
