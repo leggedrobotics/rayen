@@ -71,21 +71,10 @@ class MyLayer(torch.nn.Module):
 
         for i in range(self.num_steps):
         	u=x[self.dim*i:self.dim*(i+1)]
-        	# print(u)
+        	u=makeColumnVector(u)
         	u=torch.nn.functional.normalize(u, dim=0);
-        	# print(u)
-        	x0_last = torch.matmul(B_last, u) + x0_last;
+        	x0_last = B_last@u + x0_last;
         	B_last=scaleEllipsoidB(B_last,self.A,self.b,x0_last)
-
-        # orig_size = x.size()
-        # x = x.view(x.size(0), -1)
-
-        # # map this input to coefficients beta of the V-parameterization
-        # # use absolute value to enforce non-negativity of the conical coefficients
-        # x = self.bn(x)
-        # beta = self.beta_lin(x)
-        # beta_abs = torch.abs(beta)
-        # x = beta_abs.mm(self.R)
 
         return u
 
