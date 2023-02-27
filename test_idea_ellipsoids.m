@@ -10,22 +10,83 @@ V1=[0 5 1 0;
 
 A(abs(A)<1e-10) = 0;
 
-
-
 x0=[1.8;0.4];
 plot2dConvHullAndVertices(V1)
+
 % E=computeDikinEllipsoid(A,b,x0);
 % plot_ellipseE_and_center(E, x0)
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%Largest ellipsoid in polytope
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+n=2;
+B = sdpvar(n,n); %Symmetric
+x0 = sdpvar(n,1);
+constraints=[];
+%Eq. 8.15 of https://web.stanford.edu/~boyd/cvxbook/bv_cvxbook.pdf
+%Also http://web.cvxr.com/cvx/examples/cvxbook/Ch08_geometric_probs/html/max_vol_ellip_in_polyhedra.html
+for i=1:size(A,1)
+    a_i=A(i,:)';
+    b_i=b(i);
+    constraints=[constraints norm(B*a_i)+a_i'*x0 <=b_i];
+end
+optimize(constraints,-logdet(B),sdpsettings('solver','mosek')) %mosek
+B=value(B);
+x0=value(x0);
+plot_ellipseB(B,x0);
+
+% scaleEllipsoidB(B,A,b,[0.5;0.2])
+
+%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% x0=[3;0.2];
+% B=scaleEllipsoidB(B,A,b,x0);
+% plot_ellipseB(B,x0);
+
+x0_original=x0;
+
+all_x0=[];
+for i=1:7000
+    x0=x0_original;
+    for j=1:10
+        %Note: if you want to sample uniformly from the ellipsoid, then you need a cholescky decomposition: https://github.com/stla/uniformly/blob/master/R/ellipsoid.R
+        B=scaleEllipsoidB(B,A,b,x0);
+        u=uniformSampleInUnitSphere(2,1); %random unit vector 
+        
+%         %Using the E representation
+%         lambda=1/sqrt(u'*E*u);%This is the distance from the center of the ellipsoid to the border of the ellipsoid in the direction of u
+%         length=lambda*rand();
+%         x0_new=x0+length*u;
+% 
+%         %Using the B representation
+%         %Option 1: x0_new will be in the direction of u
+%         B_inv=inv(B);
+%         lambda=1/sqrt(u'*B_inv'*B_inv*u);%This is the distance from the center of the ellipsoid to the border of the ellipsoid in the direction of u
+%         length=lambda*rand();
+%         x0_new=x0+length*u;
+
+        %Option 2:x0_new will NOT be in the direction of u
+        u_ball=uniformSampleInUnitBall(2,1); %random vector in ball
+        x0_new=B*u_ball + x0; 
+
+        x0=x0_new;
+
+        all_x0=[all_x0 x0];
+    end
+end
+
+plot(all_x0(1,:),all_x0(2,:),'o')
+
+%%
 
 all_x0=[x0];
 
     E=computeDikinEllipsoid(A,b,x0);
     plot_ellipseE_and_center(E, x0)
 
-    E=scaleEllipsoid(E,A,b,x0)
+    E=scaleEllipsoidE(E,A,b,x0)
     plot_ellipseE_and_center(E, x0)
-%%
 
 %     new_x0=x0;
 for i=1:1000
@@ -33,8 +94,8 @@ for i=1:1000
     for j=1:1
         %Note: if you want to sample uniformly from the ellipsoid, then you need a cholescky decomposition: https://github.com/stla/uniformly/blob/master/R/ellipsoid.R
         E=computeDikinEllipsoid(A,b,x0);
-        scaleEllipsoid(E,A,b)
-        u=uniformSampleInUnitBall(2,1); %random unit vector 
+        scaleEllipsoidE(E,A,b,x0)
+        u=uniformSampleInUnitSphere(2,1); %random unit vector 
 %         u= -1 + 2.*rand(2,1); %random vector in [-1,1]^2
 %         u=normalize(u);
         lambda=1/sqrt(u'*E*u);%This is the distance from the center of the ellipsoid to the border of the ellipsoid in the direction of u
@@ -140,7 +201,23 @@ plot3(samples(1,:),samples(2,:),samples(3,:),'o'); axis equal;
 %%
 % [E, F, F_inv]=computeDikinEllipsoidGivenAx0(A,b,Ax_k)
 
-function E=scaleEllipsoid(E,A,b,x0)
+
+
+function B=scaleEllipsoidB(B,A,b,x0)
+    %See https://math.stackexchange.com/questions/340233/transpose-of-inverse-vs-inverse-of-transpose
+    %Note that here we have an ellipsoid not centered in the origin. 
+    minimum=Inf;
+    for i=1:numel(b)
+        a_i=A(i,:)';
+        tmp=(b(i)-a_i'*x0)^2/(a_i'*B*B'*a_i); %Note that inv_E:=B*B'
+        minimum=min(minimum,tmp);
+    end
+
+    B=B*sqrt(minimum);
+end
+
+
+function E=scaleEllipsoidE(E,A,b,x0)
     %See https://math.stackexchange.com/questions/340233/transpose-of-inverse-vs-inverse-of-transpose
     %Note that here we have an ellipsoid not centered in the origin. 
     minimum=Inf;
@@ -159,6 +236,15 @@ function result=normalize(u)
     result=u/norm(u);
 end
 
+function result=uniformSampleInUnitSphere(dim,num_points)
+%Method 19 of http://extremelearning.com.au/how-to-generate-uniformly-random-points-on-n-spheres-and-n-balls/
+
+u = normrnd(0,1,dim,num_points);  % each column is an array of dim normally distributed random variables
+u_normalized=u./vecnorm(u);
+result= u_normalized;
+
+end
+
 function result=uniformSampleInUnitBall(dim,num_points)
 %Method 20 of http://extremelearning.com.au/how-to-generate-uniformly-random-points-on-n-spheres-and-n-balls/
 
@@ -172,7 +258,7 @@ end
 
 %E representation --> {x s.t. (x-x0)'E(x-x0) <= 1}. Here, E is a psd matrix
 %B representation --> {x s.t. x=B*p_bar + x0, ||p_bar||<=1} \equiv {x s.t. ||inv(B)(x-x0)||<=1} \equiv {x s.t. (x-x0)'*inv(B)'*inv(B)*(x-x0)<=1}. 
-%B is \in R^nxn
+%B is \in R^nxn (although Boyd's book says we can assume B is psd (and therefore also symmetric) without loss of generality, see section 8.4.1
 %More info about the B representation: https://ieeexplore.ieee.org/abstract/document/7839930
 function [B,x0]=convertErepresentation2Brepresentation(E,x0)
     
@@ -208,13 +294,13 @@ end
 
 %plots an ellipse using the B representation
 function plot_ellipseB(B,x0)
-     theta=0:0.1:2*pi;
+     theta=0:0.01:2*pi;
      r=1.0;
      x_circle=[r*cos(theta);
                r*sin(theta)]; %This the unit circle
 
      x_ellipse=B*x_circle + repmat(x0,1,numel(theta));
-     plot(x_ellipse(1,:),x_ellipse(2,:),'o');
+     plot(x_ellipse(1,:),x_ellipse(2,:),'-');
 end
 
 %plots an ellipse using the E representation
