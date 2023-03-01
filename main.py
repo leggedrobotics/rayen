@@ -87,7 +87,7 @@ def plot2DEllipsoidB(B,x0,ax):
 	result=f(xxx, yyy)
 	ax.contour(xxx, yyy, result, levels=[0])
 
-	#OTHER OPTION, but you run into this issue: https://github.com/sympy/sympy/issues/20056
+	#OTHER OPTION, but you run into this visualization issue: https://github.com/sympy/sympy/issues/20056
 	# tmp=sympy.plot_implicit(expression,show=True,points=300, adaptive=False, depth = 2)
 	# move_sympyplot_to_axes(tmp, ax)
 	# pts = tmp.get_points()
@@ -120,21 +120,48 @@ def largestEllipsoidBInPolytope(A,b):
 def makeColumnVector(a):
 	return a[:,None]
 
+#Operates on torch stuff
+def squared_norm_of_each_row(D):
+	return (D**2)@torch.ones((D.shape[1],1))
+
+#Operates on torch stuff
 def scaleEllipsoidB(B,A,b,x0):
-	minimum_so_far=torch.Tensor([float("inf")])
-	for i in range(torch.numel(b)):
-		# print(A[i,:])
-		a_i=makeColumnVector(A[i,:])
+
+	# print("\n\n")
+	# # #====================First way==========================
+	# # ========================================================
+	# minimum_so_far=torch.Tensor([float("inf")])
+	# for i in range(torch.numel(b)):
+	# 	# print(A[i,:])
+	# 	a_i=makeColumnVector(A[i,:])
 		
-		tmp=(b[i,0]-a_i.mT@x0)**2/(a_i.mT@B@B.T@a_i);
-		# print(f"numerator={(b[i,0]-a_i.mT@x0)**2}, denominator={a_i.mT@B@B.T@a_i}, result={tmp}")
-		# print(f"tmp is {tmp}")
-		# print(f"tmp[0,0] is {tmp[0]}")
-		minimum_so_far=torch.minimum(minimum_so_far, tmp[0,0])
+	# 	tmp=(b[i,0]-a_i.mT@x0)**2/(a_i.mT@B@B.T@a_i);
+	# 	# print(f"numerator={(b[i,0]-a_i.mT@x0)**2}, denominator={a_i.mT@B@B.T@a_i}, result={tmp}")
+	# 	# print(f"tmp is {tmp}")
+	# 	# print(f"tmp[0,0] is {tmp[0]}")
+	# 	minimum_so_far=torch.minimum(minimum_so_far, tmp[0,0])
 
-	print(f"-------> minimum so far={minimum_so_far}")
+	# # print(f"-------> minimum so far={minimum_so_far}")
 
-	return B*torch.sqrt(minimum_so_far);
+	# result = B*torch.sqrt(minimum_so_far);
+	# print(f"First way: \n {result}")
+
+	# # #===================Second way==========================
+	# # ========================================================
+	# c=squared_norm_of_each_row(A@B)
+	# e=torch.min(((b-A@x0)**2)/c)
+	# result=B*torch.sqrt(e)
+	# print(f"Second way: \n {result}")
+	
+	# #===================Third way==========================
+	# ========================================================
+	sqrt_c=torch.sqrt(squared_norm_of_each_row(A@B))
+	sqrt_e=torch.min(torch.abs(b-A@x0)/sqrt_c)#Note that if x0 is inside the ellipsoid, then I don't need the abs(), since Ax0<=b --> b-Ax0>=0
+	result=B*sqrt_e
+	# print(f"Third way: \n {result}")
+
+
+	return result;
 
 # class stepParam():
 # 	#v in R^n
@@ -227,7 +254,7 @@ print(f"Largest ellipsoid as B={B} and x0={x0}")
 # print(x0)
 
 # a=np.array([[4], [8], [9], [7], [2], [8],[5], [1], [0.5],]);
-num_steps=5;
+num_steps=2;
 my_layer=MyLayer(A,b,num_steps)
 
 all_optimal_points=torch.tensor(np.array([[],[]],dtype=np.float32))
