@@ -72,12 +72,9 @@ def plot2DEllipsoidB(B,x0,ax):
 	except np.linalg.LinAlgError as err:
 		print(str(err))
 		return
-	tmp=(x-x0).T@B_inv.T@B_inv@(x-x0)-1
-	expression=tmp[0,0]; #This is [[scalar]]
-	# print(expression)
-	# print("Going to lambdify")
+	tmp=(x-x0).T@B_inv.T@B_inv@(x-x0)-1 #This is [[scalar]]
+	expression=tmp[0,0]; 
 	f=sympy.lambdify([x1,x2], expression)
-	# print("Finished from lambdify")
 
 	eigenvalues=np.linalg.eigvals(B)
 	tmp_eig=np.amax(eigenvalues);
@@ -99,7 +96,8 @@ def plot2DEllipsoidB(B,x0,ax):
 # B is \in R^nxn (although Boyd's book says we can assume B is psd (and therefore also symmetric) without loss of generality, see section 8.4.1
 # More info about the B representation: https://ieeexplore.ieee.org/abstract/document/7839930
 
-#It returns the ellipsoid in B representation 
+#It returns the ellipsoid in B representation
+#It operates on numpy stuff 
 def largestEllipsoidBInPolytope(A,b):
 	n=A.shape[1];
 	B = cp.Variable((n,n), symmetric=True)
@@ -162,14 +160,6 @@ def scaleEllipsoidB(B,A,b,x0):
 
 
 	return result;
-
-# class stepParam():
-# 	#v in R^n
-# 	#delta in [0,1]
-# 	def __init__(self, v, delta):
-# 		self.v=
-# 		self.beta=delta*torch.nn.functional.normalize(v, dim=0);;
-
 
 class MyLayer(torch.nn.Module):
 	def __init__(self, A_np, b_np, num_steps):
