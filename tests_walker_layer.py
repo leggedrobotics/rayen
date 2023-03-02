@@ -18,23 +18,28 @@ b=np.array([[0],
 			[1.2127]])
 
 
-B, x0 = utils.largestEllipsoidBInPolytope(A,b)
+# B, x0 = utils.largestBallInPolytope(A,b)
 
-print(f"Largest ellipsoid as B={B} and x0={x0}")
+# print(f"Largest ellipsoid as B={B} and x0={x0}")
 
 num_steps=10;
-my_layer=LinearConstraintWalker(A,b,num_steps)
+my_layer=LinearConstraintWalker(A,b,num_steps, use_max_ellipsoid=False)
 
 all_optimal_points=torch.tensor(np.array([[],[]],dtype=np.float32))
 
 fig, ax = plt.subplots()
 
+dim=A.shape[1]
+
 #for j in range(10000):
 for theta in np.arange(0,2*math.pi, 0.01): #[0.93]: #
-	x=torch.Tensor(np.array([[math.cos(theta)],[math.sin(theta)],[3000]]));
+	# x=torch.rand((dim*(dim+1)/2,1))
+	tmp=torch.Tensor(np.array([[math.cos(theta)],[math.sin(theta)],[3000]]));
 	# x=torch.Tensor(my_layer.input_numel, 1).uniform_(-1, 1)
 	# x=torch.Tensor(np.array([[0.5],[4],[3]]));
-	x= x.repeat(num_steps, 1)
+	tmp= tmp.repeat(num_steps, 1)
+	# x=torch.cat((x,tmp),0)
+	x=tmp;
 	# print(f"x={x}")
 	# print(f"x.mT={x.mT}")
 	optimal_point=my_layer.forward(x)
@@ -54,8 +59,9 @@ ax.scatter(all_optimal_points_np[0,:], all_optimal_points_np[1,:])
 
 utils.plot2DPolyhedron(A,b,ax)
 
-utils.plot2DEllipsoidB(B,x0,ax)
+utils.plot2DEllipsoidB(my_layer.B.numpy(),my_layer.x0.numpy(),ax)
 
+ax.set_aspect('equal')
 plt.show()
 
 # %%

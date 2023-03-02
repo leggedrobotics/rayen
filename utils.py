@@ -6,6 +6,61 @@ import torch
 import sympy
 
 
+#This function is taken from https://github.com/tfrerix/constrained-nets
+def H_to_V(A, b):
+	"""
+	Converts a polyhedron in H-representation to
+	one in V-representation using pycddlib.
+	"""
+	# define cdd problem and convert representation
+	if len(b.shape) == 1:
+		b = np.expand_dims(b, axis=1)
+	mat_np = np.concatenate([b, -A], axis=1)
+	if mat_np.dtype in [np.int32, np.int64]:
+		nt = 'fraction'
+	else:
+		nt = 'float'
+	mat_list = mat_np.tolist()
+
+	mat_cdd = cdd.Matrix(mat_list, number_type=nt)
+	mat_cdd.rep_type = cdd.RepType.INEQUALITY
+	poly = cdd.Polyhedron(mat_cdd)
+	gen = poly.get_generators()
+
+	# convert the cddlib output data structure to numpy
+	V_list = []
+	R_list = []
+	lin_set = gen.lin_set
+	V_lin_idx = []
+	R_lin_idx = []
+	for i in range(gen.row_size):
+		g = gen[i]
+		g_type = g[0]
+		g_vec = g[1:]
+		if i in lin_set:
+			is_linear = True
+		else:
+			is_linear = False
+		if g_type == 1:
+			V_list.append(g_vec)
+			if is_linear:
+				V_lin_idx.append(len(V_list) - 1)
+		elif g_type == 0:
+			R_list.append(g_vec)
+			if is_linear:
+				R_lin_idx.append(len(R_list) - 1)
+		else:
+			raise ValueError('Generator data structure is not valid.')
+
+	V = np.asarray(V_list)
+	R = np.asarray(R_list)
+
+	# by convention of cddlib, those rays assciated with R_lin_idx
+	# are not constrained to non-negative coefficients
+	if len(R) > 0:
+		R = np.concatenate([R, -R[R_lin_idx, :]], axis=0)
+	return V, R
+
 def getVertexesRaysFromAb(A, b):
 	bmA= np.concatenate([b, -A], axis=1) # See https://pycddlib.readthedocs.io/en/latest/matrix.html
 	bmA_cdd = cdd.Matrix(bmA.tolist(), number_type='float')
@@ -96,6 +151,10 @@ def plot2DEllipsoidB(B,x0,ax):
 #It returns the ellipsoid in B representation
 #It operates on numpy stuff 
 def largestEllipsoidBInPolytope(A,b):
+
+	if len(b.shape) == 1:
+		b = np.expand_dims(b, axis=1) #Make b a column vector
+
 	n=A.shape[1];
 	B = cp.Variable((n,n), symmetric=True)
 	x0 = cp.Variable((n,1))
@@ -109,7 +168,37 @@ def largestEllipsoidBInPolytope(A,b):
 
 	objective = cp.Minimize(-cp.atoms.log_det(B))
 	prob = cp.Problem(objective, constraints)
-	result = prob.solve(verbose=False);
+	print("Calling solve...")
+	result = prob.solve(verbose=True);
+	print("Solved!")
+
+	return B.value, x0.value
+
+#It operates on numpy stuff 
+def largestBallInPolytope(A,b):
+
+	if len(b.shape) == 1:
+		b = np.expand_dims(b, axis=1) #Make b a column vector
+
+	n=A.shape[1];
+	r = cp.Variable()#A scalar
+	x0 = cp.Variable((n,1))
+	constraints=[]
+
+	#https://programtalk.com/vs2/python/2718/cvxpy/examples/chebyshev.py/
+	#See also https://dkenefake.github.io/blog/ChebBall for when there are equality constraints
+	for i in range(A.shape[0]):
+		a_i=A[i,:].T
+		constraints.append(r*cp.norm(a_i)+a_i.T@x0<=b[i,0])
+
+	objective = cp.Minimize(-r) #This is just a linear program
+	prob = cp.Problem(objective, constraints)
+	print("Calling solve...")
+	result = prob.solve(verbose=True);
+	print("Solved!")
+
+	B=r*np.eye(n)
+
 	return B.value, x0.value
 
 def makeColumnVector(a):

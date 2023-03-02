@@ -1,13 +1,26 @@
 import torch
 import utils
+import numpy as np
 
 class LinearConstraintWalker(torch.nn.Module):
-	def __init__(self, A_np, b_np, num_steps):
+	def __init__(self, A_np, b_np, num_steps, use_max_ellipsoid):
 		super().__init__()
+
+		if np.allclose(b_np, 0):
+			raise ValueError("Constraint set is a zero-centered cone.")
 
 		self.dim=A_np.shape[1]
 		self.num_steps=num_steps;
-		B_np, x0_np = utils.largestEllipsoidBInPolytope(A_np,b_np)
+
+		self.num_variables_C=self.dim*(self.dim+1)/2 #C is a symmetric matrix such that C'*C=C*C=B. 
+
+		# print("Solving for the largest Ellipsoid...")
+		if(use_max_ellipsoid==True):
+			B_np, x0_np = utils.largestEllipsoidBInPolytope(A_np,b_np) #This step is very slow in high dimensions
+		else:
+			B_np, x0_np = utils.largestBallInPolytope(A_np,b_np) 
+		# print("Solved for the largest Ellipsoid")
+
 		self.A = torch.Tensor(A_np)
 		self.b = torch.Tensor(b_np)
 
@@ -21,9 +34,7 @@ class LinearConstraintWalker(torch.nn.Module):
 		# print(f"b = {self.b}")
 		# print(f"B = {self.B}")
 		# print(f"x0 = {self.x0}")
-		
-		self.all_B=[self.B]
-		self.all_x0=[self.x0]
+	
 
 	def plotAllSteps(self,ax):
 		for i in range(len(self.all_x0)):
@@ -36,6 +47,18 @@ class LinearConstraintWalker(torch.nn.Module):
 
 		# print(x)
 
+
+		#https://stackoverflow.com/a/68029042/6057617
+		# vals=torch.unsqueeze(x[0:self.num_variables_C,0],1)
+		# C = torch.zeros(self.dim, self.dim)
+		# i, j = torch.triu_indices(self.dim, self.dim)
+		# C[i, j] = vals
+		# C.T[i, j] = vals
+
+		# self.B=C*C;
+
+		##Construct the B matirx
+
 		B_last=self.B
 		x0_last=self.x0
 
@@ -43,7 +66,7 @@ class LinearConstraintWalker(torch.nn.Module):
 		self.all_x0=[x0_last]
 
 		for i in range(self.num_steps):
-			init=(self.dim+1)*i
+			init=(self.dim+1)*i #+ self.num_variables_C
 			v=torch.unsqueeze(x[init:(init+self.dim),0],1)
 			tmp=torch.unsqueeze(x[(init+self.dim):(init+self.dim+1),0],1)
 			beta=torch.sigmoid(tmp)
