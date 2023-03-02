@@ -1,1 +1,0 @@
---> The module can be at the end of the NN (in the output), but also in between
