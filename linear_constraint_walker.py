@@ -1,7 +1,7 @@
 import torch
 import utils
 
-class WalkerLayer(torch.nn.Module):
+class LinearConstraintWalker(torch.nn.Module):
 	def __init__(self, A_np, b_np, num_steps):
 		super().__init__()
 

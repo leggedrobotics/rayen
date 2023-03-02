@@ -63,7 +63,7 @@ def H_to_V(A, b):
         R = np.concatenate([R, -R[R_lin_idx, :]], axis=0)
     return V, R
 
-class LinearConstraint(nn.Module):
+class LinearConstraintBarycentric(nn.Module):
     """
     A linear inequality constraint layer.
 

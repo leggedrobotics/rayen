@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 import torch.nn as nn
-from constrained_nets import LinearConstraint
+from linear_constraint_barycentric import LinearConstraintBarycentric
 from osqp_projection import ConstraintProjector
 
 
@@ -28,12 +28,12 @@ class ProjectionModel(nn.Module):
         return x.view(orig_size)
 
 
-class ParameterizationModel(nn.Module):
+class BarycentricModel(nn.Module):
     def __init__(self, A_np, b_np, mapping=None, box_constraints=None, filename=''):
         super().__init__()
         d = A_np.shape[1]
         self.net = nn.Sequential() if mapping is None else mapping
-        self.constraint = LinearConstraint(A_np, b_np, box_constraints)
+        self.constraint = LinearConstraintBarycentric(A_np, b_np, box_constraints)
 
     def forward(self, x, epoch=-1):
         orig_size = x.size()

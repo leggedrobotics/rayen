@@ -14,7 +14,7 @@ from torchvision import transforms
 from torch.utils.data import DataLoader
 
 from constrained_nets import H_to_V
-from models import ParameterizationModel, ProjectionModel
+from models import BarycentricModel, ProjectionModel
 from dataset_util import MNIST
 from osqp_projection import BatchProjector
 
@@ -171,7 +171,7 @@ def main(params):
     # solve problem using specified method
     results = []  # a list of dicts
     for trial in range(params['n_trials']):
-        if params['method'] == 'opt_projection':
+        if params['method'] == 'optimal_projection': #This is the ground truth (optimal projection)
             x_train = next(iter(DataLoader(train_data, batch_size=len(train_data), shuffle=False)))[0].numpy()
             x_val = next(iter(DataLoader(val_data, batch_size=len(val_data), shuffle=False)))[0].numpy()
             x_test = next(iter(DataLoader(test_data, batch_size=len(test_data), shuffle=False)))[0].numpy()
@@ -197,8 +197,8 @@ def main(params):
                 mapping = nn.Sequential(nn.Linear(d,d))
                 model = ProjectionModel(A, b, mapping, box_constraints)
                 loss_fn = nn.MSELoss(size_average=True)
-            elif params['method'] == 'v_parameterization':
-                model = ParameterizationModel(A, b, mapping=None, box_constraints=box_constraints)
+            elif params['method'] == 'barycentric_model':
+                model = BarycentricModel(A, b, mapping=None, box_constraints=box_constraints)
                 loss_fn = nn.MSELoss(size_average=True)
             else:
                 raise ValueError('Method "{}" not known.'.format(params['method']))
@@ -219,7 +219,7 @@ def main(params):
             results.append(single_result)
 
     # evaluate model
-    if params['method'] != 'opt_projection':
+    if params['method'] != 'optimal_projection':
         print('Entering evaluation')
         eval_model(model, params, data)
     # convert to pandas dataframe
