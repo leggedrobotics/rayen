@@ -4,7 +4,7 @@ import math
 
 import matplotlib.pyplot as plt
 import utils
-from linear_constraint_layer import LinearConstraintLayer
+from walker_layer import WalkerLayer
 
 
 A=np.array([[-1,0],
@@ -23,7 +23,7 @@ B, x0 = utils.largestEllipsoidBInPolytope(A,b)
 print(f"Largest ellipsoid as B={B} and x0={x0}")
 
 num_steps=10;
-my_layer=LinearConstraintLayer(A,b,num_steps)
+my_layer=WalkerLayer(A,b,num_steps)
 
 all_optimal_points=torch.tensor(np.array([[],[]],dtype=np.float32))
 
