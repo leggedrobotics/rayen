@@ -2,6 +2,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from linear_constraint_barycentric import LinearConstraintBarycentric
+from linear_constraint_walker import LinearConstraintWalker
 from osqp_projection import ConstraintProjector
 
 
@@ -39,6 +40,21 @@ class BarycentricModel(nn.Module):
         orig_size = x.size()
         y = x.view(x.size(0), -1)
         z = self.constraint(self.net(y), epoch)
+        z = z.view(orig_size)
+        return z
+
+class MapperAndWalker(nn.Module):
+    def __init__(self, A_np, b_np, num_steps, numel_input_mapper):
+        super().__init__()
+        self.constraint = LinearConstraintWalker(A_np, b_np, num_steps=num_steps, use_max_ellipsoid=False)
+        print(f"numel_input_mapper={numel_input_mapper}")
+        print(f"self.constraint.getNumelInput()={self.constraint.getNumelInput()}")
+        self.net = nn.Sequential(nn.Linear(numel_input_mapper, self.constraint.getNumelInput()))
+
+    def forward(self, x):
+        orig_size = x.size()
+        y = x.view(x.size(0), -1)
+        z = self.constraint(self.net(y))
         z = z.view(orig_size)
         return z
 

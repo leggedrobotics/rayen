@@ -8,60 +8,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import cdd
 from osqp_projection import ConstraintProjector
-
-def H_to_V(A, b):
-    """
-    Converts a polyhedron in H-representation to
-    one in V-representation using pycddlib.
-    """
-    # define cdd problem and convert representation
-    if len(b.shape) == 1:
-        b = np.expand_dims(b, axis=1)
-    mat_np = np.concatenate([b, -A], axis=1)
-    if mat_np.dtype in [np.int32, np.int64]:
-        nt = 'fraction'
-    else:
-        nt = 'float'
-    mat_list = mat_np.tolist()
-
-    mat_cdd = cdd.Matrix(mat_list, number_type=nt)
-    mat_cdd.rep_type = cdd.RepType.INEQUALITY
-    poly = cdd.Polyhedron(mat_cdd)
-    gen = poly.get_generators()
-
-    # convert the cddlib output data structure to numpy
-    V_list = []
-    R_list = []
-    lin_set = gen.lin_set
-    V_lin_idx = []
-    R_lin_idx = []
-    for i in range(gen.row_size):
-        g = gen[i]
-        g_type = g[0]
-        g_vec = g[1:]
-        if i in lin_set:
-            is_linear = True
-        else:
-            is_linear = False
-        if g_type == 1:
-            V_list.append(g_vec)
-            if is_linear:
-                V_lin_idx.append(len(V_list) - 1)
-        elif g_type == 0:
-            R_list.append(g_vec)
-            if is_linear:
-                R_lin_idx.append(len(R_list) - 1)
-        else:
-            raise ValueError('Generator data structure is not valid.')
-
-    V = np.asarray(V_list)
-    R = np.asarray(R_list)
-
-    # by convention of cddlib, those rays assciated with R_lin_idx
-    # are not constrained to non-negative coefficients
-    if len(R) > 0:
-        R = np.concatenate([R, -R[R_lin_idx, :]], axis=0)
-    return V, R
+import utils
 
 class LinearConstraintBarycentric(nn.Module):
     """
@@ -93,7 +40,7 @@ class LinearConstraintBarycentric(nn.Module):
         A_dd = A_np
         b_dd = np.zeros_like(b_np)
         num_constraints = A_np.shape[0]
-        _, R_dd = H_to_V(A_dd, b_dd)
+        _, R_dd = utils.H_to_V(A_dd, b_dd)
         R_dd = np.float32(R_dd)
         A_np = np.float32(A_np)
         b_np = np.float32(b_np)

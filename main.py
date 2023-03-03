@@ -13,8 +13,8 @@ import pandas as pd
 from torchvision import transforms
 from torch.utils.data import DataLoader
 
-from constrained_nets import H_to_V
-from models import BarycentricModel, ProjectionModel
+# import utils
+from models import BarycentricModel, ProjectionModel, MapperAndWalker
 from dataset_util import MNIST
 from osqp_projection import BatchProjector
 
@@ -57,7 +57,7 @@ def train_model(model, loss_fn, params, data):
         epoch_start = time.time()
         for x, _ in training_generator:
             x = x.to(device)
-            out = model(x, epoch)
+            out = model(x)
             loss = loss_fn(out, x)
             train_loss += loss.item()
             if epoch > 0:
@@ -144,12 +144,18 @@ def main(params):
         transform=img_transform,
         download=False)
     data = (train_data, val_data, test_data)
-
+    # print("==========Train data========")
+    # print(train_data)
+    # print("==========Val data========")
+    # print(val_data)
+    # print("==========Test data========")
+    # print(test_data)
+    # exit()
 
     # construct checkerboard constraint
     A = np.zeros((16, 28, 28)).astype(np.float32)
     b = np.zeros(16).astype(np.float32)
-    for k in range(16):
+    for k in range(16): #for each one of the 16 tiles
         i = 7 * k % 28
         j = 7 * (k // 4)
         if k % 2 == 0:
@@ -157,7 +163,36 @@ def main(params):
         else:
             A_val = (-1)**(j + 1)
         A[k, i:i + 7, j:j + 7] = A_val
-    A = A.reshape(16, -1)
+
+        print(f"For k={k}, A[k,:,:]=\n {A[k,:,:]}")
+
+    A = A.reshape(16, -1) #A is a 16x784 tensor after this. Each rows contains 784 (28*28=784) elements, and represents an average constraint
+
+    ##############################################################
+    print(f"Before adding the box constraints, A.shape={A.shape}" )
+    #Add now the box constraint directly in A
+    num_pixels=A.shape[1]
+    for i in range(num_pixels): #For each one of the pixels in the image
+        tmp=np.zeros((1,num_pixels));
+        tmp[0,i]=1;
+
+        # pixel<=1
+        A=np.concatenate((A,tmp),0) 
+        b=np.concatenate((b,np.array([1])))
+
+        # pixel>=-1  \equiv  -pixel<=1
+        A=np.concatenate((A,-tmp),0) #That pixel needs to be >=-1
+        b=np.concatenate((b,np.array([1])))
+
+    print(f"After adding the box constraints, A.shape={A.shape}" )
+    print(A.shape)
+    ##############################################################
+
+
+
+
+    # print(A.shape)
+    # exit()
 
     device_id = params['device']
     device = torch.device('cuda:{}'.format(device_id) if device_id >= 0 else 'cpu')
@@ -167,6 +202,8 @@ def main(params):
         box_constraints = (-1, 1)
     else:
         box_constraints = None
+
+    #Add the box constraints 
 
     # solve problem using specified method
     results = []  # a list of dicts
@@ -192,13 +229,17 @@ def main(params):
 
             argmins = argmins_test
         else:
+            d = A.shape[1]
+
             if params['method'] == 'test_time_projection':
-                d = A.shape[1]
                 mapping = nn.Sequential(nn.Linear(d,d))
                 model = ProjectionModel(A, b, mapping, box_constraints)
                 loss_fn = nn.MSELoss(size_average=True)
-            elif params['method'] == 'barycentric_model':
+            elif params['method'] == 'barycentric':
                 model = BarycentricModel(A, b, mapping=None, box_constraints=box_constraints)
+                loss_fn = nn.MSELoss(size_average=True)
+            elif params['method'] == 'walker':
+                model = MapperAndWalker(A_np=A, b_np=b, num_steps=4, numel_input_mapper=d)
                 loss_fn = nn.MSELoss(size_average=True)
             else:
                 raise ValueError('Method "{}" not known.'.format(params['method']))

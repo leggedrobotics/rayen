@@ -206,7 +206,11 @@ def makeColumnVector(a):
 
 #Operates on torch stuff
 def squared_norm_of_each_row(D):
-	return (D**2)@torch.ones((D.shape[1],1))
+	# print(f"D**2.shape={(D**2).shape}")
+	result=torch.sum(D**2, dim=2, keepdim=True)
+	# print(f"result.shape={result.shape}")
+
+	return result  #@torch.ones((D.shape[1],1),device=D.device)
 
 #Operates on torch stuff
 def scaleEllipsoidB(B,A,b,x0):
@@ -239,9 +243,44 @@ def scaleEllipsoidB(B,A,b,x0):
 	
 	# #===================Third way==========================
 	# ========================================================
-	sqrt_c=torch.sqrt(squared_norm_of_each_row(A@B))
-	sqrt_e=torch.min(torch.abs(b-A@x0)/sqrt_c)#Note that if x0 is inside the ellipsoid, then I don't need the abs(), since Ax0<=b --> b-Ax0>=0
+	
+	sqrt_c=torch.sqrt(squared_norm_of_each_row(A@B)) #This could be computed in the constructor (and not in each forward call)
+
+	# print(f"sqrt_c={sqrt_c}")
+
+
+	Ax0=A@x0;
+	b_minus_Ax0=torch.sub(torch.unsqueeze(b,dim=0),Ax0)
+	abs_b_minus_Ax0=torch.abs(b_minus_Ax0) #Note that if x0 is inside the ellipsoid, then I don't need the abs(), since Ax0<=b --> b-Ax0>=0
+	abs_b_minus_Ax0_divided_by_sqrt_c=torch.div(abs_b_minus_Ax0,sqrt_c)
+	tmp=torch.min(abs_b_minus_Ax0_divided_by_sqrt_c,dim=1,keepdim=True)
+	sqrt_e=tmp.values
 	result=B*sqrt_e
 	# print(f"Third way: \n {result}")
 
 	return result;
+
+
+	# sqrt
+
+	# print(f"sqrt_e={sqrt_e}")
+
+
+	# print(f"sqrt_e.shape={sqrt_e.shape}")
+	# print(f"B.shape={B.shape}")
+
+
+	# print("-------------\n")
+	# print(f"x0.shape={x0.shape}")
+	
+	# print(f"B.shape={B.shape}")
+	# print(f"A.shape={A.shape}")
+	# print(f"A@B.shape={(A@B).shape}")
+	# print(f"b.shape={b.shape}")
+
+
+	# print("==============================")
+	# print(f"A={A}")
+	# print(f"B={B}")
+	# print(f"b={b}")
+	# print(f"x0={x0}\n")
