@@ -53,12 +53,12 @@ else:
 	ax = fig.add_subplot(111) 
 
 num_steps=2;
-my_layer=LinearConstraintWalker(A, b, Aeq, beq, num_steps,use_max_ellipsoid=True)
+my_layer=LinearConstraintWalker(A, b, Aeq, beq, num_steps,use_max_ellipsoid=False)
 
 numel_input_walker=my_layer.getNumelInputWalker()
 
 ##This puts everything in a batch and performs one call
-all_angles=np.arange(0,2*math.pi, 0.01)
+all_angles = np.arange(0,2*math.pi, 0.01)
 x_batched=torch.empty(len(all_angles), numel_input_walker, 1)
 for i in range(x_batched.shape[0]): #for each element of the batch
 	theta=all_angles[i]

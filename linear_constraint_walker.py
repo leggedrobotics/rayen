@@ -23,6 +23,8 @@ class LinearConstraintWalker(torch.nn.Module):
 	def __init__(self, Aineq_np, bineq_np, Aeq_np, beq_np, num_steps, use_max_ellipsoid):
 		super().__init__()
 
+		# self.method="ellipsoid_walker"
+		self.method="point_walker"
 
 		if np.allclose(bineq_np, 0):
 			raise ValueError("Constraint set is a zero-centered cone.")
@@ -141,18 +143,52 @@ class LinearConstraintWalker(torch.nn.Module):
 
 		# print(f"First x0.shape={x0_last.shape}\n")
 
-		for i in range(self.num_steps):
-			# print("========================New iteration ========================")
-			init=(self.dim+1)*i #+ self.num_variables_C
-			v = torch.unsqueeze(z[:,  init:(init+self.dim),0],2)             
-			tmp= torch.unsqueeze(z[:, (init+self.dim):(init+self.dim+1),0],2)
+		if(self.method=="ellipsoid_walker"):
+			for i in range(self.num_steps):
+				# print("========================New iteration ========================")
+				init=(self.dim+1)*i #+ self.num_variables_C
+				v = torch.unsqueeze(z[:,  init:(init+self.dim),0],2)             
+				tmp= torch.unsqueeze(z[:, (init+self.dim):(init+self.dim+1),0],2)
+				beta=torch.sigmoid(tmp)
+				u=torch.nn.functional.normalize(v, dim=1);
+				beta_times_u = beta*u #Using elementwise multiplication and broadcasting here
+				x0_last = torch.matmul(B_last, beta_times_u) + x0_last;
+				B_last=utils.scaleEllipsoidB(self.B,self.A,self.b,x0_last) #Note that here, self.B (instead of B_last) is preferred for numerical stability 
+				self.all_B.append(B_last)
+				self.all_x0.append(x0_last)
+
+		elif(self.method=="point_walker"):
+
+			v = torch.unsqueeze(z[:,  0:self.dim,0],2) 
+			tmp= torch.unsqueeze(z[:, self.dim:(self.dim+1),0],2)
 			beta=torch.sigmoid(tmp)
 			u=torch.nn.functional.normalize(v, dim=1);
-			beta_times_u = beta*u #Using elementwise multiplication and broadcasting here
-			x0_last = torch.matmul(B_last, beta_times_u) + x0_last;
-			B_last=utils.scaleEllipsoidB(self.B,self.A,self.b,x0_last) #Note that here, self.B (instead of B_last) is preferred for numerical stability 
-			self.all_B.append(B_last)
-			self.all_x0.append(x0_last)
+
+			b_minus_Ax0=torch.sub(torch.unsqueeze(self.b,dim=0),self.A@self.x0)
+
+			print(f"x0={self.x0}")
+			print(f"b={self.b}")
+			print(f"A={self.A}")
+			print(f"Ax0={self.A@self.x0}")
+
+			all_max_distances=torch.div(b_minus_Ax0,self.A@u)
+			all_max_distances[all_max_distances<=0]=float("Inf")
+			#Note that we know that self.x0 is a strictly feasible point of the set
+			tmp = torch.min(all_max_distances, dim=1, keepdim=True)
+			max_distance =tmp.values
+
+			#Note that something like:
+			#max_distance = torch.min(all_max_distances[all_max_distances>=0], dim=1)
+			#would remove the dimensions (since the mask may delete more/fewer elements per batch)
+
+
+			# print(f"all_max_distances={max_distance}") 
+			# print(f"max_distance={max_distance}")
+			x0_last = beta*max_distance*u + self.x0;
+		else:
+			assert(False,"Method not implemented yet")
+
+
 
 		#Now lift back to the original space
 		if(self.has_ineq_constraints==True):
