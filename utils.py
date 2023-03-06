@@ -4,7 +4,7 @@ import cvxpy as cp
 import numpy as np
 import torch
 import sympy
-
+import matplotlib.pyplot as plt
 
 #This function is taken from https://github.com/tfrerix/constrained-nets
 def H_to_V(A, b):
@@ -60,6 +60,102 @@ def H_to_V(A, b):
 	if len(R) > 0:
 		R = np.concatenate([R, -R[R_lin_idx, :]], axis=0)
 	return V, R
+
+
+def plot3DPolytopeHRepresentation(A,b, limits, ax):
+	points, R=H_to_V(A,b)
+	plot3DPolytopeVRepresentation(points.T, limits, ax)
+
+def plot3DPolytopeVRepresentation(V, limits, ax):
+	points=V.T
+
+	## https://stackoverflow.com/a/71544694/6057617
+
+	# to get the convex hull with cdd, one has to prepend a column of ones
+	vertices = np.hstack((np.ones((8,1)), points))
+
+	# do the polyhedron
+	mat = cdd.Matrix(vertices, linear=False, number_type="fraction") 
+	mat.rep_type = cdd.RepType.GENERATOR
+	poly = cdd.Polyhedron(mat)
+
+	# get the adjacent vertices of each vertex
+	adjacencies = [list(x) for x in poly.get_input_adjacency()]
+
+	# store the edges in a matrix (giving the indices of the points)
+	edges = [None]*(8-1)
+	for i,indices in enumerate(adjacencies[:-1]):
+		indices = list(filter(lambda x: x>i, indices))
+		l = len(indices)
+		col1 = np.full((l, 1), i)
+		indices = np.reshape(indices, (l, 1))
+		edges[i] = np.hstack((col1, indices))
+	Edges = np.vstack(tuple(edges))
+
+	# plot
+	# fig = plt.figure()
+	# ax = fig.add_subplot(111, projection="3d")
+
+	start = points[Edges[:,0]]
+	end = points[Edges[:,1]]
+
+	for i in range(12):
+		ax.plot(
+			[start[i,0], end[i,0]], 
+			[start[i,1], end[i,1]], 
+			[start[i,2], end[i,2]],
+			"blue"
+		)
+
+	ax.set_xlabel("x")
+	ax.set_ylabel("y")
+	ax.set_zlabel("z")
+
+	ax.set_xlim3d(limits[0],limits[1])
+	ax.set_ylim3d(limits[2],limits[3])
+	ax.set_zlim3d(limits[4],limits[5])
+
+
+
+from mpl_toolkits.mplot3d import axes3d
+
+#Taken from here: https://stackoverflow.com/a/4687582/6057617
+def plot_implicit(fn, limits):
+	''' create a plot of an implicit function
+	fn  ...implicit function (plot where fn==0)
+	bbox ..the x,y,and z limits of plotted interval'''
+	# xmin, xmax, ymin, ymax, zmin, zmax = bbox*3
+	fig = plt.figure()
+	ax = fig.add_subplot(111, projection='3d')
+	A = np.linspace(limits[0],limits[1], 100) # resolution of the contour
+	B = np.linspace(limits[0],limits[1], 15) # number of slices
+	A1,A2 = np.meshgrid(A,A) # grid on which the contour is plotted
+
+	for z in B: # plot contours in the XY plane
+		X,Y = A1,A2
+		Z = fn(X,Y,z)
+		cset = ax.contour(X, Y, Z+z, [z], zdir='z')
+		# [z] defines the only level to plot for this contour for this value of z
+
+	for y in B: # plot contours in the XZ plane
+		X,Z = A1,A2
+		Y = fn(X,y,Z)
+		cset = ax.contour(X, Y+y, Z, [y], zdir='y')
+
+	for x in B: # plot contours in the YZ plane
+		Y,Z = A1,A2
+		X = fn(x,Y,Z)
+		cset = ax.contour(X+x, Y, Z, [x], zdir='x')
+
+	# must set plot limits because the contour will likely extend
+	# way beyond the displayed level.  Otherwise matplotlib extends the plot limits
+	# to encompass all values in the contour.
+	ax.set_xlim3d(limits[0],limits[1])
+	ax.set_ylim3d(limits[2],limits[3])
+	ax.set_zlim3d(limits[4],limits[5])
+
+	plt.show()
+
 
 def getVertexesRaysFromAb(A, b):
 	bmA= np.concatenate([b, -A], axis=1) # See https://pycddlib.readthedocs.io/en/latest/matrix.html
