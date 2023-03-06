@@ -1,10 +1,11 @@
 import numpy as np
 import torch
+import torch.nn as nn
 import math
 
 import matplotlib.pyplot as plt
 import utils
-from linear_constraint_walker import LinearConstraintWalker
+from linear_constraint_walker import LinearConstraintWalker, getNumelInputWalker
 
 
 A=np.array([[-1,0],
@@ -23,7 +24,9 @@ b=np.array([[0],
 # print(f"Largest ellipsoid as B={B} and x0={x0}")
 
 num_steps=10;
-my_layer=LinearConstraintWalker(A,b,num_steps, use_max_ellipsoid=True)
+dim=A.shape[1]
+
+numel_input_walker=getNumelInputWalker(dim, num_steps)
 
 all_optimal_points=x = torch.empty(1,2,0) #torch.tensor(np.array([[[]],[[]]],dtype=np.float32))
 
@@ -56,7 +59,7 @@ dim=A.shape[1]
 
 ##This puts everything in a batch and performs one call
 all_angles=np.arange(0,2*math.pi, 0.01)
-x_batched=torch.empty(len(all_angles), my_layer.getNumelInput(), 1)
+x_batched=torch.empty(len(all_angles), numel_input_walker, 1)
 for i in range(x_batched.shape[0]): #for each element of the batch
 	theta=all_angles[i]
 	tmp=torch.Tensor(np.array([[math.cos(theta)],[math.sin(theta)],[3000]]));
@@ -64,13 +67,17 @@ for i in range(x_batched.shape[0]): #for each element of the batch
 	x_batched[i,:,:]=tmp
 
 
+# mapper=nn.Sequential(nn.Linear(x_batched.shape[1], numel_input_walker))
+mapper=nn.Sequential() #do nothing.
+my_layer=LinearConstraintWalker(A,b,num_steps, mapper=mapper, use_max_ellipsoid=True)
+
 result=my_layer(x_batched)
 
 # my_layer.plotAllSteps(ax)
 
 print(f"result={result}");
 print(f"result.shape={result.shape}");
-result=result.numpy();
+result=result.detach().numpy();
 
 
 # plot
