@@ -10,6 +10,8 @@ from linear_constraint_walker import LinearConstraintWalker
 
 
 use_example_3d=True
+# method="ellipsoid_walker"
+method="ellipsoid_walker"   # point_walker or ellipsoid_walker
 
 if(use_example_3d):
 	A=np.array([ [1, 0, 0],
@@ -52,18 +54,26 @@ if(A.shape[1]==3):
 else:
 	ax = fig.add_subplot(111) 
 
-num_steps=2;
-my_layer=LinearConstraintWalker(A, b, Aeq, beq, num_steps,use_max_ellipsoid=False)
+num_steps=4; #Only used in the ellipsoid_walker method
+my_layer=LinearConstraintWalker(A, b, Aeq, beq, num_steps, method, use_max_ellipsoid=True)
 
 numel_input_walker=my_layer.getNumelInputWalker()
 
 ##This puts everything in a batch and performs one call
 all_angles = np.arange(0,2*math.pi, 0.01)
 x_batched=torch.empty(len(all_angles), numel_input_walker, 1)
+
 for i in range(x_batched.shape[0]): #for each element of the batch
 	theta=all_angles[i]
 	tmp=torch.Tensor(np.array([[math.cos(theta)],[math.sin(theta)],[3000]])); #Assumming my_layer.dim==2 here
-	tmp= tmp.repeat(num_steps, 1)
+	if(method=="ellipsoid_walker"):
+		tmp= tmp.repeat(num_steps, 1)
+	elif(method=="point_walker"):
+		print(f"tmp.shape={tmp.shape}")
+		tmp=torch.unsqueeze(tmp, dim=0)
+	else:
+		raise Exception("Method not implemented yet")
+
 	x_batched[i,:,:]=tmp
 
 

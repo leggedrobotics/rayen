@@ -20,11 +20,11 @@ import scipy
 #         return z
 
 class LinearConstraintWalker(torch.nn.Module):
-	def __init__(self, Aineq_np, bineq_np, Aeq_np, beq_np, num_steps, use_max_ellipsoid):
+	def __init__(self, Aineq_np, bineq_np, Aeq_np, beq_np, num_steps, method, use_max_ellipsoid):
 		super().__init__()
 
-		# self.method="ellipsoid_walker"
-		self.method="point_walker"
+
+		self.method=method
 
 		if np.allclose(bineq_np, 0):
 			raise ValueError("Constraint set is a zero-centered cone.")
@@ -89,7 +89,12 @@ class LinearConstraintWalker(torch.nn.Module):
 		self.mapper=nn.Sequential();
 
 	def getNumelInputWalker(self):
-		return (self.dim+1)*self.num_steps 
+		if(self.method=="ellipsoid_walker"):
+			return (self.dim+1)*self.num_steps
+		elif(self.method=="point_walker"):
+			return (self.dim+1)
+		else:
+			assert(False,"Method not implemented yet") 
 
 	def setMapper(self, mapper):
 		self.mapper=mapper
@@ -165,12 +170,6 @@ class LinearConstraintWalker(torch.nn.Module):
 			u=torch.nn.functional.normalize(v, dim=1);
 
 			b_minus_Ax0=torch.sub(torch.unsqueeze(self.b,dim=0),self.A@self.x0)
-
-			print(f"x0={self.x0}")
-			print(f"b={self.b}")
-			print(f"A={self.A}")
-			print(f"Ax0={self.A@self.x0}")
-
 			all_max_distances=torch.div(b_minus_Ax0,self.A@u)
 			all_max_distances[all_max_distances<=0]=float("Inf")
 			#Note that we know that self.x0 is a strictly feasible point of the set
