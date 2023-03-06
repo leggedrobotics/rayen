@@ -84,8 +84,6 @@ class LinearConstraintWalker(torch.nn.Module):
 		self.B=torch.unsqueeze(self.B,0)
 		self.x0=torch.unsqueeze(self.x0,0)
 
-		self.num_var_per_step=self.dim + 1 #3 for the direction and 1 for the length.
-
 		self.mapper=nn.Sequential();
 
 	def getNumelInputWalker(self):
@@ -121,9 +119,6 @@ class LinearConstraintWalker(torch.nn.Module):
 		self.A = self.A.to(x.device)
 		self.b = self.b.to(x.device)
 
-		print(f"x.shape before={x.shape}")
-		# print(f"self.mapper={self.mapper}")
-
 		##################  MAPPER LAYER ####################
 		# x has dimensions [num_batches, numel_input_mapper, 1]
 		y = x.view(x.size(0), -1)
@@ -136,19 +131,15 @@ class LinearConstraintWalker(torch.nn.Module):
 
 
 		# print("========================In forward ========================")
-		# print(f"x={x}")
-		# print(f"x.shape={x.shape}")
-
-
-		B_last=self.B
-		x0_last=self.x0
-
-		self.all_x0=[ x0_last  ]
-		self.all_B=[ B_last  ] 
-
-		# print(f"First x0.shape={x0_last.shape}\n")
 
 		if(self.method=="ellipsoid_walker"):
+
+			B_last=self.B
+			x0_last=self.x0
+
+			self.all_x0=[ x0_last  ]
+			self.all_B=[ B_last  ] 
+
 			for i in range(self.num_steps):
 				# print("========================New iteration ========================")
 				init=(self.dim+1)*i #+ self.num_variables_C
