@@ -1,12 +1,10 @@
 function plot3dConvHullAndVertices(V,radius_sphere)
 
-    color='r'
+    color='r';
     color_vertex=[.98 .45 .02];
     radius=radius_sphere;
     s={};
     for i=1:size(V,2)
-        i
-        V
         s{end+1}=plotSphere(V(:,i),radius, color_vertex); hold on;
         alpha(s{i},1.0)
     end
@@ -37,5 +35,8 @@ function plot3dConvHullAndVertices(V,radius_sphere)
     s2=trisurf(k1,vx,vy,vz,'LineWidth',1,'FaceColor',color);
    
     alpha(s2,0.1)
+    xlabel('x')
+    ylabel('y')
+    zlabel('z')
 
 end
