@@ -7,17 +7,17 @@ import matplotlib.pyplot as plt
 import utils
 from linear_constraint_walker import LinearConstraintWalker
 
-use_example_3d=False
+use_example_3d=True
 
 if(use_example_3d):
-	A=np.array([ [1, 0, 0],
+	Aineq=np.array([ [1, 0, 0],
 				 [0, 1, 0],
 				 [0, 0, 1],
 				 [-1, 0, 0],
 				 [0, -1, 0],
 				 [0, 0, -1]]);
 
-	b=np.array([[1],
+	bineq=np.array([[1],
 				[1],
 				[1],
 				[0],
@@ -29,12 +29,12 @@ if(use_example_3d):
 	beq=np.array([[1]]);
 
 else:
-	A=np.array([[-1,0],
+	Aineq=np.array([[-1,0],
 				 [0, -1],
 				 [0, 1],
 				 [0.2425,    0.9701]]);
 
-	b=np.array([[0],
+	bineq=np.array([[0],
 				[0],
 				[1],
 				[1.2127]])
@@ -44,14 +44,14 @@ else:
 
 
 fig = plt.figure()
-if(A.shape[1]==3):
+if(Aineq.shape[1]==3):
 	ax = fig.add_subplot(111, projection="3d")
-	utils.plot3DPolytopeHRepresentation(A,b,[-1, 2, -1, 2, -1, 2], ax)
+	utils.plot3DPolytopeHRepresentation(Aineq,bineq,[-1, 2, -1, 2, -1, 2], ax)
 else:
 	ax = fig.add_subplot(111) 
 
 num_steps=4; #Only used in the ellipsoid_walker method
-my_layer=LinearConstraintWalker(A, b, Aeq, beq)
+my_layer=LinearConstraintWalker(Aineq, bineq, Aeq, beq)
 
 numel_input_walker=my_layer.getNumelInputWalker()
 
@@ -83,12 +83,12 @@ print(f"result.shape={result.shape}");
 result=result.detach().numpy();
 
 
-if(A.shape[1]==3):
+if(Aineq.shape[1]==3):
 	ax.scatter3D(result[:,0,0], result[:,1,0], result[:,2,0])
 
-if(A.shape[1]==2):
+if(Aineq.shape[1]==2):
 	ax.scatter(result[:,0,0], result[:,1,0])
-	utils.plot2DPolyhedron(A,b,ax)
+	utils.plot2DPolyhedron(Aineq,bineq,ax)
 	utils.plot2DEllipsoidB(my_layer.B[0,:,:].numpy(),my_layer.x0[0,:,:].numpy(),ax)
 	ax.set_aspect('equal')
 
