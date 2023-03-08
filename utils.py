@@ -182,6 +182,14 @@ def getVertexesRaysFromGenerators(gen):
 
 	return vertices, rays
 
+def uniformSampleInUnitSphere(dim):
+	#Method 19 of http://extremelearning.com.au/how-to-generate-uniformly-random-points-on-n-spheres-and-n-balls/
+
+	u = np.random.normal(loc=0.0, scale=1.0, size=(dim,1))
+	u_normalized= u / np.linalg.norm(u)
+
+	return u_normalized
+
 # https://stackoverflow.com/a/69427715/6057617
 # def move_sympyplot_to_axes(p, ax):
 #     backend = p.backend(p)
