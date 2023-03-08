@@ -290,8 +290,10 @@ def largestBallInPolytope(A,b):
 	objective = cp.Minimize(-r) #This is just a linear program
 	prob = cp.Problem(objective, constraints)
 	print("Calling solve...")
-	result = prob.solve(verbose=True);
+	result = prob.solve(verbose=False);
 	print("Solved!")
+	if(prob.status != 'optimal'):
+		raise Exception("Value is not optimal")
 
 	B=r*np.eye(n)
 
