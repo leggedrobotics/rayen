@@ -11,14 +11,21 @@ A=box.A;
 b=box.b;
 [V,nr,nre]=lcon2vert(A,b,[],[]);
 V=V'; %my convention
-Aeq=[1 0 0];
-beq=0.0;
+Aeq=[1 1 1;
+     -1 1 1];
+beq=[1;0.1];
 
+
+% Aeq=[1 0 0];
+% beq=0.0;
 
 plot3dConvHullAndVertices(V, 0.02)
 
 syms x y z
-fimplicit3(Aeq*[x;y;z]-beq,[-1 1 -1 1 -1 1],'EdgeColor','none','FaceAlpha',.5)
+for i=1:size(Aeq,1)
+    fimplicit3(Aeq(i,:)*[x;y;z]-beq(i,1),[-1 1 -1 1 -1 1],'EdgeColor','none','FaceAlpha',.5)
+end
+
 
 z = sdpvar(size(A,2),1);
 
@@ -69,9 +76,10 @@ for i=1:size(A,1)
     else
      error('Something else happened')
     end
-
-    assert(obj<=0)
-    if(obj>-1e-7) %objective is zero. %Note that the objective is always negative
+    
+    tol=1e-6;
+    assert(obj<=tol,"obj is %f",obj)
+    if(obj>-tol) %objective is zero. %Note that the objective is always negative
         equality_set=[equality_set i];
     end
 end
