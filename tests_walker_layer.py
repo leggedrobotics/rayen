@@ -91,7 +91,6 @@ num_directions=200; #for each direction you have several samples
 x_batched=torch.empty(0, numel_input_walker, 1)
 for i in range(num_directions): #for each direction
 	direction=utils.uniformSampleInUnitSphere(my_layer.dim)
-	# scalar=np.array([[3000]]);
 	for scalar in list(np.linspace(-2.0, 2.0, num=10)):
 		scalar_np=np.array([[scalar]])
 		direction_and_scalar=np.concatenate((direction,scalar_np), axis=0);
