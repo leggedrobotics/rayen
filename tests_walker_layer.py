@@ -5,7 +5,7 @@ import math
 
 import matplotlib.pyplot as plt
 import utils
-from linear_constraint_walker import LinearConstraintWalker
+from linear_constraint_walker import LinearConstraintWalker, checkAndGetDimAmbientSpace
 
 def getCube():
 	Aineq=np.array([ [1, 0, 0],
@@ -52,18 +52,35 @@ def getExample(example):
 		Aeq=np.array([[1, 1, 1],
 					  [-1, 1, 1] ]);
 		beq=np.array([[1],[0.1]]);
+
+	elif example==3: #Just a plane
+		Aineq=None
+		bineq=None
+		Aeq=np.array([[1, 1, 1]]);
+		beq=np.array([[1]]);	
+
+	elif example==4: #Unbounded 2d polyhedron. It has two vertices and two rays
+
+		Aineq=np.array([[0,-1], [2,-4], [-2,1]]);
+		bineq=np.array([[-2], [8], [-5]]);
+		Aeq=None
+		beq=None
+
 	else:
 		raise("Not implemented yet")
 
 	return Aineq, bineq, Aeq, beq
 
 
-Aineq, bineq, Aeq, beq=getExample(2)
+Aineq, bineq, Aeq, beq=getExample(0)
+
+has_ineq_constraints, has_eq_constraints, dim_ambient_space = checkAndGetDimAmbientSpace(Aineq, bineq, Aeq, beq);
 
 fig = plt.figure()
-if(Aineq.shape[1]==3):
+if(dim_ambient_space==3):
 	ax = fig.add_subplot(111, projection="3d")
-	utils.plot3DPolytopeHRepresentation(Aineq,bineq,[-1, 2, -1, 2, -1, 2], ax)
+	if(has_ineq_constraints):
+		utils.plot3DPolytopeHRepresentation(Aineq,bineq,[-1, 2, -1, 2, -1, 2], ax)
 else:
 	ax = fig.add_subplot(111) 
 
@@ -91,12 +108,12 @@ num_directions=200; #for each direction you have several samples
 x_batched=torch.empty(0, numel_input_walker, 1)
 for i in range(num_directions): #for each direction
 	direction=utils.uniformSampleInUnitSphere(my_layer.dim)
-	for scalar in list(np.linspace(-2.0, 2.0, num=10)):
+	for scalar in list(np.linspace(-8.0, 8.0, num=100)):
 		scalar_np=np.array([[scalar]])
 		direction_and_scalar=np.concatenate((direction,scalar_np), axis=0);
 		tmp=torch.Tensor(direction_and_scalar)
 		tmp=torch.unsqueeze(tmp, dim=0)
-		print(f"direction_and_scalar={direction_and_scalar}")
+		# print(f"direction_and_scalar={direction_and_scalar}")
 		x_batched=torch.cat((x_batched, tmp), axis=0)
 
 

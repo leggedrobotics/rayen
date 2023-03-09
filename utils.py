@@ -5,6 +5,14 @@ import numpy as np
 import torch
 import sympy
 import matplotlib.pyplot as plt
+from colorama import Fore, Back, Style
+
+def printInBoldBlue(data_string):
+    print(Style.BRIGHT+Fore.BLUE+data_string+Style.RESET_ALL)
+def printInBoldRed(data_string):
+    print(Style.BRIGHT+Fore.RED+data_string+Style.RESET_ALL)
+def printInBoldGreen(data_string):
+    print(Style.BRIGHT+Fore.GREEN+data_string+Style.RESET_ALL)
 
 #This function is taken from https://github.com/tfrerix/constrained-nets
 def H_to_V(A, b):
@@ -212,12 +220,24 @@ def plot2DPolyhedron(A, b, ax):
 
 	# plt.imshow( tmp.astype(int), extent=(x1.min(),x1.max(),x2.min(),x2.max()),origin="lower", cmap="Greys", alpha = 0.3);
 
-	vertices, rays = getVertexesRaysFromAb(A, b)
-	#See example from https://docs.scipy.org/doc/scipy/reference/generated/scipy.spatial.ConvexHull.html
-	coord = vertices.T
-	hull = ConvexHull(coord)
-	for simplex in hull.simplices:
-		ax.plot(coord[simplex, 0], coord[simplex, 1], 'r-')
+	# #second way, right now it only works if there are no rays
+	# vertices, rays = getVertexesRaysFromAb(A, b)
+	# #See example from https://docs.scipy.org/doc/scipy/reference/generated/scipy.spatial.ConvexHull.html
+	# coord = vertices.T
+	# hull = ConvexHull(coord)
+	# for simplex in hull.simplices:
+	# 	ax.plot(coord[simplex, 0], coord[simplex, 1], 'r-')
+
+	#third way
+	npoints=300
+	d = np.linspace(-2,16,npoints)
+	x1,x2 = np.meshgrid(d,d)
+
+	tmp=1;
+	for i in range(A.shape[0]):
+		tmp=tmp & (A[i,0]*x1 + A[i,1]*x2 <=b[i,0]);
+
+	plt.imshow( tmp.astype(int), extent=(x1.min(),x1.max(),x2.min(),x2.max()),origin="lower", cmap="Greys", alpha = 0.3);
 
 
 def plot2DEllipsoidB(B,x0,ax):
@@ -279,7 +299,7 @@ def largestEllipsoidBInPolytope(A,b):
 	return B.value, x0.value
 
 #It operates on numpy stuff 
-def largestBallInPolytope(A,b):
+def largestBallInPolytope(A,b, max_radius=None):
 
 	if len(b.shape) == 1:
 		b = np.expand_dims(b, axis=1) #Make b a column vector
@@ -295,6 +315,9 @@ def largestBallInPolytope(A,b):
 		a_i=A[i,:].T
 		constraints.append(r*cp.norm(a_i)+a_i.T@x0<=b[i,0])
 
+	if(max_radius is not None):
+		constraints.append(r<=max_radius)
+
 	objective = cp.Minimize(-r) #This is just a linear program
 	prob = cp.Problem(objective, constraints)
 	print("Calling solve...")
@@ -304,6 +327,8 @@ def largestBallInPolytope(A,b):
 		raise Exception("Value is not optimal")
 
 	B=r*np.eye(n)
+
+	printInBoldGreen(f"Found ball of radius r={r.value}")
 
 	return B.value, x0.value
 
