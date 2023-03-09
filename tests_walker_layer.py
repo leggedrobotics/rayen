@@ -67,7 +67,7 @@ def getExample(example):
 		beq=None
 
 	else:
-		raise("Not implemented yet")
+		raise Exception("Not implemented yet")
 
 	return Aineq, bineq, Aeq, beq
 
