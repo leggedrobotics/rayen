@@ -19,7 +19,6 @@ class Projector():
 		self.x = cp.Parameter((dim,1))#x is the original point
 
 		#Section 8.1.1 of https://web.stanford.edu/~boyd/cvxbook/bv_cvxbook.pdf
-
 		constraints=[]
 		if(has_ineq_constraints):
 			constraints.append(Aineq@self.y<=bineq)
