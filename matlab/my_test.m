@@ -199,50 +199,6 @@ function result=samplePointsSimplex(num_points, dim)
     result=samplePoints(zeros(dim,1),ones(dim,1),num_points,1,0);
 end
 
-
-
-
-function [A,b]=getAbLinearConstraints(opti_tmp)
-
-    g=opti_tmp.g();
-    lower=opti_tmp.lbg();
-    upper=opti_tmp.ubg();
-    
-    %constraints are lower<=g<=upper
-    
-    all_g=[];
-    all_upper=[];
-    
-    for i=1:size(g,1)
-        if(isPlusInfCasadi(upper(i))==false)
-    %         upper(i)
-            all_upper=[all_upper; upper(i)];
-            all_g=[all_g; g(i)];
-        end
-        if(isMinusInfCasadi(lower(i))==false)
-            all_upper=[all_upper; -lower(i)];
-            all_g=[all_g; -g(i)];
-        end
-    end
-    % The constraints are now all_g<=all_upper
-
-
-    % The constraints are now all_g_minus_all_upper<=0
-    all_g_minus_all_upper=all_g-all_upper;
-    
-    variables=opti_tmp.x;
-
-    b=-casadi.substitute(all_g_minus_all_upper, variables, zeros(size(variables))); %Note the - sign
-    A=jacobian(all_g_minus_all_upper, variables);
-    try
-        b=convertMX2Matlab(b);
-        A=convertMX2Matlab(A);
-    catch
-        error('Are you sure you only have linear constraints?');
-    end
-
-end
-
 %%
 % hold on;
 % P=getA_MV(2,[-1,1]);
