@@ -187,11 +187,15 @@ class LinearConstraint():
 
 		#At this point, the feasible region is represented by Ax<=b		
 
-		printInBoldBlue("-- point1")
-		print(f"A=\n{A}\n b=\n{b}")
+		# printInBoldBlue("-- point1")
+		# print(f"A=\n{A}\n b=\n{b}")
+
+		printInBoldGreen(f"A is {A.shape} and b is {b.shape}")
 
 		#Remove redundant constraints
 		################################################
+		printInBoldBlue("Removing redundant constraints...")
+		indexes_const_removed=[]
 		for i in reversed(range(A.shape[0])):
 			all_rows_but_i=[x for x in range(A.shape[0]) if x != i]
 			objective = cp.Maximize(A[i,:]@z)
@@ -202,22 +206,27 @@ class LinearConstraint():
 				raise Exception("Value is not optimal")
 
 			if ((objective.value-b[i,0])<=TOL):
-				print(f"Deleting constraint {i}")
+				# print(f"Deleting constraint {i}")
+				indexes_const_removed.append(i)
 				A = np.delete(A, (i), axis=0)
 				b = np.delete(b, (i), axis=0)
 
-		printInBoldBlue("-- point2")
-		print(f"A=\n{A}\n b=\n{b}")
+		# printInBoldBlue(f"Removed constraints {indexes_const_removed}")
+		printInBoldBlue(f"Removed {len(indexes_const_removed)} constraints ")
+		printInBoldGreen(f"A is {A.shape} and b is {b.shape}")
+
+		# print(f"A=\n{A}\n b=\n{b}")
 
 		#Find equality set
 		################################################
 		index_eq_set=[]
 
-		print(f"A=\n{A}")
-		print(f"b=\n{b}")
+		# print(f"A=\n{A}")
+		# print(f"b=\n{b}")
+
+		printInBoldBlue("Finding Affine Hull and projecting...")
 
 		for i in range(A.shape[0]):
-			print(f"i={i}")
 			objective = cp.Minimize(A[i,:]@z-b[i,0]) #I try to go far from the constraint, into the feasible set
 			constraints=[A@z<=b]
 			prob = cp.Problem(objective, constraints)
@@ -235,6 +244,7 @@ class LinearConstraint():
 			if (obj_value>-TOL): #if the objective value is zero (I tried to go far from the constraint, but I couldn't)
 				index_eq_set.append(i)
 
+
 		printInBoldGreen(f"index_eq_set={index_eq_set}")
 
 		if(index_eq_set): #Note that in Python, empty lists are false, see https://stackoverflow.com/a/53522/6057617
@@ -251,8 +261,8 @@ class LinearConstraint():
 			NA_eq_set=scipy.linalg.null_space(A_eq_set);
 			p0=np.linalg.pinv(A_eq_set)@b_eq_set
 
-			print(f"NA_eq_set={NA_eq_set}")
-			print(f"p0={p0}")
+			# print(f"NA_eq_set={NA_eq_set}")
+			# print(f"p0={p0}")
 
 			A_projected=A@NA_eq_set;
 			b_projected=b-A@p0
@@ -264,11 +274,13 @@ class LinearConstraint():
 			b_projected=b
 				
 
-		print(f"A_projected=\n{A_projected}")
-		print(f"b_projected=\n{b_projected}")
+		# print(f"A_projected=\n{A_projected}")
+		# print(f"b_projected=\n{b_projected}")
 
-		print(f"A=\n{A}")
-		print(f"b=\n{b}")
+		# print(f"A=\n{A}")
+		# print(f"b=\n{b}")
+
+		printInBoldGreen(f"A_projected is {A_projected.shape} and b_projected is {b_projected.shape}")
 
 		#Check whether or not the polyhedron is bounded
 		###############################################

@@ -19,7 +19,7 @@ from dataset_util import MNIST
 from osqp_projection import BatchProjector
 
 from linear_constraint_walker import LinearConstraintWalker
-from create_dataset import createProjectionDataset
+from create_dataset import createProjectionDataset, getCorridorDatasetAndLC
 from examples_sets import getExample
 
 import utils
@@ -43,9 +43,9 @@ def train_model(model, params, data):
     )
 
     train_data, val_data, test_data = data
-    print('train size:', len(train_data))
-    print('val size:', len(val_data))
-    print('test size:', len(test_data))
+    assert len(train_data)>0
+    assert len(val_data)>0
+    assert len(test_data)>0
 
     train_generator = DataLoader(train_data, batch_size=params['batch_size'], shuffle=True)
     val_generator = DataLoader(val_data, batch_size=params['batch_size'], shuffle=False)
@@ -144,9 +144,12 @@ def main(params):
 
     torch.set_default_dtype(torch.float64) ##Use float32 here??
 
-    ##my stuff
-    lc=getExample(1)
-    my_dataset=createProjectionDataset(9000, lc);
+    ## PROJECTION EXAMPLES
+    # lc=getExample(1)
+    # my_dataset=createProjectionDataset(9000, lc);
+
+    ## CORRIDOR EXAMPLES
+    my_dataset, lc=getCorridorDatasetAndLC()
 
     train_size = int(0.7 * len(my_dataset))
     val_size = int(0.1 * len(my_dataset))
@@ -163,7 +166,7 @@ def main(params):
         model = LinearConstraintWalker(lc)
 
         # mapper=nn.Sequential(nn.Linear(Aineq.shape[1], model.getNumelInputWalker()))
-        mapper=utils.create_mlp(input_dim=lc.dimAmbSpace(), output_dim=model.getNumelInputWalker(), net_arch=[64,64])
+        mapper=utils.create_mlp(input_dim=my_dataset.getNumelX(), output_dim=model.getNumelInputWalker(), net_arch=[256,256])
 
         # mapper=nn.Sequential() #do nothing.
         model.setMapper(mapper)

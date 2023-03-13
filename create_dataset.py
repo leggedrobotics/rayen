@@ -5,6 +5,8 @@ from examples_sets import getExample
 import numpy as np
 import cvxpy as cp
 import matplotlib.pyplot as plt
+import scipy.io
+import utils
 
 
 # create custom dataset class
@@ -20,6 +22,12 @@ class CustomDataset(Dataset):
 		x = self.all_x[idx]
 		y = self.all_y[idx]
 		return x, y
+
+	def getNumelX(self):
+		return self.all_x[0].size #Using the first element
+
+	def getNumelY(self):
+		return self.all_y[0].size #Using the first element
 
 	def plot(self, ax):
 		dim=self.all_x[0].shape[0]
@@ -71,6 +79,42 @@ def createProjectionDataset(num_samples, lc): #lc is the LinearConstraint
 	# exit()
 
 	return my_dataset
+
+def getCorridorDatasetAndLC():
+	mat = scipy.io.loadmat('./matlab/corridor.mat')
+	all_x=list(mat["all_x"][0])
+	all_y=list(mat["all_y"][0])
+
+	polyhedron=mat["polyhedron"]
+
+	Aineq=polyhedron['Aineq'][0,0];
+	bineq=polyhedron['bineq'][0,0];
+
+	assert all_x[0].ndim==2
+	assert Aineq.ndim==2
+	assert bineq.ndim==2
+
+	#This converts all the  to column vectors
+	#Note that the order in the flatten() function needs to be consistent with the one from Casadi
+	all_y_flattened=[np.expand_dims(y_i.flatten('F'), axis=1) for y_i in all_y] 
+	all_x_flattened=all_x;
+
+	assert all_y_flattened[0].shape[1]==1
+	assert all_x_flattened[0].shape[1]==1
+
+	lc=utils.LinearConstraint(Aineq, bineq, None, None)
+	my_dataset = CustomDataset(all_x_flattened, all_y_flattened)
+
+	return my_dataset, lc
+
+	# print(polyhedron['Aineq'][0,0])
+
+	# print(f"len(all_x)={len(all_x)}")
+	# print(f"len(all_y)={len(all_y)}")
+	# print(all_x[0].shape)
+	# print(all_x[0])
+	# print(all_y[0].shape)
+	# print(all_y[0])
 
 
 # print('\nFirst iteration of data set: ', next(iter(my_dataset)), '\n')
