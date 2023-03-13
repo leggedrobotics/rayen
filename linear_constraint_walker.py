@@ -11,7 +11,6 @@ class LinearConstraintWalker(torch.nn.Module):
 	def __init__(self, lc): #lc is the linear constraint
 		super().__init__()
 
-
 		A_projected, b_projected, p0, NA_eq_set, B, x0=lc.process();
 
 		self.dim=A_projected.shape[1]

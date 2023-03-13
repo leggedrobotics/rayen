@@ -7,25 +7,6 @@ import cvxpy as cp
 import matplotlib.pyplot as plt
 
 
-class Projector():
-	def __init__(self, lc): #lc is the LinearConstraint
-
-		self.y = cp.Variable((lc.dimAmbSpace(),1)) #y is the projected point
-		self.x = cp.Parameter((lc.dimAmbSpace(),1))#x is the original point
-
-		#Section 8.1.1 of https://web.stanford.edu/~boyd/cvxbook/bv_cvxbook.pdf
-		constraints=lc.getCvxpyConstraints(self.y)
-		objective = cp.Minimize(cp.sum_squares(self.y - self.x))
-		self.prob = cp.Problem(objective, constraints)
-
-	def project(self, x):
-		self.x.value=x;
-		result = self.prob.solve(verbose=False);
-		if(self.prob.status != 'optimal'):
-			raise Exception("Value is not optimal")
-		
-		return self.y.value
-
 # create custom dataset class
 class CustomDataset(Dataset):
 	def __init__(self, all_x, all_y):
@@ -68,11 +49,11 @@ def createProjectionDataset(num_samples, lc): #lc is the LinearConstraint
 	all_y=[];
 
 	
-	projector=Projector(lc)
 	for i in range(num_samples):
 		x=np.random.uniform(low=-4.0, high=4.0, size=(lc.dimAmbSpace(),1))
 		all_x.append(x)
-		all_y.append(projector.project(x))
+		x_projected, _ = lc.project(x)
+		all_y.append(x_projected)
 
 
 	# define data set object

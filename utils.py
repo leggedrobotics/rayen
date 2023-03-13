@@ -87,6 +87,14 @@ class LinearConstraint():
 			raise Exception("There are no constraints!")
 		#################################
 
+		###################### FOR PROJECTION
+		#Section 8.1.1 of https://web.stanford.edu/~boyd/cvxbook/bv_cvxbook.pdf
+		self.x_projected = cp.Variable((self.dimAmbSpace(),1))         #projected point
+		self.x_to_be_projected = cp.Parameter((self.dimAmbSpace(),1))  #original point
+		constraints=self.getCvxpyConstraints(self.x_projected)
+		objective = cp.Minimize(cp.sum_squares(self.x_projected - self.x_to_be_projected))
+		self.prob_projection = cp.Problem(objective, constraints)
+
 
 	def hasIneqConstraints(self):
 		return self.has_ineq_constraints
@@ -106,6 +114,48 @@ class LinearConstraint():
 		if(self.hasEqConstraints()):
 			constraints.append(self.Aeq@variable==self.beq)   
 		return constraints 	
+
+	def project(self, x_to_be_projected):
+		assert x_to_be_projected.shape==self.x_to_be_projected.shape
+
+		self.x_to_be_projected.value=x_to_be_projected;
+		obj_value = self.prob_projection.solve(verbose=False);
+		if(self.prob_projection.status != 'optimal'):
+			raise Exception("Value is not optimal")
+
+		return self.x_projected.value, obj_value	
+
+	def getViolation(self, x_to_be_projected):
+
+		_, violation = self.project(x_to_be_projected)
+
+		return violation;
+
+		# return x_projected
+
+		# x = cp.Variable((self.dimAmbSpace(),1))
+		# assert x0.shape==x.shape
+		# constraints=self.getCvxpyConstraints(x);
+		# print(f"All the constraints: {constraints}")
+
+		# print(f"First constraint: {constraints[0]}")
+		# print(f"Second constraint: {constraints[1]}")
+
+		# print(f"bineq-Aineq*x={self.bineq-self.Aineq@x0}")
+		# print(f"self.beq-self.Aeq@x0={self.beq-self.Aeq@x0}")
+
+		# objective = cp.Minimize(0.0)
+		# prob = cp.Problem(objective, constraints)
+		# result = prob.solve(verbose=False);
+
+		# print(prob.constraints)
+
+		# # x.value=x0;
+		# print(f"violation={(prob.constraints).violation()}")
+		# exit()
+
+		# constraints.
+
 
 	def process(self):
 
