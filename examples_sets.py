@@ -1,5 +1,5 @@
 import numpy as np
-
+from utils import LinearConstraint
 
 def getCube():
 	Aineq=np.array([ [1, 0, 0],
@@ -21,13 +21,13 @@ def getCube():
 
 def getExample(example):
 
-	if example==0:
+	if example==0: #A polygon embeded in 3D
 
 		Aineq, bineq=getCube()
 		Aeq=np.array([[1, 1, 1]]);
 		beq=np.array([[1]]);
 
-	elif example==1:
+	elif example==1: #A polyhedron
 		Aineq=np.array([[-1,0],
 					 [0, -1],
 					 [0, 1],
@@ -63,4 +63,4 @@ def getExample(example):
 	else:
 		raise Exception("Not implemented yet")
 
-	return Aineq, bineq, Aeq, beq
+	return LinearConstraint(Aineq, bineq, Aeq, beq)

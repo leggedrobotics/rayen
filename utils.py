@@ -6,6 +6,9 @@ import torch
 import sympy
 import matplotlib.pyplot as plt
 from colorama import Fore, Back, Style
+import torch.nn as nn
+import typing
+import scipy
 
 def printInBoldBlue(data_string):
     print(Style.BRIGHT+Fore.BLUE+data_string+Style.RESET_ALL)
@@ -13,6 +16,284 @@ def printInBoldRed(data_string):
     print(Style.BRIGHT+Fore.RED+data_string+Style.RESET_ALL)
 def printInBoldGreen(data_string):
     print(Style.BRIGHT+Fore.GREEN+data_string+Style.RESET_ALL)
+
+#It operates on numpy stuff 
+#polytope defined as Ax<=b
+def largestBallInPolytope(A,b, max_radius=None):
+
+	if len(b.shape) == 1:
+		b = np.expand_dims(b, axis=1) #Make b a column vector
+
+	n=A.shape[1];
+	r = cp.Variable()#A scalar
+	x0 = cp.Variable((n,1))
+	constraints=[]
+
+	#https://programtalk.com/vs2/python/2718/cvxpy/examples/chebyshev.py/
+	#See also https://dkenefake.github.io/blog/ChebBall for when there are equality constraints
+	for i in range(A.shape[0]):
+		a_i=A[i,:].T
+		constraints.append(r*cp.norm(a_i)+a_i.T@x0<=b[i,0])
+
+	if(max_radius is not None):
+		constraints.append(r<=max_radius)
+
+	objective = cp.Minimize(-r) #This is just a linear program
+	prob = cp.Problem(objective, constraints)
+	print("Calling solve...")
+	result = prob.solve(verbose=False);
+	print("Solved!")
+	if(prob.status != 'optimal'):
+		raise Exception("Value is not optimal")
+
+	B=r*np.eye(n)
+
+	printInBoldGreen(f"Found ball of radius r={r.value}")
+
+	return B.value, x0.value
+
+#Everything in numpy
+class LinearConstraint():
+	def __init__(self, Aineq, bineq, Aeq, beq):
+		self.Aineq = Aineq
+		self.bineq = bineq
+		self.Aeq = Aeq
+		self.beq = beq
+
+		# x0 = cp.Variable((n,1))
+
+		################################# CHECKS
+		self.has_eq_constraints=((Aeq is not None) and (beq is not None));
+		self.has_ineq_constraints=((Aineq is not None) and (bineq is not None));
+
+		if(self.has_ineq_constraints):
+			assert Aineq.ndim == 2, f"Aineq.shape={Aineq.shape}"
+			assert bineq.ndim == 2, f"bineq.shape={bineq.shape}"
+			assert bineq.shape[1] ==1
+			assert Aineq.shape[0] == bineq.shape[0]
+			self.dim_ambient_space=Aineq.shape[1]
+
+		if(self.has_eq_constraints):
+			assert Aeq.ndim == 2, f"Aeq.shape={Aeq.shape}"
+			assert beq.ndim == 2, f"beq.shape={beq.shape}"
+			assert beq.shape[1] ==1
+			assert Aeq.shape[0] == beq.shape[0]
+			self.dim_ambient_space=Aeq.shape[1]
+
+		if(self.has_eq_constraints and self.has_ineq_constraints):
+			assert Aineq.shape[1] == Aeq.shape[1]
+
+		if(self.has_eq_constraints==False and self.has_ineq_constraints==False):
+			raise Exception("There are no constraints!")
+		#################################
+
+
+	def hasIneqConstraints(self):
+		return self.has_ineq_constraints
+
+	def hasEqConstraints(self):
+		return self.has_eq_constraints
+
+	def dimAmbSpace(self):
+		return self.dim_ambient_space
+
+	def getCvxpyConstraints(self, variable):
+		constraints=[]
+		assert variable.shape[0]==self.dim_ambient_space 
+		assert variable.shape[1]==1 
+		if(self.hasIneqConstraints()):
+			constraints.append(self.Aineq@variable<=self.bineq)
+		if(self.hasEqConstraints()):
+			constraints.append(self.Aeq@variable==self.beq)   
+		return constraints 	
+
+	def process(self):
+
+		z = cp.Variable((self.dimAmbSpace(),1))
+
+		TOL=1e-7;
+
+		################################################
+		#Make sure that the LP has a feasible solution
+		objective = cp.Minimize(0.0)
+		constraints=self.getCvxpyConstraints(z)
+		prob = cp.Problem(objective, constraints)
+		result = prob.solve(verbose=False);
+		if(prob.status != 'optimal'):
+			raise Exception("The feasible set is empty")
+		################################################
+
+		if(self.hasIneqConstraints()):
+			A=self.Aineq;
+			b=self.bineq;
+			if(self.hasEqConstraints()): 
+				#Add the equality constraints as inequality constraints
+				A=np.concatenate((A,self.Aeq,-self.Aeq), axis=0);
+				b=np.concatenate((b,self.beq,-self.beq), axis=0);				
+		else:
+			#Add the equality constraints as inequality constraints
+			A=np.concatenate((self.Aeq,-self.Aeq), axis=0);
+			b=np.concatenate((self.Aeq,-self.Aeq), axis=0);
+
+		#At this point, the feasible region is represented by Ax<=b		
+
+		printInBoldBlue("-- point1")
+		print(f"A=\n{A}\n b=\n{b}")
+
+		#Remove redundant constraints
+		################################################
+		for i in reversed(range(A.shape[0])):
+			all_rows_but_i=[x for x in range(A.shape[0]) if x != i]
+			objective = cp.Maximize(A[i,:]@z)
+			constraints=[A[all_rows_but_i,:]@z<=b[all_rows_but_i,:],   A[i,:]@z<=(b[i,0]+1)]
+			prob = cp.Problem(objective, constraints)
+			result = prob.solve(verbose=False);
+			if(prob.status != 'optimal'):
+				raise Exception("Value is not optimal")
+
+			if ((objective.value-b[i,0])<=TOL):
+				print(f"Deleting constraint {i}")
+				A = np.delete(A, (i), axis=0)
+				b = np.delete(b, (i), axis=0)
+
+		printInBoldBlue("-- point2")
+		print(f"A=\n{A}\n b=\n{b}")
+
+		#Find equality set
+		################################################
+		index_eq_set=[]
+
+		print(f"A=\n{A}")
+		print(f"b=\n{b}")
+
+		for i in range(A.shape[0]):
+			print(f"i={i}")
+			objective = cp.Minimize(A[i,:]@z-b[i,0]) #I try to go far from the constraint, into the feasible set
+			constraints=[A@z<=b]
+			prob = cp.Problem(objective, constraints)
+			result = prob.solve(verbose=False);
+			obj_value=objective.value;
+
+			if(prob.status=='unbounded'):
+				obj_value=-math.inf #note that we are minimizing
+
+			if(prob.status != 'optimal' and prob.status!='unbounded'):
+				raise Exception(f"prob.status={prob.status}")
+
+			assert obj_value<TOL#The objective should be negative
+
+			if (obj_value>-TOL): #if the objective value is zero (I tried to go far from the constraint, but I couldn't)
+				index_eq_set.append(i)
+
+		printInBoldGreen(f"index_eq_set={index_eq_set}")
+
+		if(index_eq_set): #Note that in Python, empty lists are false, see https://stackoverflow.com/a/53522/6057617
+			A_eq_set=A[index_eq_set,:];
+			b_eq_set=b[index_eq_set,:];
+
+			A = np.delete(A, index_eq_set, axis=0)
+			b = np.delete(b, index_eq_set, axis=0)
+
+			#At this point, if A.size==0, then it all the constraints were (hidden) equality contraitns
+
+			#Project into the nullspace of A_eq_set
+			################################################
+			NA_eq_set=scipy.linalg.null_space(A_eq_set);
+			p0=np.linalg.pinv(A_eq_set)@b_eq_set
+
+			print(f"NA_eq_set={NA_eq_set}")
+			print(f"p0={p0}")
+
+			A_projected=A@NA_eq_set;
+			b_projected=b-A@p0
+		else: 
+			#no need to project
+			NA_eq_set=np.eye(self.dim_ambient_space);
+			p0=np.zeros((self.dim_ambient_space,1))
+			A_projected=A
+			b_projected=b
+				
+
+		print(f"A_projected=\n{A_projected}")
+		print(f"b_projected=\n{b_projected}")
+
+		print(f"A=\n{A}")
+		print(f"b=\n{b}")
+
+		#Check whether or not the polyhedron is bounded
+		###############################################
+		# See https://github.com/TobiaMarcucci/pympc/blob/master/pympc/geometry/polyhedron.py#L529
+		# and https://math.stackexchange.com/a/3593310/564801
+		bounded=True
+		NA_projected=scipy.linalg.null_space(A_projected);
+		if(NA_projected.size!=0): #if the null(A_projected)!={0}
+			bounded=False
+		else: #if the null(A_projected)=={0} (i.e., if A_projected is invertible) 
+			n0=A_projected.shape[0];
+			n1=A_projected.shape[1];
+			y = cp.Variable((n0,1))
+			objective = cp.Minimize(cp.norm1(y))
+			constraints=[A_projected.T@y==np.zeros((n1,1)),  y>=np.ones((n0,1))]
+			prob = cp.Problem(objective, constraints)
+			result = prob.solve(verbose=False);
+			if(prob.status == 'infeasible'):
+				bounded=False  
+
+		if(bounded):
+			printInBoldBlue("Bounded feasible set")
+		else:
+			printInBoldGreen("Unbounded feasible set")
+
+
+		if(bounded):
+			max_radius=None
+		else:
+			max_radius=1.0; #to prevent unbounded result
+
+		B, x0 = largestBallInPolytope(A_projected,b_projected, max_radius) 
+		#B, x0 = largestEllipsoidBInPolytope(A,b) #This is very slow in high dimensions
+
+		return A_projected, b_projected, p0, NA_eq_set, B, x0
+
+
+
+#This function has been taken (and modified) from https://github.com/DLR-RM/stable-baselines3/blob/201fbffa8c40a628ecb2b30fd0973f3b171e6c4c/stable_baselines3/common/torch_layers.py#L96
+def create_mlp(
+    input_dim: int,
+    output_dim: int,
+    net_arch: typing.List[int],
+    activation_fn: typing.Type[nn.Module] = nn.ReLU,
+    squash_output: bool = False):
+    """
+    Create a multi layer perceptron (MLP), which is
+    a collection of fully-connected layers each followed by an activation function.
+    :param input_dim: Dimension of the input vector
+    :param output_dim:
+    :param net_arch: Architecture of the neural net
+        It represents the number of units per layer.
+        The length of this list is the number of layers.
+    :param activation_fn: The activation function
+        to use after each layer.
+    :param squash_output: Whether to squash the output using a Tanh
+        activation function
+    :return:
+    """
+
+    if len(net_arch) > 0:
+        modules = [nn.Linear(input_dim, net_arch[0]), activation_fn()]
+    else:
+        modules = []
+
+    for idx in range(len(net_arch) - 1):
+        modules.append(nn.Linear(net_arch[idx], net_arch[idx + 1]))
+        modules.append(activation_fn())
+
+    if output_dim > 0:
+        last_layer_dim = net_arch[-1] if len(net_arch) > 0 else input_dim
+        modules.append(nn.Linear(last_layer_dim, output_dim))
+    if squash_output:
+        modules.append(nn.Tanh())
+    return nn.Sequential(*modules)
 
 #This function is taken from https://github.com/tfrerix/constrained-nets
 def H_to_V(A, b):
@@ -295,40 +576,6 @@ def largestEllipsoidBInPolytope(A,b):
 	print("Calling solve...")
 	result = prob.solve(verbose=True);
 	print("Solved!")
-
-	return B.value, x0.value
-
-#It operates on numpy stuff 
-def largestBallInPolytope(A,b, max_radius=None):
-
-	if len(b.shape) == 1:
-		b = np.expand_dims(b, axis=1) #Make b a column vector
-
-	n=A.shape[1];
-	r = cp.Variable()#A scalar
-	x0 = cp.Variable((n,1))
-	constraints=[]
-
-	#https://programtalk.com/vs2/python/2718/cvxpy/examples/chebyshev.py/
-	#See also https://dkenefake.github.io/blog/ChebBall for when there are equality constraints
-	for i in range(A.shape[0]):
-		a_i=A[i,:].T
-		constraints.append(r*cp.norm(a_i)+a_i.T@x0<=b[i,0])
-
-	if(max_radius is not None):
-		constraints.append(r<=max_radius)
-
-	objective = cp.Minimize(-r) #This is just a linear program
-	prob = cp.Problem(objective, constraints)
-	print("Calling solve...")
-	result = prob.solve(verbose=False);
-	print("Solved!")
-	if(prob.status != 'optimal'):
-		raise Exception("Value is not optimal")
-
-	B=r*np.eye(n)
-
-	printInBoldGreen(f"Found ball of radius r={r.value}")
 
 	return B.value, x0.value
 

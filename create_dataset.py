@@ -4,34 +4,23 @@ from torch.utils.data import Dataset, DataLoader
 from examples_sets import getExample
 import numpy as np
 import cvxpy as cp
-from linear_constraint_walker import checkAndGetDimAmbientSpace
 import matplotlib.pyplot as plt
 
 
 class Projector():
-	def __init__(self, Aineq, bineq, Aeq, beq):
+	def __init__(self, lc): #lc is the LinearConstraint
 
-		has_ineq_constraints, has_eq_constraints, dim_ambient_space = checkAndGetDimAmbientSpace(Aineq, bineq, Aeq, beq);
-
-
-		dim=Aineq.shape[1];
-		self.y = cp.Variable((dim,1)) #y is the projected point
-		self.x = cp.Parameter((dim,1))#x is the original point
+		self.y = cp.Variable((lc.dimAmbSpace(),1)) #y is the projected point
+		self.x = cp.Parameter((lc.dimAmbSpace(),1))#x is the original point
 
 		#Section 8.1.1 of https://web.stanford.edu/~boyd/cvxbook/bv_cvxbook.pdf
-		constraints=[]
-		if(has_ineq_constraints):
-			constraints.append(Aineq@self.y<=bineq)
-		if(has_eq_constraints):
-			constraints.append(Aeq@self.y==beq)
-
+		constraints=lc.getCvxpyConstraints(self.y)
 		objective = cp.Minimize(cp.sum_squares(self.y - self.x))
 		self.prob = cp.Problem(objective, constraints)
 
 	def project(self, x):
-		print("Calling solve...")
 		self.x.value=x;
-		result = self.prob.solve(verbose=True);
+		result = self.prob.solve(verbose=False);
 		if(self.prob.status != 'optimal'):
 			raise Exception("Value is not optimal")
 		
@@ -73,18 +62,15 @@ class CustomDataset(Dataset):
 			ax.scatter(all_x_np[0,:], all_x_np[1,:],color='red')
 			ax.scatter(all_y_np[0,:], all_y_np[1,:],color='blue')
 
-def createProjectionDataset(num_samples, Aineq, bineq, Aeq, beq):
+def createProjectionDataset(num_samples, lc): #lc is the LinearConstraint
 
 	all_x=[];
 	all_y=[];
 
-	has_ineq_constraints, has_eq_constraints, dim_ambient_space = checkAndGetDimAmbientSpace(Aineq, bineq, Aeq, beq);
-
-
-	dim=Aineq.shape[1]
-	projector=Projector(Aineq, bineq, Aeq, beq)
+	
+	projector=Projector(lc)
 	for i in range(num_samples):
-		x=np.random.uniform(low=-4.0, high=4.0, size=(dim,1))
+		x=np.random.uniform(low=-4.0, high=4.0, size=(lc.dimAmbSpace(),1))
 		all_x.append(x)
 		all_y.append(projector.project(x))
 
