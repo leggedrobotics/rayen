@@ -9,30 +9,53 @@
 
 doSetup();
 
-
-% [allA, allb, p0, pf]=getCorridorConstraintsFromCurve();
-
-
-%%
 P=[0 1 2 3 4 3 2;
    0 1 1 2 4 4 4;
    0 1 1 1 4 1 0];
 allA={};
 allb={};
+allV={};
+
+steps=4;
+samples_per_step=10;
+radius=0.8;
+
 for i=1:(size(P,2)-1)
-    [A, b]=getABgivenP1P2(P(:,i),P(:,i+1));
+%     [A, b]=getABgivenP1P2(P(:,i),P(:,i+1));
+    [A, b, V]=getAbVerticesPolyhedronAroundP1P2(P(:,i),P(:,i+1), steps, samples_per_step, radius);
     allA{end+1}=A;
     allb{end+1}=b;
+    allV{end+1}=V;
 end
 
 p0=0.8*P(:,1) + 0.2*P(:,2);
 pf=0.2*P(:,end-1) + 0.8*P(:,end);
 
+figure;
+hold on;
+alpha=0.2;
+
+for i=1:size(allA,2)
+    plotregion(-allA{i},- allb{i}, [], [],'r',alpha)
+end
+
+% plotPolyhedron(P,'r')
+camlight
+lighting phong
+
+delta=1.0;
+xlim([min(P(1,:))-delta,max(P(1,:))+delta]);
+ylim([min(P(2,:))-delta,max(P(2,:))+delta]);
+zlim([min(P(3,:))-delta,max(P(3,:))+delta]);
+
+plotSphere(p0,0.08,'g')
+plotSphere(pf,0.08,'r')
+
 %%
 
 
 t0=0.0;
-tf=7.0;
+tf=3.5;
 
 num_of_regions=size(allA,2);
 num_of_seg_per_region=5; %Note: IF YOU FIND THE ERROR "Matrix product with incompatible dimensions. Lhs is 3x1 and rhs is 3x3." when changing, this, the cause if the hand-coded "n_int_knots=15; " in computeMatrixForClampedUniformBSpline.m. Increase it.
@@ -58,7 +81,7 @@ sp=MyClampedUniformSpline(t0,tf,deg_pos, dim_pos, num_seg, opti);
 v0=[0 0.6 0]'; a0=zeros(3,1);
 vf=zeros(3,1); af=zeros(3,1);
 
-v_max=35*ones(3,1);   a_max=100*ones(3,1);   j_max=500*ones(3,1);
+v_max=4*ones(3,1);   a_max=6*ones(3,1);   j_max=50*ones(3,1);
 
 %Initial conditions
 opti.subject_to( sp.getPosT(t0)== p0);
@@ -71,12 +94,12 @@ opti.subject_to( sp.getVelT(tf)== vf);
 opti.subject_to( sp.getAccelT(tf)== af);
 
 
-all_binary={};
+% all_binary={};
 
 const_p={}
 const_p=[const_p sp.getMaxVelConstraints(basis, v_max)];      %Max vel constraints (position)
 const_p=[const_p sp.getMaxAccelConstraints(basis, a_max)];    %Max accel constraints (position)
-% const_p=[const_p sp.getMaxJerkConstraints(basis, j_max)];     %Max jerk constraints (position)
+const_p=[const_p sp.getMaxJerkConstraints(basis, j_max)];     %Max jerk constraints (position)
 opti.subject_to([const_p]);
 
 %Corridor constraints
@@ -129,7 +152,7 @@ if (strcmp(my_solver,'ipopt'))
 end
 opti.solver(my_solver,opts); %{"ipopt.hessian_approximation":"limited-memory"} 
 
-all_weights=0:2:10;
+all_weights=0.5 %0:2:10;
 % all_x=num2cell(rand(1,numel(all_weights)));
 % all_y=num2cell(rand(1,numel(all_weights)));
 all_x={};
@@ -157,45 +180,62 @@ save('corridor.mat','all_x','all_y','polyhedron');
 sol = opti.solve();
 sp.updateCPsWithSolution(sol.value(sp.getCPsAsMatrix()));
 
-% for j=1:(sp.num_seg)
-%     %Get the control points of the interval
-% 
-%     Q_matrix=cell2mat(sp.getCPs_XX_Pos_ofInterval("MINVO",j));
-%     [k,av]=convhull(Q_matrix');
-%     if(basis=="MINVO")
-%         all_volumes.MINVO=[all_volumes.MINVO, av];
-%     elseif(basis=="BEZIER")
-%         all_volumes.BEZIER=[all_volumes.BEZIER, av];
-%     end
-%     
-% end
-
-% end
 
 %%
-sp.plotPos3D()
-hold on;
 
-alpha=0.05;
-
-for i=1:size(allA,2)
-    plotregion(-allA{i},- allb{i}, [], [],'r',alpha)
-end
 
 % fplot3(Pcurve(1,:),Pcurve(2,:),Pcurve(3,:),[0,1]); axis equal;
-xlim([min(P(1,:))-0.5,max(P(1,:))+0.5]);
-ylim([min(P(2,:))-0.5,max(P(2,:))+0.5]);
-zlim([min(P(3,:))-0.5,max(P(3,:))+0.5]);
+
 % ylim([-4,4]);zlim([-4,4]);
 
-scatter3(p0(1),p0(2),p0(3),'filled','g')
-scatter3(pf(1),pf(2),pf(3),'filled','r')
+
+sp.plotPos3D(6)
 
 plot3(P(1,:),P(2,:),P(3,:),'--','LineWidth',2)
 
 view(48,38); axis equal
 
 xlabel('x'); ylabel('y'); zlabel('z');
+
+sp.plotPosVelAccelJerk(v_max,a_max,j_max)
+%%
+% close all;
+% figure; hold on;
+% p1=[0;0;0];
+% p2=[1;1;1];
+
+%This gives the vertices of a polyhedron around the line p1-->p2
+function [A, b, V]=getAbVerticesPolyhedronAroundP1P2(p1,p2, steps, samples_per_step, radius)
+
+
+%     samples_per_step=5;
+%     radius=0.5;
+    all_points=[];
+
+    for alpha=linspace(0,1,steps)
+        point=alpha*p1 + (1-alpha)*p2;
+        results=point + radius*uniformSampleInUnitBall(3,samples_per_step);
+        all_points=[all_points results];
+    end
+
+    [k1,av1] = convhull(all_points');
+    k_all_unique=unique(k1);
+    
+    V=all_points(:,k_all_unique); %V contains the vertices
+
+    [A,b,Aeq,beq]=vert2lcon(V');
+
+    assert(numel(Aeq)==0)
+    assert(numel(beq)==0)
+
+%     for tmp=k_all_unique'
+%         tmp
+%         P(:,tmp)
+%         plotSphere(P(:,tmp), 0.03, 'r');
+%     end
+
+
+end
 
 %This gives a polyhedron with 6 faces around the line p1-->p2
 %Region is {x such that A1*x<=b1}
@@ -253,30 +293,75 @@ b=[A(1,:)*w_p1_a;
    A(6,:)*w_p1_d;];
 end
 
-%Region is {x such that A1*x<=b1}
-function [A1,b1]=getAb_Box(center,side)
 
-A1=[1 0 0;
-    0 1 0;
-    0 0 1;
-    -1 0 0;
-    0 -1 0;
-    0 0 -1];
+function plotConvexHullOfPoints(V,color)
 
-of_x=center(1);
-of_y=center(2);
-of_z=center(3);
+x=V(1,:);
+y=V(2,:);
+z=V(3,:);
 
-b1=[side(1)/2.0+of_x;
-    side(2)/2.0+of_y;
-    side(3)/2.0+of_z;
-    side(1)/2.0-of_x;
-    side(2)/2.0-of_y;
-    side(3)/2.0-of_z];
+[k1,av1] = convhull(x,y,z);
+
+trisurf(k1,x,y,z,'FaceColor',color)
+k_all=k1(:);
+k_all_unique=unique(k1);
+
+for i=1:length(k_all_unique)
+    plotSphere([x(k_all_unique(i)) y(k_all_unique(i)) z(k_all_unique(i))], 0.03, color)
+end
 
 end
 
 
+
+function handle=plotSphere(position, radius, color)
+
+    [x,y,z] = sphere(50);
+    handle = surf(x*radius+position(1),y*radius+position(2),z*radius+position(3),'FaceColor',color,'LineStyle','none' );
+
+end
+
+
+% for j=1:(sp.num_seg)
+%     %Get the control points of the interval
+% 
+%     Q_matrix=cell2mat(sp.getCPs_XX_Pos_ofInterval("MINVO",j));
+%     [k,av]=convhull(Q_matrix');
+%     if(basis=="MINVO")
+%         all_volumes.MINVO=[all_volumes.MINVO, av];
+%     elseif(basis=="BEZIER")
+%         all_volumes.BEZIER=[all_volumes.BEZIER, av];
+%     end
+%     
+% end
+
+% end
+
+% %Region is {x such that A1*x<=b1}
+% function [A1,b1]=getAb_Box(center,side)
+% 
+% A1=[1 0 0;
+%     0 1 0;
+%     0 0 1;
+%     -1 0 0;
+%     0 -1 0;
+%     0 0 -1];
+% 
+% of_x=center(1);
+% of_y=center(2);
+% of_z=center(3);
+% 
+% b1=[side(1)/2.0+of_x;
+%     side(2)/2.0+of_y;
+%     side(3)/2.0+of_z;
+%     side(1)/2.0-of_x;
+%     side(2)/2.0-of_y;
+%     side(3)/2.0-of_z];
+% 
+% end
+
+
+% [allA, allb, p0, pf]=getCorridorConstraintsFromCurve();
 % function [allA, allb, p0, pf]=getCorridorConstraintsFromCurve()
 %     syms t
 %     Pcurve= [ sin(t*3*pi)+2*sin(2*t*3*pi);

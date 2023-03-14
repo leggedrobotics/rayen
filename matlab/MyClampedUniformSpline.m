@@ -482,14 +482,15 @@ classdef MyClampedUniformSpline < handle
             end        
         end
 
-        function plotPos3D(obj)
-            figure; hold on;
+        function plotPos3D(obj, linewidth)
+%             figure; 
+            hold on;
             syms t real
             for j=1:obj.num_seg
                 interv=obj.timeSpanOfInterval(j);           
                 u=(t-min(interv))/(max(interv)-min(interv));
                 pos=obj.evalDerivativeU(0,u,j);
-                fplot3(pos(1),pos(2),pos(3),interv);
+                fplot3(pos(1),pos(2),pos(3),interv, 'LineWidth', linewidth);
             end           
             axis equal; view([45,45])
         end
