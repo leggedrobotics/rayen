@@ -8,7 +8,7 @@ import utils
 from linear_constraint_walker import LinearConstraintWalker
 from examples_sets import getExample
 
-lc=getExample(2)
+lc=getExample(0)
 
 fig = plt.figure()
 if(lc.dimAmbSpace()==3):
