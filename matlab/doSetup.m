@@ -6,8 +6,7 @@ function doSetup()
     set(0,'defaultfigurecolor',[1 1 1])
     
     import casadi.*
-    addpath(genpath('./../deep_panther/panther/matlab'))
-    addpath(genpath('./../deep_panther/submodules/minvo'))
+    addpath(genpath('./../minvo'))
     addpath(genpath('./utils'))
 
 end

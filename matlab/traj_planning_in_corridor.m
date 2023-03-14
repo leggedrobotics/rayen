@@ -129,7 +129,7 @@ if (strcmp(my_solver,'ipopt'))
 end
 opti.solver(my_solver,opts); %{"ipopt.hessian_approximation":"limited-memory"} 
 
-all_weights=0:0.05:10;
+all_weights=0:2:10;
 % all_x=num2cell(rand(1,numel(all_weights)));
 % all_y=num2cell(rand(1,numel(all_weights)));
 all_x={};
@@ -196,34 +196,6 @@ plot3(P(1,:),P(2,:),P(3,:),'--','LineWidth',2)
 view(48,38); axis equal
 
 xlabel('x'); ylabel('y'); zlabel('z');
-
-% function [allA, allb, p0, pf]=getCorridorConstraintsFromCurve()
-%     syms t
-%     Pcurve= [ sin(t*3*pi)+2*sin(2*t*3*pi);
-%               cos(t*3*pi)-2*cos(2*t*3*pi);
-%              -sin(3*t*3*pi);];
-% 
-% 
-%     p_last=subs(Pcurve,t,0.0);
-%     allA={}; allb={};
-%     delta=0.3;
-%     last_tt=0;
-%     for tt=delta:delta:3
-% 
-%         p1=double(p_last);
-%         p2=double(subs(Pcurve,t,tt));
-% 
-%         [A b]=getABgivenP1P2(p1,p2);
-%         allA{end+1}= A;
-%         allb{end+1}=b;
-%         p_last=p2;
-%         last_tt=tt;
-%     end
-%     
-%     p0=double(0.9*subs(Pcurve,t,0.0)+0.1*subs(Pcurve,t,delta));
-%     pf=double(0.9*subs(Pcurve,t,last_tt)+0.1*subs(Pcurve,t,last_tt-delta));
-% end
-
 
 %This gives a polyhedron with 6 faces around the line p1-->p2
 %Region is {x such that A1*x<=b1}
@@ -303,6 +275,35 @@ b1=[side(1)/2.0+of_x;
     side(3)/2.0-of_z];
 
 end
+
+
+% function [allA, allb, p0, pf]=getCorridorConstraintsFromCurve()
+%     syms t
+%     Pcurve= [ sin(t*3*pi)+2*sin(2*t*3*pi);
+%               cos(t*3*pi)-2*cos(2*t*3*pi);
+%              -sin(3*t*3*pi);];
+% 
+% 
+%     p_last=subs(Pcurve,t,0.0);
+%     allA={}; allb={};
+%     delta=0.3;
+%     last_tt=0;
+%     for tt=delta:delta:3
+% 
+%         p1=double(p_last);
+%         p2=double(subs(Pcurve,t,tt));
+% 
+%         [A b]=getABgivenP1P2(p1,p2);
+%         allA{end+1}= A;
+%         allb{end+1}=b;
+%         p_last=p2;
+%         last_tt=tt;
+%     end
+%     
+%     p0=double(0.9*subs(Pcurve,t,0.0)+0.1*subs(Pcurve,t,delta));
+%     pf=double(0.9*subs(Pcurve,t,last_tt)+0.1*subs(Pcurve,t,last_tt-delta));
+% end
+
 
 % polyhedron.Aeq=[]; %already included in (Aineq, bineq)
 % polyhedron.beq=[];
