@@ -43,8 +43,8 @@ class SplittedDatasetAndGenerator():
 		self.batch_size=batch_size
 
 		self.train_generator = DataLoader(self.train_dataset, batch_size=batch_size, shuffle=True)
-		self.val_generator = DataLoader(self.train_dataset, batch_size=batch_size, shuffle=False)
-		self.test_generator = DataLoader(self.train_dataset, batch_size=batch_size, shuffle=False)
+		self.val_generator = DataLoader(self.val_dataset, batch_size=batch_size, shuffle=False)
+		self.test_generator = DataLoader(self.test_dataset, batch_size=batch_size, shuffle=False)
 	
 
 def append_filename(params, filename):
@@ -64,7 +64,7 @@ def train_model(model, params, sdag):
 
 	# scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.5, patience=5, cooldown=5)
 
-	loss_fn = nn.MSELoss(size_average=True)
+	loss_fn = nn.MSELoss(reduction='mean')
 
 	training_metrics = {'train_loss': [], 'val_loss': [], 'cumulative_epoch_time': []}
 	cumulative_epoch_time = 0
@@ -118,40 +118,51 @@ def train_model(model, params, sdag):
 
 	return training_metrics
 
-def test_model(model, params, sdag):
+def test_model(model, params, sdag, lc):
 	device_id = params['device']
 	device = torch.device('cuda:{}'.format(device_id) if device_id >= 0 else 'cpu')
 	model = model.to(device)
-	
-	batch_size = 256
 
 	model.eval()
 	val_loss = 0
-	eval_times = np.zeros(params['n_evals'])
-	with torch.set_grad_enabled(False):
-		for n in range(params['n_evals']):
-			start_eval_time = time.time()
-			for x, y in sdag.test_generator:
-				x = x.to(device)
-				y = y.to(device)
-				y_predicted = model(x)
 
-			end_eval_time = time.time()
-			eval_time = end_eval_time - start_eval_time
-			eval_times[n] = eval_time
-	print('Evaluated {} runs of {} samples with batch size {}.'.format(params['n_evals'], len(sdag.test_generator), sdag.batch_size))
-	print('mean eval time: {}, standard deviation: {}'.format(np.mean(eval_times), np.std(eval_times)))
+	violations = np.empty((0,1))
+
+	with torch.set_grad_enabled(False):
+		start_eval_time = time.time()
+		for x, y in sdag.test_generator:
+			x = x.to(device)
+			y = y.to(device)
+			y_predicted = model(x)
+
+			print(f"y_predicted.shape={y_predicted.shape}")
+
+			y_predicted_numpy=y_predicted.cpu().numpy();
+			violations_of_this_batch=np.apply_along_axis(lc.getViolation,axis=1, arr=y_predicted_numpy)
+			#Shape of violations_of_this_batch is [batch_size, 1]
+			violations=np.concatenate((violations, violations_of_this_batch), axis=0)
+
+			print(f"violations.shape={violations.shape}")
+
+		end_eval_time = time.time()
+		eval_time = end_eval_time - start_eval_time
+	
+	assert np.all(violations>=0) #violations, by definition are nonnegative
+	assert violations.shape[0]==len(sdag.test_dataset), f"violations.shape[0]={violations.shape[0]}, len(sdag.test_dataset)={len(sdag.test_dataset)}"
+	# print('Evaluated {} runs of {} samples with batch size {}.'.format(params['n_evals'], len(sdag.test_generator), sdag.batch_size))
+	# print('mean eval time: {}, standard deviation: {}'.format(np.mean(eval_times), np.std(eval_times)))
+	utils.printInBoldRed(f'mean violation={np.mean(violations)}')
 
 def main(params):
 
 	torch.set_default_dtype(torch.float64) ##Use float32 here??
 
 	## PROJECTION EXAMPLES
-	# lc=getExample(1)
-	# my_dataset=createProjectionDataset(9000, lc);
+	lc=getExample(1)
+	my_dataset=createProjectionDataset(600, lc);
 
 	## CORRIDOR EXAMPLES
-	my_dataset, lc=getCorridorDatasetAndLC()
+	# my_dataset, lc=getCorridorDatasetAndLC()
 
 	sdag=SplittedDatasetAndGenerator(my_dataset, percent_train=0.6, percent_val=0.2, batch_size=params['batch_size'])
 
@@ -169,7 +180,6 @@ def main(params):
 		model.setMapper(mapper)
 
 		training_metrics = train_model(model, params, sdag)
-		# argmins = argmins.reshape((-1, 28, 28))
 
 		for it, t in enumerate(zip(training_metrics['train_loss'],
 								   training_metrics['val_loss'], training_metrics['cumulative_epoch_time'])):
@@ -184,9 +194,8 @@ def main(params):
 			results.append(single_result)
 
 	# evaluate model
-	if params['method'] != 'optimal_projection':
-		utils.printInBoldBlue('Entering evaluation')
-		test_model(model, params, sdag)
+	utils.printInBoldBlue('Entering testing')
+	test_model(model, params, sdag, lc)
 	# convert to pandas dataframe
 	df = pd.DataFrame(results)
 
@@ -196,7 +205,7 @@ def main(params):
 	# dump results to pickle
 	if params['result_dir'] is not None:
 		filename = params['method'] + '_data.p'
-		to_dump = {'training_metrics': df} #, 'argmins': argmins
+		to_dump = {'training_metrics': df} 
 
 		pickle.dump(to_dump, open(append_filename(params, filename), 'wb'))
 
@@ -208,11 +217,11 @@ if __name__ == '__main__':
 	parser.add_argument('--method', type=str, default='walker')
 	parser.add_argument('--result_dir', type=str, default='results')
 	parser.add_argument('--device', type=int, default=0)
-	parser.add_argument('--num_epochs', type=int, default=5000)
+	parser.add_argument('--num_epochs', type=int, default=4000)
 	parser.add_argument('--n_trials', type=int, default=1)
 	parser.add_argument('--batch_size', type=int, default=256)
 	parser.add_argument('--n_evals', type=int, default=1)
-	parser.add_argument('--verbosity', type=int, default=1)
+	parser.add_argument('--verbosity', type=int, default=10)
 	parser.add_argument('--learning_rate', type=float, default=1e-3)
 	parser.add_argument('--log_to_file', dest='log_to_file', action='store_true', default=True)
 	parser.add_argument('--box_constraints', dest='box_constraints', action='store_true', default=False)

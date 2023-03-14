@@ -17,6 +17,7 @@ def printInBoldRed(data_string):
 def printInBoldGreen(data_string):
     print(Style.BRIGHT+Fore.GREEN+data_string+Style.RESET_ALL)
 
+
 #It operates on numpy stuff 
 #polytope defined as Ax<=b
 def largestBallInPolytope(A,b, max_radius=None):
@@ -127,7 +128,15 @@ class LinearConstraint():
 
 	def getViolation(self, x_to_be_projected):
 
+		if(x_to_be_projected.ndim==1):
+			#convert to a column vector
+			x_to_be_projected=np.expand_dims(x_to_be_projected, axis=1)
+
+		# print(f"projecting {x_to_be_projected}")
+
 		_, violation = self.project(x_to_be_projected)
+
+		assert violation>=0  #violation is nonnegative by definition
 
 		return violation;
 
