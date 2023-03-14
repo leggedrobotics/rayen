@@ -2,7 +2,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from linear_constraint_barycentric import LinearConstraintBarycentric
-from linear_constraint_walker import LinearConstraintWalker
+from linear_constraint_layer import LinearConstraintLayer
 from osqp_projection import ConstraintProjector
 
 

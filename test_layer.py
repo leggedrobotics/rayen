@@ -5,7 +5,7 @@ import math
 
 import matplotlib.pyplot as plt
 import utils
-from linear_constraint_walker import LinearConstraintWalker
+from linear_constraint_layer import LinearConstraintLayer
 from examples_sets import getExample
 
 lc=getExample(0)
@@ -21,7 +21,7 @@ else:
 num_steps=4; #Only used in the ellipsoid_walker method
 my_layer=LinearConstraintWalker(lc)
 
-numel_input_walker=my_layer.getNumelInputWalker()
+numel_input_walker=my_layer.getNumelOutputMapper()
 
 ##This samples different angles
 # all_angles = np.arange(0,2*math.pi, 0.01)

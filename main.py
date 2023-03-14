@@ -18,7 +18,7 @@ from models import BarycentricModel, ProjectionModel, WrapperWalkerForImages
 from dataset_util import MNIST
 from osqp_projection import BatchProjector
 
-from linear_constraint_walker import LinearConstraintWalker
+from linear_constraint_layer import LinearConstraintLayer
 from create_dataset import createProjectionDataset, getCorridorDatasetAndLC
 from examples_sets import getExample
 
@@ -158,11 +158,11 @@ def main(params):
 	torch.set_default_dtype(torch.float64) ##Use float32 here??
 
 	## PROJECTION EXAMPLES
-	lc=getExample(1)
-	my_dataset=createProjectionDataset(600, lc);
+	# lc=getExample(1)
+	# my_dataset=createProjectionDataset(200, lc);
 
 	## CORRIDOR EXAMPLES
-	# my_dataset, lc=getCorridorDatasetAndLC()
+	my_dataset, lc=getCorridorDatasetAndLC()
 
 	sdag=SplittedDatasetAndGenerator(my_dataset, percent_train=0.6, percent_val=0.2, batch_size=params['batch_size'])
 
@@ -171,10 +171,10 @@ def main(params):
 
 	results = []  # a list of dicts
 	for trial in range(params['n_trials']):
-		model = LinearConstraintWalker(lc)
+		model = LinearConstraintLayer(lc, method='unconstrained') #'walker', 'unconstrained'
 
 		# mapper=nn.Sequential(nn.Linear(Aineq.shape[1], model.getNumelInputWalker()))
-		mapper=utils.create_mlp(input_dim=my_dataset.getNumelX(), output_dim=model.getNumelInputWalker(), net_arch=[256,256])
+		mapper=utils.create_mlp(input_dim=my_dataset.getNumelX(), output_dim=model.getNumelOutputMapper(), net_arch=[256,256])
 
 		# mapper=nn.Sequential() #do nothing.
 		model.setMapper(mapper)
