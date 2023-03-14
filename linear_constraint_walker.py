@@ -22,9 +22,6 @@ class LinearConstraintWalker(torch.nn.Module):
 		self.B = torch.Tensor(B)
 		self.x0 = torch.Tensor(x0)
 
-		#add batches dimension
-		self.B=torch.unsqueeze(self.B,0)
-		self.x0=torch.unsqueeze(self.x0,0)
 
 		self.mapper=nn.Sequential();
 
@@ -62,7 +59,7 @@ class LinearConstraintWalker(torch.nn.Module):
 		
 		u=torch.nn.functional.normalize(v, dim=1);
 
-		b_minus_Ax0=torch.sub(torch.unsqueeze(self.b,dim=0),self.A@self.x0)
+		b_minus_Ax0=torch.sub(self.b,self.A@self.x0)
 		all_max_distances=torch.div(b_minus_Ax0,self.A@u)
 		all_max_distances[all_max_distances<=0]=float("Inf")
 		#Note that we know that self.x0 is a strictly feasible point of the set

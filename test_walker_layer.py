@@ -8,7 +8,7 @@ import utils
 from linear_constraint_walker import LinearConstraintWalker
 from examples_sets import getExample
 
-lc=getExample(0)
+lc=getExample(2)
 
 fig = plt.figure()
 if(lc.dimAmbSpace()==3):
@@ -38,7 +38,7 @@ numel_input_walker=my_layer.getNumelInputWalker()
 # 	x_batched[i,:,:]=tmp
 
 
-num_directions=200; #for each direction you have several samples
+num_directions=500; #for each direction you have several samples
 x_batched=torch.empty(0, numel_input_walker, 1)
 for i in range(num_directions): #for each direction
 	direction=utils.uniformSampleInUnitSphere(my_layer.dim)
@@ -72,7 +72,7 @@ if(lc.Aineq.shape[1]==3):
 if(lc.Aineq.shape[1]==2):
 	ax.scatter(result[:,0,0], result[:,1,0])
 	utils.plot2DPolyhedron(lc.Aineq,lc.bineq,ax)
-	utils.plot2DEllipsoidB(my_layer.B[0,:,:].numpy(),my_layer.x0[0,:,:].numpy(),ax)
+	utils.plot2DEllipsoidB(my_layer.B.numpy(),my_layer.x0.numpy(),ax)
 	ax.set_aspect('equal')
 
 plt.show()
