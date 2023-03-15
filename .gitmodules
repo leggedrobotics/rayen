@@ -1,3 +1,6 @@
 [submodule "minvo"]
-	path = minvo
+	path = submodules/minvo
 	url = https://github.com/mit-acl/minvo
+[submodule "export_fig"]
+	path = submodules/export_fig
+	url = https://github.com/altmany/export_fig
