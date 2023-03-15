@@ -1,6 +1,5 @@
-function plot3dConvHullAndVertices(V,radius_sphere)
+function plot3dConvHullAndVertices(V,color, radius_sphere)
 
-    color='r';
     color_vertex=[.98 .45 .02];
     radius=radius_sphere;
     s={};

@@ -6,7 +6,7 @@
 %final points --> better job in the overlapping areas between several
 %polyhedra
 
-
+close all; clc;clear;
 doSetup();
 
 P=[0 1 2 3 4 3 2;
@@ -55,7 +55,7 @@ plotSphere(pf,0.08,'r')
 
 
 t0=0.0;
-tf=3.5;
+tf=4.0;
 
 num_of_regions=size(allA,2);
 num_of_seg_per_region=5; %Note: IF YOU FIND THE ERROR "Matrix product with incompatible dimensions. Lhs is 3x1 and rhs is 3x3." when changing, this, the cause if the hand-coded "n_int_knots=15; " in computeMatrixForClampedUniformBSpline.m. Increase it.
@@ -152,7 +152,7 @@ if (strcmp(my_solver,'ipopt'))
 end
 opti.solver(my_solver,opts); %{"ipopt.hessian_approximation":"limited-memory"} 
 
-all_weights=0.5 %0:2:10;
+all_weights=0.2 %0:2:10;W
 % all_x=num2cell(rand(1,numel(all_weights)));
 % all_y=num2cell(rand(1,numel(all_weights)));
 all_x={};
@@ -291,34 +291,6 @@ b=[A(1,:)*w_p1_a;
    A(4,:)*w_p1_c;
    A(5,:)*w_p1_d;
    A(6,:)*w_p1_d;];
-end
-
-
-function plotConvexHullOfPoints(V,color)
-
-x=V(1,:);
-y=V(2,:);
-z=V(3,:);
-
-[k1,av1] = convhull(x,y,z);
-
-trisurf(k1,x,y,z,'FaceColor',color)
-k_all=k1(:);
-k_all_unique=unique(k1);
-
-for i=1:length(k_all_unique)
-    plotSphere([x(k_all_unique(i)) y(k_all_unique(i)) z(k_all_unique(i))], 0.03, color)
-end
-
-end
-
-
-
-function handle=plotSphere(position, radius, color)
-
-    [x,y,z] = sphere(50);
-    handle = surf(x*radius+position(1),y*radius+position(2),z*radius+position(3),'FaceColor',color,'LineStyle','none' );
-
 end
 
 
