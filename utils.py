@@ -9,6 +9,7 @@ from colorama import Fore, Back, Style
 import torch.nn as nn
 import typing
 import scipy
+import math
 
 def printInBoldBlue(data_string):
     print(Style.BRIGHT+Fore.BLUE+data_string+Style.RESET_ALL)
@@ -203,6 +204,8 @@ class LinearConstraint():
 
 		#Remove redundant constraints
 		################################################
+		#Eq 1.5 of https://www.research-collection.ethz.ch/bitstream/handle/20.500.11850/167108/1/thesisFinal_MaySzedlak.pdf
+		#See also https://mathoverflow.net/a/69667
 		printInBoldBlue("Removing redundant constraints...")
 		indexes_const_removed=[]
 		for i in reversed(range(A.shape[0])):
@@ -228,6 +231,10 @@ class LinearConstraint():
 
 		#Find equality set
 		################################################
+		# Eq. 1.5 of https://www.research-collection.ethz.ch/bitstream/handle/20.500.11850/167108/1/thesisFinal_MaySzedlak.pdf
+		# Section 5.2 of https://www.researchgate.net/publication/268373838_Polyhedral_Tools_for_Control
+		# See also Definition 2.16 of https://sites.math.washington.edu/~thomas/teaching/m583_s2008_web/main.pdf
+
 		index_eq_set=[]
 
 		# print(f"A=\n{A}")
@@ -263,7 +270,7 @@ class LinearConstraint():
 			A = np.delete(A, index_eq_set, axis=0)
 			b = np.delete(b, index_eq_set, axis=0)
 
-			#At this point, if A.size==0, then it all the constraints were (hidden) equality contraitns
+			#At this point, if A.size==0, then it all the constraints were (hidden) equality constraints
 
 			#Project into the nullspace of A_eq_set
 			################################################

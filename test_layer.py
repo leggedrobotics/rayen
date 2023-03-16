@@ -19,7 +19,7 @@ else:
 	ax = fig.add_subplot(111) 
 
 num_steps=4; #Only used in the ellipsoid_walker method
-my_layer=LinearConstraintWalker(lc)
+my_layer=LinearConstraintLayer(lc)
 
 numel_input_walker=my_layer.getNumelOutputMapper()
 

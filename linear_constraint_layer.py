@@ -62,22 +62,29 @@ class LinearConstraintLayer(torch.nn.Module):
 			self.NA_eq_set = self.NA_eq_set.to(x.device)
 			self.p0 = self.p0.to(x.device)
 			
-			v = torch.unsqueeze(z[:,  0:self.dim,0],2) 
-			scalar= torch.unsqueeze(z[:, self.dim:(self.dim+1),0],2)
+			v = z[:,  0:self.dim,0:1] #0:1 to keep the dimension. Other option is torch.unsqueeze(z[:,  0:self.dim,0],2) 
+			beta= z[:, self.dim:(self.dim+1),0:1]#0:1 to keep the dimension. Other option istorch.unsqueeze(z[:, self.dim:(self.dim+1),0],2)
 			
 			u=torch.nn.functional.normalize(v, dim=1);
 
 			b_minus_Ax0=torch.sub(self.b,self.A@self.x0)
-			all_max_distances=torch.div(b_minus_Ax0,self.A@u)
-			all_max_distances[all_max_distances<=0]=float("Inf")
-			#Note that we know that self.x0 is a strictly feasible point of the set
-			max_distance = torch.min(all_max_distances, dim=1, keepdim=True).values
 
-			#Here, the size of max_distance is [num_batches, 1, 1]
+			## FIRST OPTION
+			# all_max_distances=torch.div(b_minus_Ax0,self.A@u)
+			# all_max_distances[all_max_distances<=0]=float("Inf")
+			# #Note that we know that self.x0 is a strictly feasible point of the set
+			# max_distance = torch.min(all_max_distances, dim=1, keepdim=True).values
 
-			alpha=torch.where(torch.isfinite(max_distance), 
-							   max_distance*torch.sigmoid(scalar),  #If it's bounded in that direction --> apply sigmoid function
-							   torch.abs(scalar)) #If it's not bounded in that direction --> just use the scalar
+			# #Here, the size of max_distance is [num_batches, 1, 1]
+
+			# alpha=torch.where(torch.isfinite(max_distance), 
+			# 				   max_distance*torch.sigmoid(beta),  #If it's bounded in that direction --> apply sigmoid function
+			# 				   torch.abs(beta)) #If it's not bounded in that direction --> just use the beta
+
+			## SECOND OPTION
+			my_lambda=torch.max(torch.div(self.A@u, b_minus_Ax0), dim=1, keepdim=True).values
+			alpha=torch.where(my_lambda<=0, torch.abs(beta), torch.sigmoid(beta)/my_lambda)
+
 
 			x0_new = self.x0 + alpha*u 
 			
