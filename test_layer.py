@@ -8,7 +8,7 @@ import utils
 from linear_constraint_layer import LinearConstraintLayer
 from examples_sets import getExample
 
-lc=getExample(3)
+lc=getExample(0)
 
 fig = plt.figure()
 if(lc.dimAmbSpace()==3):
@@ -71,7 +71,7 @@ if(lc.dimAmbSpace()==3):
 if(lc.dimAmbSpace()==2):
 	ax.scatter(result[:,0,0], result[:,1,0])
 	utils.plot2DPolyhedron(lc.Aineq,lc.bineq,ax)
-	utils.plot2DEllipsoidB(my_layer.B.numpy(),my_layer.x0.numpy(),ax)
+	utils.plot2DEllipsoidB(my_layer.B.numpy(),my_layer.z0.numpy(),ax)
 	ax.set_aspect('equal')
 
 plt.show()
