@@ -15,14 +15,19 @@ class LinearConstraintLayer(torch.nn.Module):
 		self.method=method
 
 		if(self.method=='walker'):
-			A_projected, b_projected, p0, NA_eq_set, B, x0=lc.process();
-			self.dim=A_projected.shape[1]
-			self.A = torch.Tensor(A_projected)
-			self.b = torch.Tensor(b_projected)
-			self.p0=torch.Tensor(p0)
-			self.NA_eq_set=torch.Tensor(NA_eq_set)
+			A_p, b_p, y0, NA_E, B, z0=lc.process();
+
+			self.Z_is_unconstrained= (not np.any(A_p))  and (not np.any(b_p)); #A_p is the zero matrix and b_p the zero vector
+
+
+			self.dim=A_p.shape[1]
+			self.A_p = torch.Tensor(A_p)
+			self.b_p = torch.Tensor(b_p)
+			self.y0=torch.Tensor(y0)
+			self.NA_E=torch.Tensor(NA_E)
 			self.B = torch.Tensor(B)
-			self.x0 = torch.Tensor(x0)
+			self.z0 = torch.Tensor(z0)
+
 
 
 		self.mapper=nn.Sequential();
@@ -55,22 +60,23 @@ class LinearConstraintLayer(torch.nn.Module):
 
 		if(self.method=='walker'):
 
-			self.A = self.A.to(x.device)
-			self.b = self.b.to(x.device)
+			self.A_p = self.A_p.to(x.device)
+			self.b_p = self.b_p.to(x.device)
 			self.B = self.B.to(x.device)
-			self.x0 = self.x0.to(x.device)
-			self.NA_eq_set = self.NA_eq_set.to(x.device)
-			self.p0 = self.p0.to(x.device)
+			self.z0 = self.z0.to(x.device)
+			self.NA_E = self.NA_E.to(x.device)
+			self.y0 = self.y0.to(x.device)
 			
 			v = z[:,  0:self.dim,0:1] #0:1 to keep the dimension. Other option is torch.unsqueeze(z[:,  0:self.dim,0],2) 
 			beta= z[:, self.dim:(self.dim+1),0:1]#0:1 to keep the dimension. Other option istorch.unsqueeze(z[:, self.dim:(self.dim+1),0],2)
 			
 			u=torch.nn.functional.normalize(v, dim=1);
 
-			b_minus_Ax0=torch.sub(self.b,self.A@self.x0)
+			bp_minus_Apz0=torch.sub(self.b_p,self.A_p@self.z0)
 
+			print(bp_minus_Apz0)
 			## FIRST OPTION
-			# all_max_distances=torch.div(b_minus_Ax0,self.A@u)
+			# all_max_distances=torch.div(bp_minus_Apz0,self.A_p@u)
 			# all_max_distances[all_max_distances<=0]=float("Inf")
 			# #Note that we know that self.x0 is a strictly feasible point of the set
 			# max_distance = torch.min(all_max_distances, dim=1, keepdim=True).values
@@ -82,21 +88,25 @@ class LinearConstraintLayer(torch.nn.Module):
 			# 				   torch.abs(beta)) #If it's not bounded in that direction --> just use the beta
 
 			## SECOND OPTION
-			my_lambda=torch.max(torch.div(self.A@u, b_minus_Ax0), dim=1, keepdim=True).values
+			if(self.Z_is_unconstrained==False):
+				my_lambda=torch.max(torch.div(self.A_p@u, bp_minus_Apz0), dim=1, keepdim=True).values
+			else:
+				my_lambda=torch.zeros((x.shape[0],1,1))
+
 			alpha=torch.where(my_lambda<=0, torch.abs(beta), torch.sigmoid(beta)/my_lambda)
 
 
-			x0_new = self.x0 + alpha*u 
+			z0_new = self.z0 + alpha*u 
 			
 			#Now lift back to the original space
-			x0_new =self.NA_eq_set@x0_new + self.p0
+			y0_new =self.NA_E@z0_new + self.y0
 
-			if(torch.isnan(x0_new).any()):
+			if(torch.isnan(y0_new).any()):
 				print("at least one element is nan")
-				raise("exiting")
+				raise Exception("exiting")
 
 		if(self.method=='unconstrained'):
-			x0_new=z
+			y0_new=z
 
 
-		return x0_new
+		return y0_new

@@ -8,7 +8,7 @@ import utils
 from linear_constraint_layer import LinearConstraintLayer
 from examples_sets import getExample
 
-lc=getExample(0)
+lc=getExample(3)
 
 fig = plt.figure()
 if(lc.dimAmbSpace()==3):
@@ -65,11 +65,10 @@ result=my_layer(x_batched)
 # print(f"result.shape={result.shape}");
 result=result.detach().numpy();
 
-
-if(lc.Aineq.shape[1]==3):
+if(lc.dimAmbSpace()==3):
 	ax.scatter3D(result[:,0,0], result[:,1,0], result[:,2,0])
 
-if(lc.Aineq.shape[1]==2):
+if(lc.dimAmbSpace()==2):
 	ax.scatter(result[:,0,0], result[:,1,0])
 	utils.plot2DPolyhedron(lc.Aineq,lc.bineq,ax)
 	utils.plot2DEllipsoidB(my_layer.B.numpy(),my_layer.x0.numpy(),ax)
