@@ -55,7 +55,9 @@ for i=size(A,1):-1:1
 end
 
 %%Now let's find the equality set
-
+% Section 5.2 of https://www.researchgate.net/publication/268373838_Polyhedral_Tools_for_Control
+% Eq. 1.5 of https://www.research-collection.ethz.ch/bitstream/handle/20.500.11850/167108/1/thesisFinal_MaySzedlak.pdf
+% See also Definition 2.16 of https://sites.math.washington.edu/~thomas/teaching/m583_s2008_web/main.pdf
 z = sdpvar(size(A,2),1);
 equality_set=[];
 all_objectives=[];
