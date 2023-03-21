@@ -10,6 +10,7 @@ import torch.nn as nn
 import typing
 import scipy
 import math
+from tqdm import tqdm
 
 def printInBoldBlue(data_string):
     print(Style.BRIGHT+Fore.BLUE+data_string+Style.RESET_ALL)
@@ -122,8 +123,8 @@ class LinearConstraint():
 
 		self.x_to_be_projected.value=x_to_be_projected;
 		obj_value = self.prob_projection.solve(verbose=False);
-		if(self.prob_projection.status != 'optimal'):
-			raise Exception("Value is not optimal")
+		if(self.prob_projection.status != 'optimal' and self.prob_projection.status != 'optimal_inaccurate'):
+			raise Exception(f"Value is not optimal, prob_status={self.prob_projection.status}")
 
 		return self.x_projected.value, obj_value	
 
@@ -193,7 +194,7 @@ class LinearConstraint():
 		else:
 			#Add the equality constraints as inequality constraints
 			A=np.concatenate((self.Aeq,-self.Aeq), axis=0);
-			b=np.concatenate((self.Aeq,-self.Aeq), axis=0);
+			b=np.concatenate((self.beq,-self.beq), axis=0);
 
 		#At this point, the feasible region is represented by Ax<=b		
 
@@ -208,7 +209,9 @@ class LinearConstraint():
 		#See also https://mathoverflow.net/a/69667
 		printInBoldBlue("Removing redundant constraints...")
 		indexes_const_removed=[]
-		for i in reversed(range(A.shape[0])):
+		reversed_indexes=list(reversed(range(A.shape[0])));
+		for i in tqdm(reversed_indexes):
+			# print(i)
 			all_rows_but_i=[x for x in range(A.shape[0]) if x != i]
 			objective = cp.Maximize(A[i,:]@z)
 			constraints=[A[all_rows_but_i,:]@z<=b[all_rows_but_i,:],   A[i,:]@z<=(b[i,0]+1)]
@@ -241,7 +244,7 @@ class LinearConstraint():
 
 		printInBoldBlue("Finding Affine Hull and projecting...")
 
-		for i in range(A.shape[0]):
+		for i in tqdm(range(A.shape[0])):
 			objective = cp.Minimize(A[i,:]@z-b[i,0]) #I try to go far from the constraint, into the feasible set
 			constraints=[A@z<=b]
 			prob = cp.Problem(objective, constraints)
@@ -251,7 +254,7 @@ class LinearConstraint():
 			if(prob.status=='unbounded'):
 				obj_value=-math.inf #note that we are minimizing
 
-			if(prob.status != 'optimal' and prob.status!='unbounded'):
+			if(prob.status != 'optimal' and prob.status!='unbounded' and prob.status!='optimal_inaccurate'):
 				raise Exception(f"prob.status={prob.status}")
 
 			assert obj_value<TOL#The objective should be negative
@@ -293,6 +296,11 @@ class LinearConstraint():
 		print(f"A_p=\n{A_p}")
 		print(f"b_p=\n{b_p}")
 
+		assert A_p.ndim == 2, f"Aineq.shape={A_p.shape}"
+		assert b_p.ndim == 2, f"bineq.shape={b_p.shape}"
+		assert b_p.shape[1] ==1
+		assert A_p.shape[0] == b_p.shape[0]
+
 		# print(f"A=\n{A}")
 		# print(f"b=\n{b}")
 
@@ -329,10 +337,10 @@ class LinearConstraint():
 		else:
 			max_radius=1.0; #to prevent unbounded result
 
-		B, x0 = largestBallInPolytope(A_p,b_p, max_radius) 
-		#B, x0 = largestEllipsoidBInPolytope(A,b) #This is very slow in high dimensions
+		B, z0 = largestBallInPolytope(A_p,b_p, max_radius) 
+		#B, z0 = largestEllipsoidBInPolytope(A,b) #This is very slow in high dimensions
 
-		return A_p, b_p, p0, NA_E, B, x0
+		return A_p, b_p, p0, NA_E, B, z0
 
 
 
@@ -373,6 +381,13 @@ def create_mlp(
     if squash_output:
         modules.append(nn.Tanh())
     return nn.Sequential(*modules)
+
+#https://stackoverflow.com/questions/65154622/sample-uniformly-at-random-from-a-simplex-in-python
+def runif_in_simplex(n):
+  ''' Return uniformly random vector in the n-simplex '''
+
+  k = np.random.exponential(scale=1.0, size=n)
+  return k / sum(k)
 
 #This function is taken from https://github.com/tfrerix/constrained-nets
 def H_to_V(A, b):
@@ -420,6 +435,8 @@ def H_to_V(A, b):
 		else:
 			raise ValueError('Generator data structure is not valid.')
 
+	printInBoldRed(f"Found {len(V_list)} vertices and {len(R_list)} rays")
+
 	V = np.asarray(V_list)
 	R = np.asarray(R_list)
 
@@ -427,12 +444,26 @@ def H_to_V(A, b):
 	# are not constrained to non-negative coefficients
 	if len(R) > 0:
 		R = np.concatenate([R, -R[R_lin_idx, :]], axis=0)
+
+	V=V.T; 
+	R=R.T;
+
+
+	if(R.size==0):
+		R=np.array([[]])#Simply add a dimension, so that both V and R are 2D matrices
+
+	if(V.size==0):
+		V=np.array([[]])#Simply add a dimension, so that both V and R are 2D matrices
+
+	#Each column of V is a vertex
+	#Each column of R is a ray
+
 	return V, R
 
 
 def plot3DPolytopeHRepresentation(A,b, limits, ax):
 	points, R=H_to_V(A,b)
-	plot3DPolytopeVRepresentation(points.T, limits, ax)
+	plot3DPolytopeVRepresentation(points, limits, ax)
 
 def plot3DPolytopeVRepresentation(V, limits, ax):
 	points=V.T

@@ -14,7 +14,7 @@ class LinearConstraintLayer(torch.nn.Module):
 
 		self.method=method
 
-		if(self.method=='walker'):
+		if(self.method=='walker' or self.method=='barycentric'):
 			A_p, b_p, y0, NA_E, B, z0=lc.process();
 
 			self.Z_is_unconstrained= (not np.any(A_p))  and (not np.any(b_p)); #A_p is the zero matrix and b_p the zero vector
@@ -28,6 +28,19 @@ class LinearConstraintLayer(torch.nn.Module):
 			self.B = torch.Tensor(B)
 			self.z0 = torch.Tensor(z0)
 
+			if(self.method=='barycentric'):
+				print(f"A_p={A_p}")
+				print(f"b_p={b_p}")
+				print("Computing vertices and rays...")
+				self.V,self.R = utils.H_to_V(A_p, b_p);
+				self.V = torch.Tensor(self.V)
+				self.R = torch.Tensor(self.R)
+				self.num_vertices=self.V.shape[1];
+				self.num_rays=self.R.shape[1];
+				assert (self.num_vertices+self.num_rays)>0
+				print(self.V)
+				print(self.R)
+				# exit()
 
 
 		self.mapper=nn.Sequential();
@@ -38,6 +51,9 @@ class LinearConstraintLayer(torch.nn.Module):
 			return (self.dim+1)
 		if(self.method=='unconstrained'):
 			return self.lc.dimAmbSpace()
+		if(self.method=='barycentric'):
+			return self.num_vertices + self.num_rays
+
 
 	def setMapper(self, mapper):
 		self.mapper=mapper
@@ -74,7 +90,6 @@ class LinearConstraintLayer(torch.nn.Module):
 
 			bp_minus_Apz0=torch.sub(self.b_p,self.A_p@self.z0)
 
-			print(bp_minus_Apz0)
 			## FIRST OPTION
 			# all_max_distances=torch.div(bp_minus_Apz0,self.A_p@u)
 			# all_max_distances[all_max_distances<=0]=float("Inf")
@@ -107,6 +122,22 @@ class LinearConstraintLayer(torch.nn.Module):
 
 		if(self.method=='unconstrained'):
 			y0_new=z
+
+
+		if (self.method=='barycentric'):
+			tmp1 = z[:,  0:self.num_vertices,0:1] #0:1 to keep the dimension. Other option is torch.unsqueeze(z[:,  0:self.dim,0],2) 
+			tmp2 = z[:,  self.num_vertices:(self.num_vertices+self.num_rays),0:1] #0:1 to keep the dimension. Other option is torch.unsqueeze(z[:,  0:self.dim,0],2) 
+			
+			lambdas=nn.functional.softmax(tmp1, dim=1)
+			mus=torch.abs(tmp2)
+
+			z0_new=self.V@lambdas + self.R@mus
+
+			print(z0_new.shape)
+			#Now lift back to the original space
+			y0_new =self.NA_E@z0_new + self.y0
+
+			# exit()
 
 
 		return y0_new

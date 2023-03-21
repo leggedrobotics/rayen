@@ -41,7 +41,7 @@ def getExample(example):
 		Aeq=None;
 		beq=None;
 
-	elif example==2:
+	elif example==2: #The intersection between a cube and a plane 3d cube 
 		Aineq, bineq=getCube()
 		Aeq=np.array([[1, 1, 1],
 					  [-1, 1, 1] ]);

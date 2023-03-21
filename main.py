@@ -171,7 +171,7 @@ def main(params):
 
 	results = []  # a list of dicts
 	for trial in range(params['n_trials']):
-		model = LinearConstraintLayer(lc, method='unconstrained') #'walker', 'unconstrained'
+		model = LinearConstraintLayer(lc, method=params['method']) 
 
 		# mapper=nn.Sequential(nn.Linear(Aineq.shape[1], model.getNumelInputWalker()))
 		mapper=utils.create_mlp(input_dim=my_dataset.getNumelX(), output_dim=model.getNumelOutputMapper(), net_arch=[256,256])
@@ -214,7 +214,7 @@ if __name__ == '__main__':
 
 
 	parser = argparse.ArgumentParser()
-	parser.add_argument('--method', type=str, default='walker')
+	parser.add_argument('--method', type=str, default='walker') #walker or barycentric
 	parser.add_argument('--result_dir', type=str, default='results')
 	parser.add_argument('--device', type=int, default=0)
 	parser.add_argument('--num_epochs', type=int, default=4000)

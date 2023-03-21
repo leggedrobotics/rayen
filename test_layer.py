@@ -8,7 +8,8 @@ import utils
 from linear_constraint_layer import LinearConstraintLayer
 from examples_sets import getExample
 
-lc=getExample(0)
+lc=getExample(3)
+method='walker' #'walker'
 
 fig = plt.figure()
 if(lc.dimAmbSpace()==3):
@@ -19,13 +20,13 @@ else:
 	ax = fig.add_subplot(111) 
 
 num_steps=4; #Only used in the ellipsoid_walker method
-my_layer=LinearConstraintLayer(lc)
+my_layer=LinearConstraintLayer(lc, method=method)
 
-numel_input_walker=my_layer.getNumelOutputMapper()
+numel_output_mapper=my_layer.getNumelOutputMapper()
 
 ##This samples different angles
 # all_angles = np.arange(0,2*math.pi, 0.01)
-# x_batched=torch.empty(len(all_angles), numel_input_walker, 1)
+# x_batched=torch.empty(len(all_angles), numel_output_mapper, 1)
 
 # for i in range(x_batched.shape[0]): #for each element of the batch
 # 	theta=all_angles[i]
@@ -38,22 +39,37 @@ numel_input_walker=my_layer.getNumelOutputMapper()
 # 	x_batched[i,:,:]=tmp
 
 
-num_directions=500; #for each direction you have several samples
-x_batched=torch.empty(0, numel_input_walker, 1)
-for i in range(num_directions): #for each direction
-	direction=utils.uniformSampleInUnitSphere(my_layer.dim)
-	for scalar in list(np.linspace(-8.0, 8.0, num=100)):
-		scalar_np=np.array([[scalar]])
-		direction_and_scalar=np.concatenate((direction,scalar_np), axis=0);
-		tmp=torch.Tensor(direction_and_scalar)
-		tmp=torch.unsqueeze(tmp, dim=0)
-		# print(f"direction_and_scalar={direction_and_scalar}")
-		x_batched=torch.cat((x_batched, tmp), axis=0)
+if(method=='walker'):
+	num_directions=500; #for each direction you have several samples
+	x_batched=torch.empty(0, numel_output_mapper, 1)
+	for i in range(num_directions): #for each direction
+		direction=utils.uniformSampleInUnitSphere(my_layer.dim)
+		for scalar in list(np.linspace(-8.0, 8.0, num=100)):
+			scalar_np=np.array([[scalar]])
+			direction_and_scalar=np.concatenate((direction,scalar_np), axis=0);
+			tmp=torch.Tensor(direction_and_scalar)
+			tmp=torch.unsqueeze(tmp, dim=0)
+			# print(f"direction_and_scalar={direction_and_scalar}")
+			x_batched=torch.cat((x_batched, tmp), axis=0)
+
+if(method=='barycentric'):
+	x_batched=torch.empty(0, numel_output_mapper, 1)
+
+	for i in range(5000):
+		# sample_lambda = utils.runif_in_simplex(my_layer.num_vertices);
+		# sample_mu = np.random.uniform(0.0,2.5,my_layer.num_rays);
+		# sample=np.concatenate((sample_lambda, sample_mu));
+		sample=np.random.uniform(-5,5,numel_output_mapper);
+		sample=torch.Tensor(np.expand_dims(sample, axis=1))
+		sample=torch.unsqueeze(sample, dim=0) 
+		x_batched=torch.cat((x_batched, sample), axis=0) 
+
+
 
 
 # print(f"x_batched={x_batched}")
 # exit()
-# mapper=nn.Sequential(nn.Linear(x_batched.shape[1], numel_input_walker))
+# mapper=nn.Sequential(nn.Linear(x_batched.shape[1], numel_output_mapper))
 mapper=nn.Sequential() #do nothing.
 my_layer.setMapper(mapper)
 
