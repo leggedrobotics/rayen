@@ -301,29 +301,65 @@ classdef MyClampedUniformSpline < handle
                 result = obj.evalDerivativeT(3,t);               
         end
         
-%         function result = getAccelCost(obj)
-% 
-%             result=0;
-%             for j=1:obj.num_seg   
-%                 V=sp.getCPs_BS_Pos_ofInterval(j);
-%                 interv=sp.timeSpanOfInterval(j);
-%                 P=V*getA_BS(obj.p,interv);
-%                 
-%                 polyint(P(1,:))
-%                 %Work in progress...
-%             end
-%             
-%         end
-
-
-        function result=getApproxAccelCost(obj,delta)
+        function result=getApproxVelCost(obj,num_samples)
             result=0;
-            for j=1:obj.num_seg  
-                for u=0:delta:1
-                    accel=obj.getAccelU(u,j);
-                    result=result+ accel'*accel*delta;
-                end
+            all_t=linspace(obj.t0, obj.tf,num_samples);
+            for i=1:(numel(all_t)-1)
+                vel_ti=obj.getVelT(all_t(i));
+                vel_tip1=obj.getVelT(all_t(i+1));
+                tmp=0.5*(vel_ti'*vel_ti + vel_tip1'*vel_tip1); %trapezoidal rule
+                delta=all_t(i+1)-all_t(i);
+                result=result+ tmp*delta;
             end
+        end
+
+        function result=getApproxAccelCost(obj,num_samples)
+            result=0;
+            all_t=linspace(obj.t0, obj.tf,num_samples);
+            for i=1:(numel(all_t)-1)
+                accel_ti=obj.getAccelT(all_t(i));
+                accel_tip1=obj.getAccelT(all_t(i+1));
+                tmp=0.5*(accel_ti'*accel_ti + accel_tip1'*accel_tip1); %trapezoidal rule
+                delta=all_t(i+1)-all_t(i);
+                result=result+ tmp*delta;
+            end
+        end
+
+        function result = getVelCost(obj)
+            t=casadi.MX.sym('t');
+            T=getTCasadi(t,obj.p);
+            result=0;
+            for j=1:obj.num_seg   
+                V=obj.getCPsofIntervalAsMatrix(j);
+                interv=obj.timeSpanOfInterval(j);
+                T_normalized=casadi.substitute(T,t,(t-interv(1))/(interv(2)-interv(1)));
+                Pt=V*obj.getA_BS_Pos_Interval(j)*T_normalized; %Pt is the position polynomial
+                Vt=jacobian(Pt,t);  
+                Vt_squared_norm=Vt'*Vt;
+                v_squared=getCoeffPolyCasadi(Vt_squared_norm, t, 2*obj.p);
+                tmp=[numel(v_squared):-1:1];
+                integral_of_segment_j=sum(v_squared.*((interv(2).^tmp)./tmp)) - sum(v_squared.*((interv(1).^tmp)./tmp));
+                result=result+integral_of_segment_j;
+            end            
+        end
+
+        function result = getAccelCost(obj)
+            t=casadi.MX.sym('t');
+            T=getTCasadi(t,obj.p);
+            result=0;
+            for j=1:obj.num_seg   
+                V=obj.getCPsofIntervalAsMatrix(j);
+                interv=obj.timeSpanOfInterval(j);
+                T_normalized=casadi.substitute(T,t,(t-interv(1))/(interv(2)-interv(1)));
+                Pt=V*obj.getA_BS_Pos_Interval(j)*T_normalized; %Pt is the position polynomial
+                Vt=jacobian(Pt,t);  
+                At=jacobian(Vt,t);  
+                At_squared_norm=At'*At;
+                a_squared=getCoeffPolyCasadi(At_squared_norm, t, 2*obj.p);
+                tmp=[numel(a_squared):-1:1];
+                integral_of_segment_j=sum(a_squared.*((interv(2).^tmp)./tmp)) - sum(a_squared.*((interv(1).^tmp)./tmp));
+                result=result+integral_of_segment_j;
+            end            
         end
 
         %For spline, control_cost=
