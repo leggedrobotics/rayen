@@ -16,9 +16,9 @@ allA={};
 allb={};
 allV={};
 
-steps=4;
-samples_per_step=10;
-radius=0.8;
+steps=2;
+samples_per_step=5;
+radius=1.3;
 
 for i=1:(size(P,2)-1)
 %     [A, b]=getABgivenP1P2(P(:,i),P(:,i+1));
@@ -55,10 +55,10 @@ plotSphere(pf,0.08,'r')
 
 
 t0=0.0;
-tf=4.0;
+tf=10.0;
 
 num_of_regions=size(allA,2);
-num_of_seg_per_region=5; %Note: IF YOU FIND THE ERROR "Matrix product with incompatible dimensions. Lhs is 3x1 and rhs is 3x3." when changing, this, the cause if the hand-coded "n_int_knots=15; " in computeMatrixForClampedUniformBSpline.m. Increase it.
+num_of_seg_per_region=3; %Note: IF YOU FIND THE ERROR "Matrix product with incompatible dimensions. Lhs is 3x1 and rhs is 3x3." when changing, this, the cause if the hand-coded "n_int_knots=15; " in computeMatrixForClampedUniformBSpline.m. Increase it.
 
 all_volumes.MINVO=[];
 all_volumes.BEZIER=[];
@@ -68,11 +68,14 @@ all_costs=[];
 
 basis="MINVO"; %MINVO OR B_SPLINE or BEZIER. This is the basis used for collision checking (in position, velocity, accel and jerk space), both in Matlab and in C++
 linear_solver_name='mumps'; %mumps [default, comes when installing casadi], ma27, ma57, ma77, ma86, ma97 
-my_solver='ipopt' %'ipopt' %'gurobi'
+my_solver='gurobi' %'ipopt' %'gurobi'
 print_level=0; %From 0 (no verbose) to 12 (very verbose), default is 5
 
-
-opti = casadi.Opti();%'conic' I think you need to use 'conic' for gurobi
+if (strcmp(my_solver,'gurobi'))
+opti = casadi.Opti('conic');%'conic' I think you need to use 'conic' for gurobi
+else
+ opti = casadi.Opti();
+end
 deg_pos=3;
 dim_pos=3;
 num_seg =num_of_seg_per_region*num_of_regions;
@@ -134,9 +137,12 @@ end
 
 %%%%%%%%%%%%%%%%%% COST
 final_pos_cost=(sp.getPosT(tf)- pf)'*(sp.getPosT(tf)- pf);
-control_cost=sp.getControlCost();
+jerk_cost=sp.getControlCost();
+accel_cost=sp.getAccelCost();
+vel_cost=sp.getVelCost();
+
 weight_param=opti.parameter();
-cost=simplify(control_cost + weight_param*final_pos_cost);
+cost=simplify(vel_cost +  jerk_cost + weight_param*final_pos_cost);
 opti.minimize(cost)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -152,7 +158,7 @@ if (strcmp(my_solver,'ipopt'))
 end
 opti.solver(my_solver,opts); %{"ipopt.hessian_approximation":"limited-memory"} 
 
-all_weights=0.2 %0:2:10;W
+all_weights=0:0.5:10; %0.2 %0:2:10;W
 % all_x=num2cell(rand(1,numel(all_weights)));
 % all_y=num2cell(rand(1,numel(all_weights)));
 all_x={};
