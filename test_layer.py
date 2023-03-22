@@ -8,8 +8,8 @@ import utils
 from linear_constraint_layer import LinearConstraintLayer
 from examples_sets import getExample
 
-lc=getExample(3)
-method='walker' #'walker'
+lc=getExample(0)
+method='proj_test' #'walker'
 
 fig = plt.figure()
 if(lc.dimAmbSpace()==3):
@@ -52,10 +52,10 @@ if(method=='walker'):
 			# print(f"direction_and_scalar={direction_and_scalar}")
 			x_batched=torch.cat((x_batched, tmp), axis=0)
 
-if(method=='barycentric'):
+if(method=='barycentric' or method=='proj_train_test' or method=='proj_test'):
 	x_batched=torch.empty(0, numel_output_mapper, 1)
 
-	for i in range(5000):
+	for i in range(1000):
 		# sample_lambda = utils.runif_in_simplex(my_layer.num_vertices);
 		# sample_mu = np.random.uniform(0.0,2.5,my_layer.num_rays);
 		# sample=np.concatenate((sample_lambda, sample_mu));
@@ -64,7 +64,18 @@ if(method=='barycentric'):
 		sample=torch.unsqueeze(sample, dim=0) 
 		x_batched=torch.cat((x_batched, sample), axis=0) 
 
+# if(method=='proj_train_test'):
+# 	x_batched=torch.empty(0, numel_output_mapper, 1)
 
+# 	for i in range(1000):
+# 		# sample_lambda = utils.runif_in_simplex(my_layer.num_vertices);
+# 		# sample_mu = np.random.uniform(0.0,2.5,my_layer.num_rays);
+# 		# sample=np.concatenate((sample_lambda, sample_mu));
+# 		sample=np.random.uniform(-5,5,numel_output_mapper);
+# 		print(sample)
+# 		sample=torch.Tensor(np.expand_dims(sample, axis=1))
+# 		sample=torch.unsqueeze(sample, dim=0) 
+# 		x_batched=torch.cat((x_batched, sample), axis=0) 
 
 
 # print(f"x_batched={x_batched}")
@@ -73,6 +84,7 @@ if(method=='barycentric'):
 mapper=nn.Sequential() #do nothing.
 my_layer.setMapper(mapper)
 
+my_layer.eval() #This changes the self.training variable of the module
 result=my_layer(x_batched)
 
 # my_layer.plotAllSteps(ax)
