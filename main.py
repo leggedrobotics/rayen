@@ -40,11 +40,16 @@ class SplittedDatasetAndGenerator():
 		assert len(self.val_dataset)>0
 		assert len(self.test_dataset)>0
 
+		utils.printInBoldRed(f"Elements [train, val, test]={[len(self.train_dataset), len(self.val_dataset), len(self.test_dataset)]}")
+
 		self.batch_size=batch_size
 
 		self.train_generator = DataLoader(self.train_dataset, batch_size=batch_size, shuffle=True)
 		self.val_generator = DataLoader(self.val_dataset, batch_size=batch_size, shuffle=False)
 		self.test_generator = DataLoader(self.test_dataset, batch_size=batch_size, shuffle=False)
+
+		utils.printInBoldRed(f"Created DataLoader with batches [train, val, test]={[len(self.train_generator), len(self.val_generator), len(self.test_generator)]}")
+
 	
 
 def append_filename(params, filename):
@@ -127,15 +132,23 @@ def test_model(model, params, sdag, lc):
 	val_loss = 0
 
 	violations = np.empty((0,1))
+	losses = np.empty((0,1))
+
+	loss_fn = nn.MSELoss(reduction='none')
 
 	with torch.set_grad_enabled(False):
 		start_eval_time = time.time()
 		for x, y in sdag.test_generator:
 			x = x.to(device)
+			x[0]=100;
 			y = y.to(device)
 			y_predicted = model(x)
 
 			print(f"y_predicted.shape={y_predicted.shape}")
+			loss = loss_fn(y_predicted, y)
+			loss_np=torch.unsqueeze(torch.flatten(loss),dim=1).cpu().numpy();
+			print(f"loss_np.shape={loss_np.shape}")
+			losses=np.concatenate((losses, loss_np),axis=0)
 
 			y_predicted_numpy=y_predicted.cpu().numpy();
 			violations_of_this_batch=np.apply_along_axis(lc.getViolation,axis=1, arr=y_predicted_numpy)
@@ -152,6 +165,7 @@ def test_model(model, params, sdag, lc):
 	# print('Evaluated {} runs of {} samples with batch size {}.'.format(params['n_evals'], len(sdag.test_generator), sdag.batch_size))
 	# print('mean eval time: {}, standard deviation: {}'.format(np.mean(eval_times), np.std(eval_times)))
 	utils.printInBoldRed(f'mean violation={np.mean(violations)}')
+	utils.printInBoldRed(f'mean loss={np.mean(losses)}')
 
 def main(params):
 
@@ -214,7 +228,7 @@ if __name__ == '__main__':
 
 
 	parser = argparse.ArgumentParser()
-	parser.add_argument('--method', type=str, default='walker') #walker or barycentric
+	parser.add_argument('--method', type=str, default='unconstrained') #walker or barycentric or unconstrained
 	parser.add_argument('--result_dir', type=str, default='results')
 	parser.add_argument('--device', type=int, default=0)
 	parser.add_argument('--num_epochs', type=int, default=4000)
