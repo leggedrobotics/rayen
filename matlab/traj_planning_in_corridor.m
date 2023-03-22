@@ -60,15 +60,9 @@ tf=10.0;
 num_of_regions=size(allA,2);
 num_of_seg_per_region=3; %Note: IF YOU FIND THE ERROR "Matrix product with incompatible dimensions. Lhs is 3x1 and rhs is 3x3." when changing, this, the cause if the hand-coded "n_int_knots=15; " in computeMatrixForClampedUniformBSpline.m. Increase it.
 
-all_volumes.MINVO=[];
-all_volumes.BEZIER=[];
-
-all_costs=[];
-% for basis=["BEZIER","MINVO"]
-
 basis="MINVO"; %MINVO OR B_SPLINE or BEZIER. This is the basis used for collision checking (in position, velocity, accel and jerk space), both in Matlab and in C++
-linear_solver_name='mumps'; %mumps [default, comes when installing casadi], ma27, ma57, ma77, ma86, ma97 
-my_solver='gurobi' %'ipopt' %'gurobi'
+linear_solver_name='ma27'; %mumps [default, comes when installing casadi], ma27, ma57, ma77, ma86, ma97 
+my_solver='ipopt' %'ipopt' %'gurobi'
 print_level=0; %From 0 (no verbose) to 12 (very verbose), default is 5
 
 if (strcmp(my_solver,'gurobi'))
@@ -136,13 +130,16 @@ end
 
 
 %%%%%%%%%%%%%%%%%% COST
-final_pos_cost=(sp.getPosT(tf)- pf)'*(sp.getPosT(tf)- pf);
-jerk_cost=sp.getControlCost();
-accel_cost=sp.getAccelCost();
 vel_cost=sp.getVelCost();
+accel_cost=sp.getAccelCost();
+jerk_cost=sp.getControlCost();
+final_pos_cost=(sp.getPosT(tf)- pf)'*(sp.getPosT(tf)- pf);
 
-weight_param=opti.parameter();
-cost=simplify(vel_cost +  jerk_cost + weight_param*final_pos_cost);
+weight_vel=opti.parameter();
+weight_accel=opti.parameter();
+weight_jerk=opti.parameter();
+
+cost=simplify(weight_vel*vel_cost + weight_accel*accel_cost +  weight_jerk*jerk_cost + final_pos_cost);
 opti.minimize(cost)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -155,25 +152,60 @@ if (strcmp(my_solver,'ipopt'))
     opts.ipopt.print_level=print_level; 
     opts.ipopt.print_frequency_iter=1e10;%1e10 %Big if you don't want to print all the iteratons
     opts.ipopt.linear_solver=linear_solver_name;
+else
+    opts.gurobi.verbose=true; 
 end
+% opts.error_on_fail=false;
 opti.solver(my_solver,opts); %{"ipopt.hessian_approximation":"limited-memory"} 
 
-all_weights=0:0.5:10; %0.2 %0:2:10;W
-% all_x=num2cell(rand(1,numel(all_weights)));
-% all_y=num2cell(rand(1,numel(all_weights)));
+
+all_weights_vel = 0:0.05:0.3; %meshgrid(0:0.1:1,    0:0.1:1,     0:0.1:1); %0.2 %0:2:10;W
+all_weights_accel= 0:0.05:0.3;
+all_weights_jerk= 0:0.05:0.3;
+
 all_x={};
 all_y={};
-for i=1:numel(all_weights)%all_weights
-    weight=all_weights(i)
-    weight
-    opti.set_value(weight_param,weight);
-    sol = opti.solve();
-    control_points=sol.value(sp.getCPsAsMatrix);
-%     all_x{i}=weight;
-%     all_y{i}=control_points;
-    all_x{end+1}=weight;
-    all_y{end+1}=control_points;
-    optimal_cost=sol.value(cost);
+all_costs=[];
+all_sols={};
+
+for wv=all_weights_vel %(all_weights)%all_weights
+    for wa=all_weights_accel
+        for wj=all_weights_jerk
+            [wv wa wj]
+            opti.set_value(weight_vel,wv);
+            opti.set_value(weight_accel,wa);
+            opti.set_value(weight_jerk,wj);
+        
+            sol = opti.solve();
+            assert(strcmp(sol.stats.return_status,'Solve_Succeeded'))
+           
+            control_points=sol.value(sp.getCPsAsMatrix);
+        %     all_x{i}=weight;1:size(all_sols,2)
+        %     all_y{i}=control_points;
+            all_x{end+1}=[wv;wa;wj];
+            all_y{end+1}=control_points;
+            optimal_cost=sol.value(cost);
+        
+            all_costs=[all_costs  [sol.value(vel_cost);
+                                   sol.value(accel_cost);
+                                   sol.value(jerk_cost);
+                                   sol.value(final_pos_cost)]];
+            
+            all_sols{end+1}=control_points;
+%             all_sols=[all_sols control_points(:)];
+
+        end
+    end
+end
+
+num_sol=numel(all_sols);
+dist_matrix=zeros(num_sol,num_sol);
+for i=1:num_sol
+    for j=1:num_sol
+%         dist_matrix(i,j)=norm(all_sols(:,i)-all_sols(:,j));
+        tmp=vecnorm(all_sols{i}-all_sols{j});
+        dist_matrix(i,j)=sum(tmp)/sp.num_cpoints;
+    end
 end
 
 [Aineq,bineq]=getAbLinearConstraints(opti);
@@ -184,8 +216,11 @@ polyhedron.bineq=bineq;
 save('corridor.mat','all_x','all_y','polyhedron');
 
 sol = opti.solve();
+
 sp.updateCPsWithSolution(sol.value(sp.getCPsAsMatrix()));
 
+figure;
+imagesc(dist_matrix); colorbar
 
 %%
 
@@ -194,7 +229,7 @@ sp.updateCPsWithSolution(sol.value(sp.getCPsAsMatrix()));
 
 % ylim([-4,4]);zlim([-4,4]);
 
-
+figure(1);
 sp.plotPos3D(6)
 
 plot3(P(1,:),P(2,:),P(3,:),'--','LineWidth',2)
@@ -203,7 +238,7 @@ view(48,38); axis equal
 
 xlabel('x'); ylabel('y'); zlabel('z');
 
-sp.plotPosVelAccelJerk(v_max,a_max,j_max)
+% sp.plotPosVelAccelJerk(v_max,a_max,j_max)
 %%
 % close all;
 % figure; hold on;
