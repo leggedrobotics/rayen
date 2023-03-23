@@ -75,7 +75,7 @@ dim_pos=3;
 num_seg =num_of_seg_per_region*num_of_regions;
 sp=MyClampedUniformSpline(t0,tf,deg_pos, dim_pos, num_seg, opti);
 
-v0=[0 0.6 0]'; a0=zeros(3,1);
+v0=zeros(3,1); a0=zeros(3,1);
 vf=zeros(3,1); af=zeros(3,1);
 
 v_max=4*ones(3,1);   a_max=6*ones(3,1);   j_max=50*ones(3,1);
@@ -135,11 +135,9 @@ accel_cost=sp.getAccelCost();
 jerk_cost=sp.getControlCost();
 final_pos_cost=(sp.getPosT(tf)- pf)'*(sp.getPosT(tf)- pf);
 
-weight_vel=opti.parameter();
-weight_accel=opti.parameter();
-weight_jerk=opti.parameter();
+weights=opti.parameter(3,1);
 
-cost=simplify(weight_vel*vel_cost + weight_accel*accel_cost +  weight_jerk*jerk_cost + final_pos_cost);
+cost=simplify(weights(1)*vel_cost + weights(2)*accel_cost +  weights(3)*jerk_cost + final_pos_cost);
 opti.minimize(cost)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -159,68 +157,68 @@ end
 opti.solver(my_solver,opts); %{"ipopt.hessian_approximation":"limited-memory"} 
 
 
-all_weights_vel = 0:0.05:0.3; %meshgrid(0:0.1:1,    0:0.1:1,     0:0.1:1); %0.2 %0:2:10;W
-all_weights_accel= 0:0.05:0.3;
-all_weights_jerk= 0:0.05:0.3;
 
+all_wv=0:0.1:0.3;
+all_wa=0:0.1:0.3;
+all_wj=0:0.1:0.3;
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Generate samples inside the distribution
 all_x={};
 all_y={};
-all_costs=[];
-all_sols={};
-
-for wv=all_weights_vel %(all_weights)%all_weights
-    for wa=all_weights_accel
-        for wj=all_weights_jerk
-            [wv wa wj]
-            opti.set_value(weight_vel,wv);
-            opti.set_value(weight_accel,wa);
-            opti.set_value(weight_jerk,wj);
-        
+for wv=all_wv
+    for wa=all_wa
+        for wj=all_wj
+            [wv;wa;wj]
+            opti.set_value(weights,[wv;wa;wj]);
             sol = opti.solve();
             assert(strcmp(sol.stats.return_status,'Solve_Succeeded'))
-           
             control_points=sol.value(sp.getCPsAsMatrix);
-        %     all_x{i}=weight;1:size(all_sols,2)
-        %     all_y{i}=control_points;
             all_x{end+1}=[wv;wa;wj];
-            all_y{end+1}=control_points;
-            optimal_cost=sol.value(cost);
-        
-            all_costs=[all_costs  [sol.value(vel_cost);
-                                   sol.value(accel_cost);
-                                   sol.value(jerk_cost);
-                                   sol.value(final_pos_cost)]];
-            
-            all_sols{end+1}=control_points;
-%             all_sols=[all_sols control_points(:)];
-
+            all_y{end+1}=control_points(:);
         end
     end
 end
 
-num_sol=numel(all_sols);
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Generate samples outside the distribution
+all_x_out_dist={};
+all_y_out_dist={};
+for wv=2*all_wv
+    for wa=2*all_wa
+        for wj=2*all_wj
+            [wv;wa;wj]'
+            opti.set_value(weights,[wv;wa;wj]);
+            sol = opti.solve();
+            assert(strcmp(sol.stats.return_status,'Solve_Succeeded'))
+            control_points=sol.value(sp.getCPsAsMatrix);
+            all_x_out_dist{end+1}=[wv;wa;wj];
+            all_y_out_dist{end+1}=control_points(:);
+        end
+    end
+end
+
+%%%%%%Plotting
+num_sol=numel(all_y);
 dist_matrix=zeros(num_sol,num_sol);
 for i=1:num_sol
     for j=1:num_sol
-%         dist_matrix(i,j)=norm(all_sols(:,i)-all_sols(:,j));
-        tmp=vecnorm(all_sols{i}-all_sols{j});
+        tmp=vecnorm(all_y{i}-all_y{j});
         dist_matrix(i,j)=sum(tmp)/sp.num_cpoints;
     end
 end
+figure;
+imagesc(dist_matrix); colorbar
+%%%%%%%%%%%%%%%%%%
 
 [Aineq,bineq]=getAbLinearConstraints(opti);
 polyhedron.Aineq=Aineq;
 polyhedron.bineq=bineq;
 
 
-save('corridor.mat','all_x','all_y','polyhedron');
+save('corridor.mat','all_x','all_y','all_x_out_dist','all_y_out_dist','polyhedron');
 
 sol = opti.solve();
 
 sp.updateCPsWithSolution(sol.value(sp.getCPsAsMatrix()));
 
-figure;
-imagesc(dist_matrix); colorbar
 
 %%
 

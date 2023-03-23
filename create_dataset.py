@@ -51,21 +51,18 @@ class CustomDataset(Dataset):
 			ax.scatter(all_x_np[0,:], all_x_np[1,:],color='red')
 			ax.scatter(all_y_np[0,:], all_y_np[1,:],color='blue')
 
-def createProjectionDataset(num_samples, lc): #lc is the LinearConstraint
+def createProjectionDataset(num_samples, lc, bbox_half_side): #lc is the LinearConstraint
 
 	all_x=[];
 	all_y=[];
 
-	
 	for i in range(num_samples):
-		x=np.random.uniform(low=-4.0, high=4.0, size=(lc.dimAmbSpace(),1))
+		x=np.random.uniform(low=-bbox_half_side, high=bbox_half_side, size=(lc.dimAmbSpace(),1))
 		all_x.append(x)
 		x_projected, _ = lc.project(x)
 		all_y.append(x_projected)
-
-
-	# define data set object
 	my_dataset = CustomDataset(all_x, all_y)
+
 
 	###plotting stuff
 	# fig = plt.figure()
@@ -80,32 +77,41 @@ def createProjectionDataset(num_samples, lc): #lc is the LinearConstraint
 
 	return my_dataset
 
-def getCorridorDatasetAndLC():
+def getCorridorDatasetsAndLC():
+
 	mat = scipy.io.loadmat('./matlab/corridor.mat')
+
 	all_x=list(mat["all_x"][0])
 	all_y=list(mat["all_y"][0])
+
+	all_x_out_dist=list(mat["all_x_out_dist"][0])
+	all_y_out_dist=list(mat["all_y_out_dist"][0])
 
 	polyhedron=mat["polyhedron"]
 
 	Aineq=polyhedron['Aineq'][0,0];
 	bineq=polyhedron['bineq'][0,0];
 
-	assert all_x[0].ndim==2
 	assert Aineq.ndim==2
 	assert bineq.ndim==2
 
-	#This converts all the  to column vectors
-	#Note that the order in the flatten() function needs to be consistent with the one from Casadi
-	all_y_flattened=[np.expand_dims(y_i.flatten('F'), axis=1) for y_i in all_y] 
-	all_x_flattened=all_x;
-
-	assert all_y_flattened[0].shape[1]==1
-	assert all_x_flattened[0].shape[1]==1
+	assert all_y[0].shape[1]==1
+	assert all_x[0].shape[1]==1
+	assert all_x_out_dist[0].shape[1]==1
+	assert all_y_out_dist[0].shape[1]==1
 
 	lc=utils.LinearConstraint(Aineq, bineq, None, None)
-	my_dataset = CustomDataset(all_x_flattened, all_y_flattened)
+	my_dataset = CustomDataset(all_x, all_y)
+	my_dataset_out_dist = CustomDataset(all_x_out_dist, all_y_out_dist)
 
-	return my_dataset, lc
+	# print(all_x[0].shape)
+	# print(all_x_out_dist[0].shape)
+
+	# print(all_y_out_dist[0].shape)
+	# print(all_y[0].shape)
+	# exit()
+
+	return my_dataset, my_dataset_out_dist,  lc
 
 	# print(polyhedron['Aineq'][0,0])
 
