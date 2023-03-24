@@ -23,12 +23,22 @@ class LinearConstraintLayer(torch.nn.Module):
 
 
 			self.dim=A_p.shape[1]
-			self.A_p = torch.Tensor(A_p)
-			self.b_p = torch.Tensor(b_p)
-			self.y0=torch.Tensor(y0)
-			self.NA_E=torch.Tensor(NA_E)
-			self.B = torch.Tensor(B)
-			self.z0 = torch.Tensor(z0)
+			A_p = torch.Tensor(A_p)
+			b_p = torch.Tensor(b_p)
+			y0=torch.Tensor(y0)
+			NA_E=torch.Tensor(NA_E)
+			B = torch.Tensor(B)
+			z0 = torch.Tensor(z0)
+
+			#See https://discuss.pytorch.org/t/model-cuda-does-not-convert-all-variables-to-cuda/114733/9
+			# and https://discuss.pytorch.org/t/keeping-constant-value-in-module-on-correct-device/10129
+			self.register_buffer("A_p", A_p)
+			self.register_buffer("b_p", b_p)
+			self.register_buffer("y0", y0)
+			self.register_buffer("NA_E", NA_E)
+			self.register_buffer("B", B)
+			self.register_buffer("z0", z0)
+
 
 			if(self.method=='proj_train_test' or self.method=='proj_test'):
 				#Section 8.1.1 of https://web.stanford.edu/~boyd/cvxbook/bv_cvxbook.pdf
@@ -95,13 +105,6 @@ class LinearConstraintLayer(torch.nn.Module):
 		####################################################
 
 		if(self.method=='walker'):
-
-			self.A_p = self.A_p.to(x.device)
-			self.b_p = self.b_p.to(x.device)
-			self.B = self.B.to(x.device)
-			self.z0 = self.z0.to(x.device)
-			self.NA_E = self.NA_E.to(x.device)
-			self.y0 = self.y0.to(x.device)
 			
 			v = z[:,  0:self.dim,0:1] #0:1 to keep the dimension. Other option is torch.unsqueeze(z[:,  0:self.dim,0],2) 
 			beta= z[:, self.dim:(self.dim+1),0:1]#0:1 to keep the dimension. Other option istorch.unsqueeze(z[:, self.dim:(self.dim+1),0],2)
