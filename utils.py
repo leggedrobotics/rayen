@@ -98,6 +98,16 @@ class LinearConstraint():
 		objective = cp.Minimize(cp.sum_squares(self.x_projected - self.x_to_be_projected))
 		self.prob_projection = cp.Problem(objective, constraints)
 
+		installed_solvers=cp.installed_solvers();
+		if 'GUROBI' in installed_solvers:
+			self.solver='GUROBI' #You need to do `python -m pip install gurobipy`
+		elif 'OSQP' in installed_solvers:
+			self.solver='OSQP'
+		elif 'CVXOPT' in installed_solvers:	
+			self.solver='CVXOPT'
+		else:
+			raise Exception(f"Did you install a solver?")
+
 
 	def hasIneqConstraints(self):
 		return self.has_ineq_constraints
@@ -122,7 +132,8 @@ class LinearConstraint():
 		assert x_to_be_projected.shape==self.x_to_be_projected.shape
 
 		self.x_to_be_projected.value=x_to_be_projected;
-		obj_value = self.prob_projection.solve(verbose=False);
+		obj_value = self.prob_projection.solve(verbose=False, solver=self.solver);
+
 		if(self.prob_projection.status != 'optimal' and self.prob_projection.status != 'optimal_inaccurate'):
 			raise Exception(f"Value is not optimal, prob_status={self.prob_projection.status}")
 
@@ -217,7 +228,7 @@ class LinearConstraint():
 			constraints=[A[all_rows_but_i,:]@z<=b[all_rows_but_i,:],   A[i,:]@z<=(b[i,0]+1)]
 			prob = cp.Problem(objective, constraints)
 			result = prob.solve(verbose=False);
-			if(prob.status != 'optimal'):
+			if(prob.status != 'optimal' and prob.status!='optimal_inaccurate'):
 				raise Exception("Value is not optimal")
 
 			if ((objective.value-b[i,0])<=TOL):
