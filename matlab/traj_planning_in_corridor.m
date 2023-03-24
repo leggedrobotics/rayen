@@ -9,16 +9,16 @@
 close all; clc;clear;
 doSetup();
 
-P=[0 1 2 3 4 3 2;
-   0 1 1 2 4 4 4;
-   0 1 1 1 4 1 0];
+P=3*[0 1 2 3 4 3 2;
+     0 1 1 2 4 4 4;
+     0 1 1 1 4 1 0];
 allA={};
 allb={};
 allV={};
 
 steps=2;
 samples_per_step=5;
-radius=1.3;
+radius=4*1.3;
 
 for i=1:(size(P,2)-1)
 %     [A, b]=getABgivenP1P2(P(:,i),P(:,i+1));
@@ -28,8 +28,8 @@ for i=1:(size(P,2)-1)
     allV{end+1}=V;
 end
 
-p0=0.8*P(:,1) + 0.2*P(:,2);
-pf=0.2*P(:,end-1) + 0.8*P(:,end);
+p0=mean(allV{1},2); %  0.8*P(:,1) + 0.2*P(:,2);
+pf=mean(allV{end},2); %0.2*P(:,end-1) + 0.8*P(:,end);
 
 figure;
 hold on;
@@ -48,8 +48,9 @@ xlim([min(P(1,:))-delta,max(P(1,:))+delta]);
 ylim([min(P(2,:))-delta,max(P(2,:))+delta]);
 zlim([min(P(3,:))-delta,max(P(3,:))+delta]);
 
-plotSphere(p0,0.08,'g')
-plotSphere(pf,0.08,'r')
+plotSphere(p0,0.2,'g')
+plotSphere(pf,0.2,'r')
+
 
 %%
 
@@ -62,7 +63,7 @@ num_of_seg_per_region=3; %Note: IF YOU FIND THE ERROR "Matrix product with incom
 
 basis="MINVO"; %MINVO OR B_SPLINE or BEZIER. This is the basis used for collision checking (in position, velocity, accel and jerk space), both in Matlab and in C++
 linear_solver_name='ma27'; %mumps [default, comes when installing casadi], ma27, ma57, ma77, ma86, ma97 
-my_solver='ipopt' %'ipopt' %'gurobi'
+my_solver='gurobi' %'ipopt' %'gurobi'
 print_level=0; %From 0 (no verbose) to 12 (very verbose), default is 5
 
 if (strcmp(my_solver,'gurobi'))
@@ -74,6 +75,12 @@ deg_pos=3;
 dim_pos=3;
 num_seg =num_of_seg_per_region*num_of_regions;
 sp=MyClampedUniformSpline(t0,tf,deg_pos, dim_pos, num_seg, opti);
+
+guess=[p0(1)*ones(1,3) linspace(p0(1), pf(1), sp.num_cpoints-6) pf(1)*ones(1,3) 
+       p0(2)*ones(1,3) linspace(p0(2), pf(2), sp.num_cpoints-6) pf(1)*ones(1,3) 
+       p0(3)*ones(1,3) linspace(p0(3), pf(3), sp.num_cpoints-6) pf(1)*ones(1,3) ]
+
+opti.set_initial(sp.getCPsAsMatrix,guess);
 
 v0=zeros(3,1); a0=zeros(3,1);
 vf=zeros(3,1); af=zeros(3,1);
@@ -151,26 +158,26 @@ if (strcmp(my_solver,'ipopt'))
     opts.ipopt.print_frequency_iter=1e10;%1e10 %Big if you don't want to print all the iteratons
     opts.ipopt.linear_solver=linear_solver_name;
 else
-    opts.gurobi.verbose=true; 
+%     opts.gurobi.verbose=true; 
 end
 % opts.error_on_fail=false;
 opti.solver(my_solver,opts); %{"ipopt.hessian_approximation":"limited-memory"} 
 
 
 
-all_wv=0:0.1:0.3;
-all_wa=0:0.1:0.3;
-all_wj=0:0.1:0.3;
+all_wv=0:0.3:0.3; %0.05
+all_wa=0:0.3:0.3;
+all_wj=0:0.3:0.3;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Generate samples inside the distribution
 all_x={};
 all_y={};
 for wv=all_wv
     for wa=all_wa
         for wj=all_wj
-            [wv;wa;wj]
+            [wv;wa;wj]'
             opti.set_value(weights,[wv;wa;wj]);
             sol = opti.solve();
-            assert(strcmp(sol.stats.return_status,'Solve_Succeeded'))
+            checkSolverSucceeded(sol, my_solver)
             control_points=sol.value(sp.getCPsAsMatrix);
             all_x{end+1}=[wv;wa;wj];
             all_y{end+1}=control_points(:);
@@ -181,13 +188,14 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Generate samples outside the distribution
 all_x_out_dist={};
 all_y_out_dist={};
-for wv=2*all_wv
-    for wa=2*all_wa
-        for wj=2*all_wj
+factor=5;
+for wv=factor*all_wv
+    for wa=factor*all_wa
+        for wj=factor*all_wj
             [wv;wa;wj]'
             opti.set_value(weights,[wv;wa;wj]);
             sol = opti.solve();
-            assert(strcmp(sol.stats.return_status,'Solve_Succeeded'))
+            checkSolverSucceeded(sol, my_solver)
             control_points=sol.value(sp.getCPsAsMatrix);
             all_x_out_dist{end+1}=[wv;wa;wj];
             all_y_out_dist{end+1}=control_points(:);
@@ -205,7 +213,7 @@ for i=1:num_sol
     end
 end
 figure;
-imagesc(dist_matrix); colorbar
+imagesc(dist_matrix); colorbar; axis equal
 %%%%%%%%%%%%%%%%%%
 
 [Aineq,bineq]=getAbLinearConstraints(opti);
@@ -230,11 +238,11 @@ sp.updateCPsWithSolution(sol.value(sp.getCPsAsMatrix()));
 figure(1);
 sp.plotPos3D(6)
 
-plot3(P(1,:),P(2,:),P(3,:),'--','LineWidth',2)
+% plot3(P(1,:),P(2,:),P(3,:),'--','LineWidth',2)
 
 view(48,38); axis equal
 
-xlabel('x'); ylabel('y'); zlabel('z');
+xlabel('x (m)'); ylabel('y (m)'); zlabel('z (m)');
 
 % sp.plotPosVelAccelJerk(v_max,a_max,j_max)
 %%
@@ -242,6 +250,15 @@ xlabel('x'); ylabel('y'); zlabel('z');
 % figure; hold on;
 % p1=[0;0;0];
 % p2=[1;1;1];
+
+function checkSolverSucceeded(sol, my_solver)
+    if (strcmp(my_solver,'ipopt'))
+        assert(strcmp(sol.stats.return_status,'Solve_Succeeded'))
+    end
+    if (strcmp(my_solver,'gurobi'))
+        assert(strcmp(sol.stats.return_status,'OPTIMAL'), sol.stats.return_status)
+    end
+end
 
 %This gives the vertices of a polyhedron around the line p1-->p2
 function [A, b, V]=getAbVerticesPolyhedronAroundP1P2(p1,p2, steps, samples_per_step, radius)
