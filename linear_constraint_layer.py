@@ -143,7 +143,6 @@ class LinearConstraintLayer(torch.nn.Module):
 
 
 			## THIRD OPTION
-			print(f"self.A_p.shape={self.A_p.shape}")
 			kappa=torch.relu( torch.max(self.D@u, dim=1, keepdim=True).values  )
 			alpha=1/(torch.exp(beta) + kappa)
 

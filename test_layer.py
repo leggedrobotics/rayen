@@ -8,7 +8,7 @@ import utils
 from linear_constraint_layer import LinearConstraintLayer
 from examples_sets import getExample
 
-lc=getExample(1)
+lc=getExample(0)
 method='walker' #'walker'
 
 fig = plt.figure()
