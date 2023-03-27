@@ -29,6 +29,10 @@ class LinearConstraintLayer(torch.nn.Module):
 			NA_E=torch.Tensor(NA_E)
 			B = torch.Tensor(B)
 			z0 = torch.Tensor(z0)
+			if(self.Z_is_unconstrained==False):
+			 	D=torch.div(A_p,   (torch.sub(b_p,A_p@z0))@torch.ones(1,self.dim)    )
+			else:
+				D=torch.zeros_like(A_p)
 
 			#See https://discuss.pytorch.org/t/model-cuda-does-not-convert-all-variables-to-cuda/114733/9
 			# and https://discuss.pytorch.org/t/keeping-constant-value-in-module-on-correct-device/10129
@@ -38,6 +42,7 @@ class LinearConstraintLayer(torch.nn.Module):
 			self.register_buffer("NA_E", NA_E)
 			self.register_buffer("B", B)
 			self.register_buffer("z0", z0)
+			self.register_buffer("D", D)
 
 
 			if(self.method=='proj_train_test' or self.method=='proj_test'):
@@ -111,9 +116,9 @@ class LinearConstraintLayer(torch.nn.Module):
 			
 			u=torch.nn.functional.normalize(v, dim=1);
 
-			bp_minus_Apz0=torch.sub(self.b_p,self.A_p@self.z0)
 
 			## FIRST OPTION
+			# bp_minus_Apz0=torch.sub(self.b_p,self.A_p@self.z0)
 			# all_max_distances=torch.div(bp_minus_Apz0,self.A_p@u)
 			# all_max_distances[all_max_distances<=0]=float("Inf")
 			# #Note that we know that self.x0 is a strictly feasible point of the set
@@ -125,19 +130,28 @@ class LinearConstraintLayer(torch.nn.Module):
 			# 				   max_distance*torch.sigmoid(beta),  #If it's bounded in that direction --> apply sigmoid function
 			# 				   torch.abs(beta)) #If it's not bounded in that direction --> just use the beta
 
-			## SECOND OPTION
-			if(self.Z_is_unconstrained==False):
-				my_lambda=torch.max(torch.div(self.A_p@u, bp_minus_Apz0), dim=1, keepdim=True).values
-			else:
-				my_lambda=torch.zeros((x.shape[0],1,1))
 
-			alpha=torch.where(my_lambda<=0, torch.abs(beta), torch.sigmoid(beta)/my_lambda)
+
+			## SECOND OPTION
+			# if(self.Z_is_unconstrained==False):
+			# 	my_lambda=torch.max(torch.div(self.A_p@u, bp_minus_Apz0), dim=1, keepdim=True).values
+			# else:
+			# 	my_lambda=torch.zeros((x.shape[0],1,1))
+
+			# alpha=torch.where(my_lambda<=0, torch.abs(beta), torch.sigmoid(beta)/my_lambda)
+
+
+
+			## THIRD OPTION
+			print(f"self.A_p.shape={self.A_p.shape}")
+			kappa=torch.relu( torch.max(self.D@u, dim=1, keepdim=True).values  )
+			alpha=1/(torch.exp(beta) + kappa)
 
 
 			z0_new = self.z0 + alpha*u 
 			
 			#Now lift back to the original space
-			y0_new =self.liftBack(z0_new) #self.NA_E@z0_new + self.y0
+			y0_new =self.liftBack(z0_new)
 
 			if(torch.isnan(y0_new).any()):
 				print("at least one element is nan")
