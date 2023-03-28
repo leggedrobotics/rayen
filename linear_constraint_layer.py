@@ -131,7 +131,6 @@ class LinearConstraintLayer(torch.nn.Module):
 			# 				   torch.abs(beta)) #If it's not bounded in that direction --> just use the beta
 
 
-
 			## SECOND OPTION
 			# if(self.Z_is_unconstrained==False):
 			# 	my_lambda=torch.max(torch.div(self.A_p@u, bp_minus_Apz0), dim=1, keepdim=True).values
@@ -139,7 +138,6 @@ class LinearConstraintLayer(torch.nn.Module):
 			# 	my_lambda=torch.zeros((x.shape[0],1,1))
 
 			# alpha=torch.where(my_lambda<=0, torch.abs(beta), torch.sigmoid(beta)/my_lambda)
-
 
 
 			## THIRD OPTION
