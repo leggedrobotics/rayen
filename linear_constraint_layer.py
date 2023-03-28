@@ -9,7 +9,7 @@ from cvxpylayers.torch import CvxpyLayer
 
 
 class LinearConstraintLayer(torch.nn.Module):
-	def __init__(self, lc, method='walker'): #lc is the linear constraint
+	def __init__(self, lc, ellipsoids=[], method='walker'): #lc is the linear constraint
 		super().__init__()
 
 		assert cp.__version__=='1.2.3' #See this issue: https://github.com/cvxgrp/cvxpylayers/issues/143
@@ -17,32 +17,34 @@ class LinearConstraintLayer(torch.nn.Module):
 		self.method=method
 
 		if(self.method=='walker' or self.method=='barycentric' or self.method=='proj_train_test' or self.method=='proj_test'):
-			A_p, b_p, y0, NA_E, B, z0=lc.process();
+			A_p, b_p, y1, NA_E, z0=lc.process(ellipsoids);
 
 			self.Z_is_unconstrained= (not np.any(A_p))  and (not np.any(b_p)); #A_p is the zero matrix and b_p the zero vector
 
-
 			self.dim=A_p.shape[1]
-			A_p = torch.Tensor(A_p)
-			b_p = torch.Tensor(b_p)
-			y0=torch.Tensor(y0)
-			NA_E=torch.Tensor(NA_E)
-			B = torch.Tensor(B)
-			z0 = torch.Tensor(z0)
-			if(self.Z_is_unconstrained==False):
-			 	D=torch.div(A_p,   (torch.sub(b_p,A_p@z0))@torch.ones(1,self.dim)    )
-			else:
-				D=torch.zeros_like(A_p)
 
+			if(self.Z_is_unconstrained==False):
+			 	D=A_p/((b_p-A_p@z0)@np.ones((1,self.dim))) #  torch.div(self.A_p,   (torch.sub(self.b_p,self.A_p@self.z0))@torch.ones(1,self.dim)    )
+			else:
+				D=np.zeros_like(A_p)
+
+			###############FOR THE ELLIPSOID CONSTRAINTS
+			self.has_ellipsoid_constraints=(len(ellipsoids)>0);#Better: https://stackoverflow.com/a/53522
+			if(self.has_ellipsoid_constraints):
+				all_E=np.array([ellipsoid.E for ellipsoid in ellipsoids]);
+				all_q=np.array([(NA_E@z0 + y1 - ellipsoid.c)  for ellipsoid in ellipsoids])
+				self.register_buffer("all_E", torch.Tensor(all_E))
+				self.register_buffer("all_q", torch.Tensor(all_q))
+			
 			#See https://discuss.pytorch.org/t/model-cuda-does-not-convert-all-variables-to-cuda/114733/9
 			# and https://discuss.pytorch.org/t/keeping-constant-value-in-module-on-correct-device/10129
-			self.register_buffer("A_p", A_p)
-			self.register_buffer("b_p", b_p)
-			self.register_buffer("y0", y0)
-			self.register_buffer("NA_E", NA_E)
-			self.register_buffer("B", B)
-			self.register_buffer("z0", z0)
-			self.register_buffer("D", D)
+			self.register_buffer("A_p", torch.tensor(A_p))
+			self.register_buffer("b_p", torch.tensor(b_p))
+			self.register_buffer("y1", torch.tensor(y1))
+			self.register_buffer("NA_E", torch.tensor(NA_E))
+			# self.register_buffer("B", torch.tensor(B))
+			self.register_buffer("z0", torch.tensor(z0))
+			self.register_buffer("D", torch.tensor(D))
 
 
 			if(self.method=='proj_train_test' or self.method=='proj_test'):
@@ -73,6 +75,8 @@ class LinearConstraintLayer(torch.nn.Module):
 				# exit()
 
 
+
+
 		self.mapper=nn.Sequential();
 		self.lc=lc;
 
@@ -92,7 +96,10 @@ class LinearConstraintLayer(torch.nn.Module):
 		utils.printInBoldRed(f"Setting the following mapper: {self.mapper}")
 
 	def liftBack(self, z0_new):
-		return self.NA_E@z0_new + self.y0
+		return self.NA_E@z0_new + self.y1
+
+	def gety0(self):
+		return self.liftBack(self.z0)
 
 	def forward(self, x):
 
@@ -142,9 +149,24 @@ class LinearConstraintLayer(torch.nn.Module):
 
 			## THIRD OPTION
 			kappa=torch.relu( torch.max(self.D@u, dim=1, keepdim=True).values  )
+
+			#########################################################3
+			###For the ellipsoidal constraints
+			if(self.has_ellipsoid_constraints):
+				for i in range(self.all_E.shape[0]): #for each of the ellipsoids
+					E=self.all_E[i,:,:]
+					q=self.all_q[i,:,:]
+					r=self.NA_E@u;
+					rT=torch.transpose(r,dim0=1, dim1=2)
+					discriminant = torch.square(2*rT@E@q) - 4*(rT@E@r)*(q.T@E@q-1)
+					assert torch.all(discriminant >= 0) 
+					lamb_positive=torch.div(  -2*rT@E@q  + torch.sqrt(discriminant) , 2*rT@E@r)
+					assert torch.all(lamb_positive >= 0) #If not, then either the feasible set is infeasible, or z0 was taken outside the feasible set
+					kappa=torch.maximum(kappa, 1/lamb_positive)
+			#########################################################3
+
+
 			alpha=1/(torch.exp(beta) + kappa)
-
-
 			z0_new = self.z0 + alpha*u 
 			
 			#Now lift back to the original space

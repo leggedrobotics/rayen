@@ -20,6 +20,58 @@ def printInBoldGreen(data_string):
     print(Style.BRIGHT+Fore.GREEN+data_string+Style.RESET_ALL)
 
 
+#Ellisoid is represented by {x | x'*E*x <=1}
+def plotEllipsoid(E, x0, ax):
+    #Partly taken from https://github.com/CircusMonkey/covariance-ellipsoid/blob/master/ellipsoid.py
+    """
+    Return the 3d points representing the covariance matrix
+    cov centred at mu and scaled by the factor nstd.
+    Plot on your favourite 3d axis. 
+    Example 1:  ax.plot_wireframe(X,Y,Z,alpha=0.1)
+    Example 2:  ax.plot_surface(X,Y,Z,alpha=0.1)
+    """
+
+    assert E.shape==(3,3)
+
+    B=np.linalg.inv(scipy.linalg.sqrtm(E))
+
+    #Ellisoid is now represented by { Bp+x0 | ||p|| <=1}
+    # Find and sort eigenvalues 
+    eigvals, eigvecs = np.linalg.eigh(B)
+    idx = np.sum(B,axis=0).argsort()
+    eigvals_temp = eigvals[idx]
+    idx = eigvals_temp.argsort()
+    eigvals = eigvals[idx]
+    eigvecs = eigvecs[:,idx]
+
+    # Set of all spherical angles to draw our ellipsoid
+    n_points = 100
+    theta = np.linspace(0, 2*np.pi, n_points)
+    phi = np.linspace(0, np.pi, n_points)
+
+    # Width, height and depth of ellipsoid
+    rx, ry, rz = np.sqrt(eigvals)
+
+    # Get the xyz points for plotting
+    # Cartesian coordinates that correspond to the spherical angles:
+    X = rx * np.outer(np.cos(theta), np.sin(phi))
+    Y = ry * np.outer(np.sin(theta), np.sin(phi))
+    Z = rz * np.outer(np.ones_like(theta), np.cos(phi))
+
+    # Rotate ellipsoid for off axis alignment
+    old_shape = X.shape
+    # Flatten to vectorise rotation
+    X,Y,Z = X.flatten(), Y.flatten(), Z.flatten()
+    X,Y,Z = np.matmul(eigvecs, np.array([X,Y,Z]))
+    X,Y,Z = X.reshape(old_shape), Y.reshape(old_shape), Z.reshape(old_shape)
+   
+    # Add in offsets for the center
+    X = X + x0[0]
+    Y = Y + x0[1]
+    Z = Z + x0[2]
+
+    ax.plot_wireframe(X,Y,Z, color='r', alpha=0.1)
+
 #It operates on numpy stuff 
 #polytope defined as Ax<=b
 def largestBallInPolytope(A,b, max_radius=None):
@@ -54,6 +106,19 @@ def largestBallInPolytope(A,b, max_radius=None):
 	printInBoldGreen(f"Found ball of radius r={r.value}")
 
 	return B.value, x0.value
+
+#Everything in numpy
+#Ellipsoid is defined as {x | (x-c)'E(x-c)<=1}
+#Where E is a positive semidefinite matrix
+class Ellipsoid():
+	def __init__(self, E, c):
+		#TODO: Should I force E to be >0, or should I let it be >=0
+		E_is_symmetric= np.allclose(E, E.T, rtol=1e-05, atol=1e-08)
+		assert E_is_symmetric
+		E_is_psd= np.all(np.linalg.eigvals(E) >= 0) #TODO: Cholesky is probably more effienct here
+		assert E_is_psd
+		self.E=E;
+		self.c=c;
 
 #Everything in numpy
 class LinearConstraint():
@@ -179,7 +244,7 @@ class LinearConstraint():
 		# constraints.
 
 
-	def process(self):
+	def process(self, ellipsoids=[]):
 
 		z = cp.Variable((self.dimAmbSpace(),1))
 
@@ -299,9 +364,9 @@ class LinearConstraint():
 		################################################
 		NA_E=scipy.linalg.null_space(A_E);
 		n=NA_E.shape[1] #dimension of the subspace
-		p0=np.linalg.pinv(A_E)@b_E
+		y1=np.linalg.pinv(A_E)@b_E
 		A_p=A_I@NA_E;
-		b_p=b_I-A_I@p0
+		b_p=b_I-A_I@y1
 				
 
 		print(f"A_p=\n{A_p}")
@@ -348,11 +413,42 @@ class LinearConstraint():
 		else:
 			max_radius=1.0; #to prevent unbounded result
 
-		B, z0 = largestBallInPolytope(A_p,b_p, max_radius) 
-		#B, z0 = largestEllipsoidBInPolytope(A,b) #This is very slow in high dimensions
+		if(len(ellipsoids)==0):
+			B, z0 = largestBallInPolytope(A_p,b_p, max_radius) 
+			#B, z0 = largestEllipsoidBInPolytope(A,b) #This is very slow in high dimensions
 
-		return A_p, b_p, p0, NA_E, B, z0
+		else:
+		
+			#Find a strictly feasible point in the intersection of  Ap x <= bp and the ellipsoids 
+			epsilon=cp.Variable()
+			z0 = cp.Variable((A_p.shape[1],1))
 
+			constraints=[A_p@z0 - b_p <= -epsilon]
+		
+			x0=NA_E@z0 + y1 #Lift to the original space
+			for e in ellipsoids:
+				print(e.c)
+				print(e.E)
+				print(f"y1={y1}")
+				# constraints.append((x0-e.c).T@e.E@(x0-e.c) -1 <= -epsilon)
+				constraints.append( cp.quad_form(x0-e.c, e.E) -1 <= -epsilon) #https://www.cvxpy.org/api_reference/cvxpy.atoms.other_atoms.html#cvxpy.atoms.quad_form.quad_form
+
+			constraints.append(epsilon>=0)
+			objective = cp.Minimize(-epsilon)
+			prob = cp.Problem(objective, constraints)
+
+			print("Calling solve...")
+			result = prob.solve(verbose=False);
+			print("Solved!")
+			if(prob.status != 'optimal'):
+				raise Exception("Value is not optimal")
+
+			assert epsilon.value>1e-8 #If not, there are no strictly feasible points
+									  #TODO: change hand-coded tolerance
+			z0= z0.value	
+
+
+		return A_p, b_p, y1, NA_E, z0
 
 
 #This function has been taken (and modified) from https://github.com/DLR-RM/stable-baselines3/blob/201fbffa8c40a628ecb2b30fd0973f3b171e6c4c/stable_baselines3/common/torch_layers.py#L96
