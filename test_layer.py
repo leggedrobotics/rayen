@@ -29,12 +29,9 @@ index_example=0
 lc=getExample(index_example)
 
 
-
-
 method='walker' #'walker'
 
 E=1.7*np.eye(lc.dimAmbSpace())
-E[0,0]=3.2
 ellipsoids=[utils.Ellipsoid(E=E, c=np.zeros((lc.dimAmbSpace(),1)))]
 
 fig = plt.figure()
@@ -103,7 +100,10 @@ if(lc.dimAmbSpace()==3):
 	print(f"y0={y0}")
 
 	for ellipsoid in ellipsoids:
-		utils.plotEllipsoid(ellipsoid.E, ellipsoid.c, ax)
+		if(ellipsoid.isESingular()==False):
+			utils.plotEllipsoid(ellipsoid.E, ellipsoid.c, ax)
+		else:
+			utils.printInBoldRed("E is singular, not plotting")
 
 
 if(lc.dimAmbSpace()==2):

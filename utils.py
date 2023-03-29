@@ -112,13 +112,26 @@ def largestBallInPolytope(A,b, max_radius=None):
 #Where E is a positive semidefinite matrix
 class Ellipsoid():
 	def __init__(self, E, c):
-		#TODO: Should I force E to be >0, or should I let it be >=0
+		assert E.shape[0]==E.shape[1]
+		#TODO: Should I let E be >=0, or should I force it to be >0
 		E_is_symmetric= np.allclose(E, E.T, rtol=1e-05, atol=1e-08)
 		assert E_is_symmetric
-		E_is_psd= np.all(np.linalg.eigvals(E) >= 0) #TODO: Cholesky is probably more effienct here
-		assert E_is_psd
+		
 		self.E=E;
 		self.c=c;
+
+		self.checkEisPsd();
+
+	def checkEisPsd(self):
+		eigenvalues=np.linalg.eigvals(self.E);
+		assert np.all(eigenvalues >= 0.0), f"E is not PSD, min eigenvalue is {np.amin(eigenvalues)}"
+
+	def checkEisPd(self):
+		eigenvalues=np.linalg.eigvals(self.E);
+		assert np.all(eigenvalues > 0.0), f"E is not PD, min eigenvalue is {np.amin(eigenvalues)}"
+
+	def isESingular(self):
+		return np.linalg.matrix_rank(self.E) < self.E.shape[0]
 
 #Everything in numpy
 class LinearConstraint():
