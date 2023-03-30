@@ -29,7 +29,7 @@ def getEllipsoid(E, c):
 
 #Sphere of radius r centered around c
 def getSphere(r, c):
-	return getEllipsoid((r/2.0)*np.eye(c.shape[0]),c)
+	return getEllipsoid((1/(r*r))*np.eye(c.shape[0]),c)
 
 def getParaboloid3D():
 	P=np.array([[1.0, 0.0, 0.0],
@@ -66,11 +66,12 @@ def getExample(example):
 		A2=np.array([[1, 1, 1]]);
 		b2=np.array([[1]]);
 
-		P,q,r=getSphere(2.0,np.zeros((3,1)))
+		P,q,r=getSphere(0.8,np.zeros((3,1)))
 
 		all_P=[P]
 		all_q=[q]
 		all_r=[r]
+
 
 	elif example==2: #Just a sphere
 
