@@ -15,12 +15,12 @@ from torch.utils.data import DataLoader
 from early_stopping import EarlyStopping
 
 # import utils
-from models import BarycentricModel, ProjectionModel, WrapperWalkerForImages
+# from models import BarycentricModel, ProjectionModel, WrapperWalkerForImages
 from dataset_util import MNIST
 from osqp_projection import BatchProjector
 
-from linear_constraint_layer import LinearConstraintLayer
-from create_dataset import createProjectionDataset, getCorridorDatasetsAndLC
+from constraint_layer import ConstraintLayer
+from create_dataset import createProjectionDataset, getCorridorDatasetsAndConstraints
 from examples_sets import getExample
 
 import utils
@@ -156,7 +156,7 @@ def train_model(model, params, sdag):
 
 	return metrics
 
-def test_model(model, params, sdag, lc):
+def test_model(model, params, sdag, cs):
 	device_id = params['device']
 	device = torch.device('cuda:{}'.format(device_id) if device_id >= 0 else 'cpu')
 	model = model.to(device)
@@ -183,7 +183,7 @@ def test_model(model, params, sdag, lc):
 			sum_all_squares = sum_all_squares + loss.item()*torch.numel(x);
 			#----------------------
 
-			violations_of_this_batch=np.apply_along_axis(lc.getViolation,axis=1, arr=y_predicted.cpu().numpy())
+			violations_of_this_batch=np.apply_along_axis(cs.getViolation,axis=1, arr=y_predicted.cpu().numpy())
 			#Shape of violations_of_this_batch is [batch_size, 1]
 			violations=np.concatenate((violations, violations_of_this_batch), axis=0)
 
@@ -203,12 +203,12 @@ def main(params):
 	torch.set_default_dtype(torch.float64) ##Use float32 here??
 
 	## PROJECTION EXAMPLES
-	# lc=getExample(1)
-	# my_dataset=createProjectionDataset(200, lc, 4.0);
-	# my_dataset_out_dist=createProjectionDataset(200, lc, 7.0);
+	# cs=getExample(3)
+	# my_dataset=createProjectionDataset(200, cs, 4.0);
+	# my_dataset_out_dist=createProjectionDataset(200, cs, 7.0);
 
 	## CORRIDOR EXAMPLES
-	my_dataset, my_dataset_out_dist, lc=getCorridorDatasetsAndLC()
+	my_dataset, my_dataset_out_dist, cs=getCorridorDatasetsAndConstraints()
 
 	sdag=SplittedDatasetAndGenerator(my_dataset, percent_train=0.6, percent_val=0.2, batch_size=params['batch_size'])
 	sdag_out_dist=SplittedDatasetAndGenerator(my_dataset_out_dist, percent_train=0.0, percent_val=0.0, batch_size=params['batch_size'])
@@ -217,7 +217,7 @@ def main(params):
 	# for trial in range(params['n_trials']):
 
 	######################### TRAINING
-	model = LinearConstraintLayer(lc, method=params['method']) 
+	model = ConstraintLayer(cs, method=params['method']) 
 	mapper=utils.create_mlp(input_dim=my_dataset.getNumelX(), output_dim=model.getNumelOutputMapper(), net_arch=[64,64])
 	# mapper=nn.Sequential() #do nothing.
 	model.setMapper(mapper)
@@ -228,8 +228,8 @@ def main(params):
 	# model.load_state_dict(torch.load('checkpoint.pt'))
 
 	print("Testing model...")
-	testing_metrics = test_model(model, params, sdag, lc)
-	testing_metrics_out_dist = test_model(model, params, sdag_out_dist, lc)
+	testing_metrics = test_model(model, params, sdag, cs)
+	testing_metrics_out_dist = test_model(model, params, sdag_out_dist, cs)
 	print("Model tested...")
 
 	#####PRINT STUFF

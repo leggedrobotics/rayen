@@ -51,15 +51,15 @@ class CustomDataset(Dataset):
 			ax.scatter(all_x_np[0,:], all_x_np[1,:],color='red')
 			ax.scatter(all_y_np[0,:], all_y_np[1,:],color='blue')
 
-def createProjectionDataset(num_samples, lc, bbox_half_side): #lc is the LinearConstraint
+def createProjectionDataset(num_samples, cs, bbox_half_side): 
 
 	all_x=[];
 	all_y=[];
 
 	for i in range(num_samples):
-		x=np.random.uniform(low=-bbox_half_side, high=bbox_half_side, size=(lc.dimAmbSpace(),1))
+		x=np.random.uniform(low=-bbox_half_side, high=bbox_half_side, size=(cs.dim_ambient_space,1))
 		all_x.append(x)
-		x_projected, _ = lc.project(x)
+		x_projected, _ = cs.project(x)
 		all_y.append(x_projected)
 	my_dataset = CustomDataset(all_x, all_y)
 
@@ -77,7 +77,7 @@ def createProjectionDataset(num_samples, lc, bbox_half_side): #lc is the LinearC
 
 	return my_dataset
 
-def getCorridorDatasetsAndLC():
+def getCorridorDatasetsAndConstraints():
 
 	mat = scipy.io.loadmat('./matlab/corridor.mat')
 
@@ -89,18 +89,18 @@ def getCorridorDatasetsAndLC():
 
 	polyhedron=mat["polyhedron"]
 
-	Aineq=polyhedron['Aineq'][0,0];
-	bineq=polyhedron['bineq'][0,0];
+	A1=polyhedron['A1'][0,0];
+	b1=polyhedron['b1'][0,0];
 
-	assert Aineq.ndim==2
-	assert bineq.ndim==2
+	assert A1.ndim==2
+	assert b1.ndim==2
 
 	assert all_y[0].shape[1]==1
 	assert all_x[0].shape[1]==1
 	assert all_x_out_dist[0].shape[1]==1
 	assert all_y_out_dist[0].shape[1]==1
 
-	lc=utils.LinearConstraint(Aineq, bineq, None, None)
+	cs=utils.linearAndConvexQuadraticConstraints(A1, b1, None, None, None, None, None)
 	my_dataset = CustomDataset(all_x, all_y)
 	my_dataset_out_dist = CustomDataset(all_x_out_dist, all_y_out_dist)
 
@@ -111,7 +111,7 @@ def getCorridorDatasetsAndLC():
 	# print(all_y[0].shape)
 	# exit()
 
-	return my_dataset, my_dataset_out_dist,  lc
+	return my_dataset, my_dataset_out_dist, cs
 
 	# print(polyhedron['Aineq'][0,0])
 

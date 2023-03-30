@@ -216,9 +216,9 @@ figure;
 imagesc(dist_matrix); colorbar; axis equal
 %%%%%%%%%%%%%%%%%%
 
-[Aineq,bineq]=getAbLinearConstraints(opti);
-polyhedron.Aineq=Aineq;
-polyhedron.bineq=bineq;
+[A1,b1]=getAbLinearConstraints(opti);
+polyhedron.A1=A1;
+polyhedron.b1=b1;
 
 
 save('corridor.mat','all_x','all_y','all_x_out_dist','all_y_out_dist','polyhedron');
