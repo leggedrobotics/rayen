@@ -12,10 +12,16 @@ make clean
 cmake . -DCMAKE_BUILD_TYPE=Release -DWITH_IPOPT=ON -DWITH_MATLAB=ON -DWITH_PYTHON=ON -DWITH_DEEPBIND=ON -DWITH_GUROBI=ON ..
 ```
 
+For Gurobi to work in python [used in utils.py], you also need to do this (inside the virtual environment):
+```
+python -m pip install gurobipy
+```
+
 --> The module can be at the end of the NN (in the output), but also in between
 
 --> The trick of dividing by the infinity norm to enforce the box constraints does not work when the polyhedron is not a cone (if it is cone it works because it still obeys the conic constraints due to pure scaling)
 
+--> TODO: method "unconstrained" does not need Ap, bp,... (save all that offline computation?)
 
 --> Constrained optimization on matrices: https://github.com/lezcano/geotorch
 

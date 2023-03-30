@@ -75,8 +75,6 @@ class ConstraintLayer(torch.nn.Module):
 			# exit()
 
 
-
-
 		self.mapper=nn.Sequential();
 		self.cs=cs;
 

@@ -17,8 +17,11 @@ import scipy
 
 
 methods=['walker','barycentric', 'unconstrained', 'proj_train_test', 'proj_test']
-num_of_examples=9
 
+
+# examples_to_run=list(range(9))
+index_examples_to_run=[10]
+num_of_examples=len(index_examples_to_run)
 ###############
 rows=math.ceil(math.sqrt(num_of_examples))
 cols=rows
@@ -29,7 +32,8 @@ for method in methods:
 	utils.printInBoldRed(f"==================== METHOD: {method} ==========================")
 	fig = plt.figure()
 	fig.suptitle(method, fontsize=10)
-	for index_example in range(num_of_examples):
+	for i in range(num_of_examples):
+		index_example=index_examples_to_run[i]
 		utils.printInBoldGreen(f"==================== Example: {index_example} ")
 
 
@@ -41,13 +45,13 @@ for method in methods:
 
 		# fig = plt.figure()
 		if(constraint.dim_ambient_space==3):
-			ax = fig.add_subplot(rows,cols,index_example+1, projection="3d")
+			ax = fig.add_subplot(rows,cols,i+1, projection="3d")
 			if(constraint.has_linear_ineq_constraints):
 				utils.plot3DPolytopeHRepresentation(constraint.A1,constraint.b1,[-1, 2, -1, 2, -1, 2], ax)
 
 
 		else:
-			ax = fig.add_subplot(rows,cols,index_example+1) 
+			ax = fig.add_subplot(rows,cols,i+1) 
 
 		num_steps=4; #Only used in the ellipsoid_walker method
 		my_layer=ConstraintLayer(constraint, method=method)
