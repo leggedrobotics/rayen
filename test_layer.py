@@ -18,10 +18,10 @@ import scipy
 
 torch.set_default_dtype(torch.float64) ##Use float32 here??
 
-index_example=7
+index_example=1
 constraint=getExample(index_example)
 
-method='walker' #'walker'
+method='proj_train_test' #walker or barycentric, unconstrained, proj_train_test, proj_test
 
 fig = plt.figure()
 if(constraint.dim_ambient_space==3):
@@ -38,7 +38,7 @@ my_layer=ConstraintLayer(constraint, method=method)
 
 numel_output_mapper=my_layer.getNumelOutputMapper()
 
-x_batched=torch.Tensor(5000, numel_output_mapper, 1).uniform_(-8, 8)
+x_batched=torch.Tensor(1000, numel_output_mapper, 1).uniform_(-8, 8)
 
 # mapper=nn.Sequential(nn.Linear(x_batched.shape[1], numel_output_mapper))
 mapper=nn.Sequential() #do nothing.
@@ -57,9 +57,9 @@ if(constraint.dim_ambient_space==3):
 	# ax.plot3D(y0[0,0], y0[1,0])
 	print(f"y0={y0}")
 
-	ax.set_xlim(-10,10)
-	ax.set_ylim(-10,10)
-	ax.set_zlim(0,10)
+	# ax.set_xlim(-10,10)
+	# ax.set_ylim(-10,10)
+	# ax.set_zlim(0,10)
 
 	# for ellipsoid in ellipsoids:
 	# 	if(ellipsoid.isESingular()==False):

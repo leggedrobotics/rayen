@@ -429,7 +429,23 @@ class linearAndConvexQuadraticConstraints():
 			#TODO: There are more solvers, see https://www.cvxpy.org/tutorial/advanced/index.html#choosing-a-solver
 			raise Exception(f"Which solver do you have installed?")
 		###################################################
-			
+
+    ######################### CONSTRAINTS IN THE SUBSPACE
+	def getLinearConstraintsInSubspaceCvxpy(self, variable):
+		assert variable.shape[1]==1
+		assert variable.shape[0]==self.k		 
+		return [self.A_p@variable<=self.b_p] 
+
+	def getQuadraticConstraintsInSubspaceCvxpy(self, variable):
+		assert variable.shape[1]==1
+		assert variable.shape[0]==self.k		 
+		return self.getQuadraticConstraintsCvxpy(self.NA_E@variable + self.y1)
+
+	def getConstraintsInSubspaceCvxpy(self, variable):
+		linear_constraints = self.getLinearConstraintsInSubspaceCvxpy(variable)
+		quadratic_constraints = self.getQuadraticConstraintsInSubspaceCvxpy(variable)
+		return linear_constraints + quadratic_constraints
+	###########################################################################
 
 	def getLinearConstraintsCvxpy(self, variable):
 		constraints=[]
@@ -690,60 +706,60 @@ class linearAndConvexQuadraticConstraints():
 
 	# 	return A_p, b_p, y1, NA_E, z0
 
-#Constraint is (1/2)x'Px + q'x +r <=0
-class convexQuadraticConstraint():
-	def __init__(self, P, q, r):
-		self.P=P;
-		self.q=q;
-		self.r=r;
+# #Constraint is (1/2)x'Px + q'x +r <=0
+# class convexQuadraticConstraint():
+# 	def __init__(self, P, q, r):
+# 		self.P=P;
+# 		self.q=q;
+# 		self.r=r;
 
-		checkMatrixisPsd(self.P);
+# 		checkMatrixisPsd(self.P);
 
 
 
-#Everything in numpy
-class LinearConstraint():
-	#Linear constraint is A1<=b, A2=b2
-	def __init__(self, A1, b1, A2, b2):
-		self.A1 = A1
-		self.b1 = b1
-		self.A2 = A2
-		self.b2 = b2
+# #Everything in numpy
+# class LinearConstraint():
+# 	#Linear constraint is A1<=b, A2=b2
+# 	def __init__(self, A1, b1, A2, b2):
+# 		self.A1 = A1
+# 		self.b1 = b1
+# 		self.A2 = A2
+# 		self.b2 = b2
 
-		# x0 = cp.Variable((n,1))
+# 		# x0 = cp.Variable((n,1))
 
-		################################# CHECKS
-		self.has_eq_constraints=((A2 is not None) and (b2 is not None));
-		self.has_ineq_constraints=((A1 is not None) and (b1 is not None));
+# 		################################# CHECKS
+# 		self.has_eq_constraints=((A2 is not None) and (b2 is not None));
+# 		self.has_ineq_constraints=((A1 is not None) and (b1 is not None));
 
-		self.has_constraints=self.has_eq_constraints or self.has_ineq_constraints;
+# 		self.has_constraints=self.has_eq_constraints or self.has_ineq_constraints;
 
-		if(self.has_ineq_constraints):
-			assert A1.ndim == 2, f"A1.shape={A1.shape}"
-			assert b1.ndim == 2, f"b1.shape={b1.shape}"
-			assert b1.shape[1] ==1
-			assert A1.shape[0] == b1.shape[0]
-			self.dim_ambient_space=A1.shape[1]
+# 		if(self.has_ineq_constraints):
+# 			assert A1.ndim == 2, f"A1.shape={A1.shape}"
+# 			assert b1.ndim == 2, f"b1.shape={b1.shape}"
+# 			assert b1.shape[1] ==1
+# 			assert A1.shape[0] == b1.shape[0]
+# 			self.dim_ambient_space=A1.shape[1]
 
-		if(self.has_eq_constraints):
-			assert A2.ndim == 2, f"A2.shape={A2.shape}"
-			assert b2.ndim == 2, f"b2.shape={b2.shape}"
-			assert b2.shape[1] ==1
-			assert A2.shape[0] == b2.shape[0]
-			self.dim_ambient_space=A2.shape[1]
+# 		if(self.has_eq_constraints):
+# 			assert A2.ndim == 2, f"A2.shape={A2.shape}"
+# 			assert b2.ndim == 2, f"b2.shape={b2.shape}"
+# 			assert b2.shape[1] ==1
+# 			assert A2.shape[0] == b2.shape[0]
+# 			self.dim_ambient_space=A2.shape[1]
 
-		if(self.has_eq_constraints and self.has_ineq_constraints):
-			assert A1.shape[1] == A2.shape[1]
-		#################################
+# 		if(self.has_eq_constraints and self.has_ineq_constraints):
+# 			assert A1.shape[1] == A2.shape[1]
+# 		#################################
 
-	def hasIneqConstraints(self):
-		return self.has_ineq_constraints
+# 	def hasIneqConstraints(self):
+# 		return self.has_ineq_constraints
 
-	def hasEqConstraints(self):
-		return self.has_eq_constraints
+# 	def hasEqConstraints(self):
+# 		return self.has_eq_constraints
 
-	def dimAmbSpace(self):
-		return self.dim_ambient_space
+# 	def dimAmbSpace(self):
+# 		return self.dim_ambient_space
 
 
 
