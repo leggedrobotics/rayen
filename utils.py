@@ -107,31 +107,49 @@ def largestBallInPolytope(A,b, max_radius=None):
 
 	return B.value, x0.value
 
+def checkMatrixisSymmetric(A):
+	assert A.shape[0]==A.shape[1]
+	assert np.allclose(A, A.T, rtol=1e-05, atol=1e-08)
+
+def checkMatrixisPsd(A):
+	checkMatrixisSymmetric(A)
+	eigenvalues=np.linalg.eigvals(A);
+	assert np.all(eigenvalues >= 0.0), f"Matrix is not PSD, min eigenvalue is {np.amin(eigenvalues)}"
+
+def checkMatrixisPd(A):
+	checkMatrixisSymmetric(A)
+	eigenvalues=np.linalg.eigvals(A);
+	assert np.all(eigenvalues > 0.0), f"Matrix is not PD, min eigenvalue is {np.amin(eigenvalues)}"
+
+def isMatrixSingular(A):
+	return (np.linalg.matrix_rank(A) < self.E.shape[0])
+
 #Everything in numpy
 #Ellipsoid is defined as {x | (x-c)'E(x-c)<=1}
 #Where E is a positive semidefinite matrix
 class Ellipsoid():
 	def __init__(self, E, c):
-		assert E.shape[0]==E.shape[1]
-		#TODO: Should I let E be >=0, or should I force it to be >0
-		E_is_symmetric= np.allclose(E, E.T, rtol=1e-05, atol=1e-08)
-		assert E_is_symmetric
-		
+
+		checkMatrixisPsd(E);
 		self.E=E;
 		self.c=c;
 
-		self.checkEisPsd();
+	def convertToQuadraticConstraint(self):
+		P=2*self.E;
+		q=(-2*self.E@self.c)
+		r=self.c.T@self.E@self.c-1
+		return convexQuadraticConstraint(P,q,r)
 
-	def checkEisPsd(self):
-		eigenvalues=np.linalg.eigvals(self.E);
-		assert np.all(eigenvalues >= 0.0), f"E is not PSD, min eigenvalue is {np.amin(eigenvalues)}"
 
-	def checkEisPd(self):
-		eigenvalues=np.linalg.eigvals(self.E);
-		assert np.all(eigenvalues > 0.0), f"E is not PD, min eigenvalue is {np.amin(eigenvalues)}"
+#Constraint is (1/2)x'Px + q'x +r <=0
+class convexQuadraticConstraint():
+	def __init__(self, P, q, r):
+		self.P=P;
+		self.q=q;
+		self.r=r;
 
-	def isESingular(self):
-		return np.linalg.matrix_rank(self.E) < self.E.shape[0]
+		checkMatrixisPsd(self.P);
+
 
 #Everything in numpy
 class LinearConstraint():
@@ -257,7 +275,7 @@ class LinearConstraint():
 		# constraints.
 
 
-	def process(self, ellipsoids=[]):
+	def process(self, cqc_list=[]):
 
 		z = cp.Variable((self.dimAmbSpace(),1))
 
@@ -426,7 +444,7 @@ class LinearConstraint():
 		else:
 			max_radius=1.0; #to prevent unbounded result
 
-		if(len(ellipsoids)==0):
+		if(len(cqc_list)==0): #No quadratic constraints
 			B, z0 = largestBallInPolytope(A_p,b_p, max_radius) 
 			#B, z0 = largestEllipsoidBInPolytope(A,b) #This is very slow in high dimensions
 
@@ -439,12 +457,13 @@ class LinearConstraint():
 			constraints=[A_p@z0 - b_p <= -epsilon]
 		
 			x0=NA_E@z0 + y1 #Lift to the original space
-			for e in ellipsoids:
-				print(e.c)
-				print(e.E)
-				print(f"y1={y1}")
+			for c in cqc_list:
+				# print(e.c)
+				# print(e.E)
+				# print(f"y1={y1}")
 				# constraints.append((x0-e.c).T@e.E@(x0-e.c) -1 <= -epsilon)
-				constraints.append( cp.quad_form(x0-e.c, e.E) -1 <= -epsilon) #https://www.cvxpy.org/api_reference/cvxpy.atoms.other_atoms.html#cvxpy.atoms.quad_form.quad_form
+				# constraints.append( cp.quad_form(x0-e.c, e.E) -1 <= -epsilon) #https://www.cvxpy.org/api_reference/cvxpy.atoms.other_atoms.html#cvxpy.atoms.quad_form.quad_form
+				constraints.append( 0.5*cp.quad_form(x0, c.P) + c.q.T@x0 + c.r <= -epsilon) #https://www.cvxpy.org/api_reference/cvxpy.atoms.other_atoms.html#cvxpy.atoms.quad_form.quad_form
 
 			constraints.append(epsilon>=0)
 			objective = cp.Minimize(-epsilon)

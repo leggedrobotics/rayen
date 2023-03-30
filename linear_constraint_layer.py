@@ -9,7 +9,7 @@ from cvxpylayers.torch import CvxpyLayer
 
 
 class LinearConstraintLayer(torch.nn.Module):
-	def __init__(self, lc, ellipsoids=[], method='walker'): #lc is the linear constraint
+	def __init__(self, lc, cqc_list=[], method='walker'): #lc is the linear constraint. cqc_list is a list of convex quadratic constraints
 		super().__init__()
 
 		assert cp.__version__=='1.2.3' #See this issue: https://github.com/cvxgrp/cvxpylayers/issues/143
@@ -17,7 +17,7 @@ class LinearConstraintLayer(torch.nn.Module):
 		self.method=method
 
 		if(self.method=='walker' or self.method=='barycentric' or self.method=='proj_train_test' or self.method=='proj_test'):
-			A_p, b_p, y1, NA_E, z0=lc.process(ellipsoids);
+			A_p, b_p, y1, NA_E, z0=lc.process(cqc_list);
 
 			self.Z_is_unconstrained= (not np.any(A_p))  and (not np.any(b_p)); #A_p is the zero matrix and b_p the zero vector
 
@@ -28,13 +28,16 @@ class LinearConstraintLayer(torch.nn.Module):
 			else:
 				D=np.zeros_like(A_p)
 
-			###############FOR THE ELLIPSOID CONSTRAINTS
-			self.has_ellipsoid_constraints=(len(ellipsoids)>0);#Better: https://stackoverflow.com/a/53522
-			if(self.has_ellipsoid_constraints):
-				all_E=np.array([ellipsoid.E for ellipsoid in ellipsoids]);
-				all_q=np.array([(NA_E@z0 + y1 - ellipsoid.c)  for ellipsoid in ellipsoids])
-				self.register_buffer("all_E", torch.Tensor(all_E))
+			###############FOR THE QUADRATIC CONSTRAINTS
+			self.num_quadratic_constraints=len(cqc_list)
+			self.has_quadratic_constraints=(self.num_quadratic_constraints>0);
+			if(self.has_quadratic_constraints):
+				all_P=np.array([c.P for c in cqc_list]);
+				all_q=np.array([c.q for c in cqc_list]);
+				all_r=np.array([c.r for c in cqc_list]);
+				self.register_buffer("all_P", torch.Tensor(all_P))
 				self.register_buffer("all_q", torch.Tensor(all_q))
+				self.register_buffer("all_r", torch.Tensor(all_r))
 			
 			#See https://discuss.pytorch.org/t/model-cuda-does-not-convert-all-variables-to-cuda/114733/9
 			# and https://discuss.pytorch.org/t/keeping-constant-value-in-module-on-correct-device/10129
@@ -151,18 +154,45 @@ class LinearConstraintLayer(torch.nn.Module):
 			kappa=torch.relu( torch.max(self.D@u, dim=1, keepdim=True).values  )
 
 			#########################################################3
-			###For the ellipsoidal constraints
-			if(self.has_ellipsoid_constraints):
-				for i in range(self.all_E.shape[0]): #for each of the ellipsoids
-					E=self.all_E[i,:,:]
-					q=self.all_q[i,:,:]
-					r=self.NA_E@u;
-					rT=torch.transpose(r,dim0=1, dim1=2)
-					discriminant = torch.square(2*rT@E@q) - 4*(rT@E@r)*(q.T@E@q-1)
-					assert torch.all(discriminant >= 0) 
-					lamb_positive=torch.div(  -2*rT@E@q  + torch.sqrt(discriminant) , 2*rT@E@r)
-					assert torch.all(lamb_positive >= 0) #If not, then either the feasible set is infeasible, or z0 was taken outside the feasible set
-					kappa=torch.maximum(kappa, 1/lamb_positive)
+			###For the convex quadratic constraints constraints
+			# if(self.has_ellipsoid_constraints):
+			# 	for i in range(self.all_E.shape[0]): #for each of the ellipsoids
+			# 		E=self.all_E[i,:,:]
+			# 		q=self.all_q[i,:,:]
+			# 		r=self.NA_E@u;
+			# 		rT=torch.transpose(r,dim0=1, dim1=2)
+			# 		discriminant = torch.square(2*rT@E@q) - 4*(rT@E@r)*(q.T@E@q-1)
+			# 		assert torch.all(discriminant >= 0) 
+			# 		lamb_positive=torch.div(  -2*rT@E@q  + torch.sqrt(discriminant) , 2*rT@E@r)
+			# 		assert torch.all(lamb_positive >= 0) #If not, then either the feasible set is infeasible, or z0 was taken outside the feasible set
+			# 		kappa=torch.maximum(kappa, 1/lamb_positive)
+
+			for i in range(self.num_quadratic_constraints): #for each of the quadratic constraints
+				P=self.all_P[i,:,:]
+				q=self.all_q[i,:,:]
+				r=self.all_r[i,:,:]
+
+				rho = self.NA_E@u
+				w = self.NA_E@self.z0 + self.y1 #Do this in the constructor of this class
+
+				rhoT=torch.transpose(rho,dim0=1, dim1=2)
+
+				a=0.5*rhoT@P@rho;
+				b=(w.T@P@rho + q.T@rho);
+				c=(0.5*w.T@P@w + q.T@w +r)
+
+				aprime=rhoT@rho;
+				bprime=2*w.T@rho;
+				cprime=w.T@w - 1;
+
+				discriminant = torch.square(b) - 4*(a)*(c)
+
+				assert torch.all(discriminant >= 0) 
+				lamb_positive=torch.div(  -(b)  + torch.sqrt(discriminant) , 2*a)
+				print(lamb_positive)
+				assert torch.all(lamb_positive >= 0) #If not, then either the feasible set is infeasible (note that z0 is inside the feasible set)
+				kappa=torch.maximum(kappa, 1/lamb_positive)
+
 			#########################################################3
 
 

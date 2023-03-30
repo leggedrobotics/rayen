@@ -32,7 +32,12 @@ lc=getExample(index_example)
 method='walker' #'walker'
 
 E=1.7*np.eye(lc.dimAmbSpace())
-ellipsoids=[utils.Ellipsoid(E=E, c=np.zeros((lc.dimAmbSpace(),1)))]
+ellipsoid=utils.Ellipsoid(E=E, c=np.zeros((lc.dimAmbSpace(),1)))
+cqc_list=[ellipsoid.convertToQuadraticConstraint()]
+
+print(f"P={cqc_list[0].P}")
+print(f"q={cqc_list[0].q}")
+print(f"r={cqc_list[0].r}")
 
 fig = plt.figure()
 if(lc.dimAmbSpace()==3):
@@ -50,7 +55,7 @@ else:
 	ax = fig.add_subplot(111) 
 
 num_steps=4; #Only used in the ellipsoid_walker method
-my_layer=LinearConstraintLayer(lc, ellipsoids=ellipsoids, method=method)
+my_layer=LinearConstraintLayer(lc, cqc_list=cqc_list, method=method)
 
 numel_output_mapper=my_layer.getNumelOutputMapper()
 
@@ -99,11 +104,11 @@ if(lc.dimAmbSpace()==3):
 	# ax.plot3D(y0[0,0], y0[1,0])
 	print(f"y0={y0}")
 
-	for ellipsoid in ellipsoids:
-		if(ellipsoid.isESingular()==False):
-			utils.plotEllipsoid(ellipsoid.E, ellipsoid.c, ax)
-		else:
-			utils.printInBoldRed("E is singular, not plotting")
+	# for ellipsoid in ellipsoids:
+	# 	if(ellipsoid.isESingular()==False):
+	# 		utils.plotEllipsoid(ellipsoid.E, ellipsoid.c, ax)
+	# 	else:
+	# 		utils.printInBoldRed("E is singular, not plotting")
 
 
 if(lc.dimAmbSpace()==2):
@@ -131,13 +136,16 @@ if(Aineq is None):
 if(bineq is None):
 	bineq=np.array([[]])
 
-all_E=[];
-all_c=[];
-for e in ellipsoids:
-	all_E.append(e.E)
-	all_c.append(e.c)
+all_P=[];
+all_q=[];
+all_r=[];
+for c in cqc_list:
+	all_P.append(c.P)
+	all_q.append(c.q)
+	all_r.append(c.r)
 
-scipy.io.savemat('example_'+str(index_example)+'.mat', dict(Aeq=Aeq, beq=beq, Aineq=Aineq, bineq=bineq, all_E=all_E, all_c=all_c, result=result))
+
+scipy.io.savemat('example_'+str(index_example)+'.mat', dict(Aeq=Aeq, beq=beq, Aineq=Aineq, bineq=bineq, all_P=all_P, all_q=all_q, all_r=all_r, result=result))
 
 ################################################3
 
