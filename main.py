@@ -1,23 +1,14 @@
 import sys
 import os
-import json
 import time
-import pickle
-import pathlib
 import numpy as np
 import torch
 import torch.nn as nn
 import argparse
 import itertools
 import pandas as pd
-from torchvision import transforms
 from torch.utils.data import DataLoader
 from early_stopping import EarlyStopping
-
-# import utils
-# from models import BarycentricModel, ProjectionModel, WrapperWalkerForImages
-from dataset_util import MNIST
-from osqp_projection import BatchProjector
 
 from constraint_layer import ConstraintLayer
 from create_dataset import createProjectionDataset, getCorridorDatasetsAndConstraints
@@ -63,12 +54,6 @@ class SplittedDatasetAndGenerator():
 		# utils.printInBoldRed(f"Created DataLoader with batches [train, val, test]={[len(self.train_generator), len(self.val_generator), len(self.test_generator)]}")
 
 	
-
-def append_filename(params, filename):
-	dir_path = os.path.join(params['result_dir'], params['method'])
-	pathlib.Path(dir_path).mkdir(parents=True, exist_ok=True)
-	return os.path.join(dir_path, filename)
-
 def train_model(model, params, sdag):
 	device_id = params['device']
 	device = torch.device('cuda:{}'.format(device_id) if device_id >= 0 else 'cpu')
@@ -257,7 +242,7 @@ if __name__ == '__main__':
 
 
 	parser = argparse.ArgumentParser()
-	parser.add_argument('--method', type=str, default='walker') #walker or barycentric, unconstrained, proj_train_test, proj_test
+	parser.add_argument('--method', type=str, default='barycentric') #walker or barycentric, unconstrained, proj_train_test, proj_test
 	parser.add_argument('--result_dir', type=str, default='results')
 	parser.add_argument('--device', type=int, default=0)
 	parser.add_argument('--num_epochs', type=int, default=7000)
