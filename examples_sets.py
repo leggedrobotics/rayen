@@ -127,6 +127,16 @@ def getExample(example):
 		A1=np.array([[0,-1], [2,-4], [-2,1]]);
 		b1=np.array([[-2], [8], [-5]]);
 
+	elif example==9: #A paraboloid and a plane
+		P,q,r=getParaboloid3D()
+
+		all_P=[P]
+		all_q=[q]
+		all_r=[r]	
+
+		A2=np.array([[1, 1, 1]]);
+		b2=np.array([[1]]);		
+
 	else:
 		raise Exception("Not implemented yet")
 
