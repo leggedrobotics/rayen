@@ -11,100 +11,116 @@ from examples_sets import getExample
 import mpl_toolkits.mplot3d as a3
 
 import matplotlib.colors as colors
-import pylab as pl
 import numpy as np
 
 import scipy
 
+
+methods=['walker','barycentric', 'unconstrained', 'proj_train_test', 'proj_test']
+num_of_examples=9
+
+###############
+rows=math.ceil(math.sqrt(num_of_examples))
+cols=rows
+
 torch.set_default_dtype(torch.float64) ##Use float32 here??
 
-index_example=1
-constraint=getExample(index_example)
-
-method='proj_train_test' #walker or barycentric, unconstrained, proj_train_test, proj_test
-
-fig = plt.figure()
-if(constraint.dim_ambient_space==3):
-	ax = fig.add_subplot(111, projection="3d")
-	if(constraint.has_linear_ineq_constraints):
-		utils.plot3DPolytopeHRepresentation(constraint.A1,constraint.b1,[-1, 2, -1, 2, -1, 2], ax)
+for method in methods:
+	utils.printInBoldRed(f"==================== METHOD: {method} ==========================")
+	fig = plt.figure()
+	fig.suptitle(method, fontsize=10)
+	for index_example in range(num_of_examples):
+		utils.printInBoldGreen(f"==================== Example: {index_example} ")
 
 
-else:
-	ax = fig.add_subplot(111) 
+		constraint=getExample(index_example)
 
-num_steps=4; #Only used in the ellipsoid_walker method
-my_layer=ConstraintLayer(constraint, method=method)
+		if(method=='barycentric' and constraint.has_quadratic_constraints):
+			#b
+			continue
 
-numel_output_mapper=my_layer.getNumelOutputMapper()
-
-x_batched=torch.Tensor(1000, numel_output_mapper, 1).uniform_(-8, 8)
-
-# mapper=nn.Sequential(nn.Linear(x_batched.shape[1], numel_output_mapper))
-mapper=nn.Sequential() #do nothing.
-my_layer.setMapper(mapper)
-
-my_layer.eval() #This changes the self.training variable of the module
-result=my_layer(x_batched)
-
-result=result.detach().numpy();
-
-y0=my_layer.gety0();
-
-if(constraint.dim_ambient_space==3):
-	ax.scatter(y0[0,0], y0[1,0], y0[2,0],color='r',s=500)
-	ax.scatter(result[:,0,0], result[:,1,0], result[:,2,0])
-	# ax.plot3D(y0[0,0], y0[1,0])
-	print(f"y0={y0}")
-
-	# ax.set_xlim(-10,10)
-	# ax.set_ylim(-10,10)
-	# ax.set_zlim(0,10)
-
-	# for ellipsoid in ellipsoids:
-	# 	if(ellipsoid.isESingular()==False):
-	# 		utils.plotEllipsoid(ellipsoid.E, ellipsoid.c, ax)
-	# 	else:
-	# 		utils.printInBoldRed("E is singular, not plotting")
+		# fig = plt.figure()
+		if(constraint.dim_ambient_space==3):
+			ax = fig.add_subplot(rows,cols,index_example+1, projection="3d")
+			if(constraint.has_linear_ineq_constraints):
+				utils.plot3DPolytopeHRepresentation(constraint.A1,constraint.b1,[-1, 2, -1, 2, -1, 2], ax)
 
 
-if(constraint.dim_ambient_space==2):
-	ax.scatter(result[:,0,0], result[:,1,0])
-	utils.plot2DPolyhedron(constraint.A1,constraint.b1,ax)
-	
-	ax.scatter(y0[0,0], y0[1,0])
-	# utils.plot2DEllipsoidB(my_layer.B.numpy(),my_layer.z0.numpy(),ax)
-	ax.set_aspect('equal')
+		else:
+			ax = fig.add_subplot(rows,cols,index_example+1) 
+
+		num_steps=4; #Only used in the ellipsoid_walker method
+		my_layer=ConstraintLayer(constraint, method=method)
+
+		numel_output_mapper=my_layer.getNumelOutputMapper()
+
+		x_batched=torch.Tensor(1000, numel_output_mapper, 1).uniform_(-8, 8)
+
+		# mapper=nn.Sequential(nn.Linear(x_batched.shape[1], numel_output_mapper))
+		mapper=nn.Sequential() #do nothing.
+		my_layer.setMapper(mapper)
+
+		my_layer.eval() #This changes the self.training variable of the module
+		result=my_layer(x_batched)
+
+		result=result.detach().numpy();
+
+		y0=my_layer.gety0();
+
+		if(constraint.dim_ambient_space==3):
+			ax.scatter(y0[0,0], y0[1,0], y0[2,0],color='r',s=500)
+			ax.scatter(result[:,0,0], result[:,1,0], result[:,2,0])
+			# ax.plot3D(y0[0,0], y0[1,0])
+			# print(f"y0={y0}")
+
+			# ax.set_xlim(-10,10)
+			# ax.set_ylim(-10,10)
+			# ax.set_zlim(0,10)
+
+			# for ellipsoid in ellipsoids:
+			# 	if(ellipsoid.isESingular()==False):
+			# 		utils.plotEllipsoid(ellipsoid.E, ellipsoid.c, ax)
+			# 	else:
+			# 		utils.printInBoldRed("E is singular, not plotting")
 
 
-###################### SAVE TO MAT FILE
+		if(constraint.dim_ambient_space==2):
+			ax.scatter(result[:,0,0], result[:,1,0])
+			utils.plot2DPolyhedron(constraint.A1,constraint.b1,ax)
+			
+			ax.scatter(y0[0,0], y0[1,0])
+			# utils.plot2DEllipsoidB(my_layer.B.numpy(),my_layer.z0.numpy(),ax)
+			ax.set_aspect('equal')
 
-A2=constraint.A2;
-b2=constraint.b2;
-A1=constraint.A1;
-b1=constraint.b1;
-all_P=constraint.all_P;
-all_q=constraint.all_q;
-all_r=constraint.all_r;
 
-if(A2 is None):
-	A2=np.array([[]])
-if(b2 is None):
-	b2=np.array([[]])
-if(A1 is None):
-	A1=np.array([[]])
-if(b1 is None):
-	b1=np.array([[]])
-if(all_P is None):
-	all_P=np.array([[]])
-if(all_q is None):
-	all_q=np.array([[]])
-if(all_r is None):
-	all_r=np.array([[]])
+		###################### SAVE TO MAT FILE
 
-scipy.io.savemat('example_'+str(index_example)+'.mat', dict(A2=A2, b2=b2, A1=A1, b1=b1, all_P=all_P, all_q=all_q, all_r=all_r, result=result))
+		A2=constraint.A2;
+		b2=constraint.b2;
+		A1=constraint.A1;
+		b1=constraint.b1;
+		all_P=constraint.all_P;
+		all_q=constraint.all_q;
+		all_r=constraint.all_r;
 
-################################################3
+		if(A2 is None):
+			A2=np.array([[]])
+		if(b2 is None):
+			b2=np.array([[]])
+		if(A1 is None):
+			A1=np.array([[]])
+		if(b1 is None):
+			b1=np.array([[]])
+		if(all_P is None):
+			all_P=np.array([[]])
+		if(all_q is None):
+			all_q=np.array([[]])
+		if(all_r is None):
+			all_r=np.array([[]])
+
+		scipy.io.savemat('example_'+str(index_example)+'.mat', dict(A2=A2, b2=b2, A1=A1, b1=b1, all_P=all_P, all_q=all_q, all_r=all_r, result=result))
+
+		################################################3
 
 
 plt.show()

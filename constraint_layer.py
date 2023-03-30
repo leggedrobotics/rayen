@@ -20,59 +20,59 @@ class ConstraintLayer(torch.nn.Module):
 			utils.printInBoldRed(f"Method {self.method} cannot be used with quadratic constraints")
 			exit();
 
-		if(self.method=='walker' or self.method=='barycentric' or self.method=='proj_train_test' or self.method=='proj_test'):
+		# if(self.method=='walker' or self.method=='barycentric' or self.method=='proj_train_test' or self.method=='proj_test'):
 
-			self.k=cs.k #Dimension of the embeded space
+		self.k=cs.k #Dimension of the embeded space
 
-			if(cs.has_linear_constraints):
-				if(cs.Z_is_unconstrained==False):
-					D=cs.A_p/((cs.b_p-cs.A_p@cs.z0)@np.ones((1,cs.k))) 
-				else:
-					D=np.zeros_like(cs.A_p)
-				
-				self.register_buffer("D", torch.tensor(D))
-
-
-			if(cs.has_quadratic_constraints):
-				self.register_buffer("all_P", torch.Tensor(np.array(cs.all_P)))
-				self.register_buffer("all_q", torch.Tensor(np.array(cs.all_q)))
-				self.register_buffer("all_r", torch.Tensor(np.array(cs.all_r)))
-		
-			#See https://discuss.pytorch.org/t/model-cuda-does-not-convert-all-variables-to-cuda/114733/9
-			# and https://discuss.pytorch.org/t/keeping-constant-value-in-module-on-correct-device/10129
-			self.register_buffer("A_p", torch.tensor(cs.A_p))
-			self.register_buffer("b_p", torch.tensor(cs.b_p))
-			self.register_buffer("y1", torch.tensor(cs.y1))
-			self.register_buffer("NA_E", torch.tensor(cs.NA_E))
-			self.register_buffer("z0", torch.tensor(cs.z0))
+		if(cs.has_linear_constraints):
+			if(cs.Z_is_unconstrained==False):
+				D=cs.A_p/((cs.b_p-cs.A_p@cs.z0)@np.ones((1,cs.k))) 
+			else:
+				D=np.zeros_like(cs.A_p)
+			
+			self.register_buffer("D", torch.tensor(D))
 
 
-			if(self.method=='proj_train_test' or self.method=='proj_test'):
-				#Section 8.1.1 of https://web.stanford.edu/~boyd/cvxbook/bv_cvxbook.pdf
-				self.z_projected = cp.Variable((cs.k,1))         #projected point
-				self.z_to_be_projected = cp.Parameter((cs.k,1))  #original point
-				constraints= cs.getConstraintsInSubspaceCvxpy(self.z_projected)
-				objective = cp.Minimize(cp.sum_squares(self.z_projected - self.z_to_be_projected))
-				self.prob_projection = cp.Problem(objective, constraints)
+		if(cs.has_quadratic_constraints):
+			self.register_buffer("all_P", torch.Tensor(np.array(cs.all_P)))
+			self.register_buffer("all_q", torch.Tensor(np.array(cs.all_q)))
+			self.register_buffer("all_r", torch.Tensor(np.array(cs.all_r)))
+	
+		#See https://discuss.pytorch.org/t/model-cuda-does-not-convert-all-variables-to-cuda/114733/9
+		# and https://discuss.pytorch.org/t/keeping-constant-value-in-module-on-correct-device/10129
+		self.register_buffer("A_p", torch.tensor(cs.A_p))
+		self.register_buffer("b_p", torch.tensor(cs.b_p))
+		self.register_buffer("y1", torch.tensor(cs.y1))
+		self.register_buffer("NA_E", torch.tensor(cs.NA_E))
+		self.register_buffer("z0", torch.tensor(cs.z0))
 
-				assert self.prob_projection.is_dpp()
-				self.proj_layer = CvxpyLayer(self.prob_projection, parameters=[self.z_to_be_projected], variables=[self.z_projected])
+
+		if(self.method=='proj_train_test' or self.method=='proj_test'):
+			#Section 8.1.1 of https://web.stanford.edu/~boyd/cvxbook/bv_cvxbook.pdf
+			self.z_projected = cp.Variable((cs.k,1))         #projected point
+			self.z_to_be_projected = cp.Parameter((cs.k,1))  #original point
+			constraints= cs.getConstraintsInSubspaceCvxpy(self.z_projected)
+			objective = cp.Minimize(cp.sum_squares(self.z_projected - self.z_to_be_projected))
+			self.prob_projection = cp.Problem(objective, constraints)
+
+			assert self.prob_projection.is_dpp()
+			self.proj_layer = CvxpyLayer(self.prob_projection, parameters=[self.z_to_be_projected], variables=[self.z_projected])
 
 
 
-			if(self.method=='barycentric'):
-				print(f"A_p={cs.A_p}")
-				print(f"b_p={cs.b_p}")
-				print("Computing vertices and rays...")
-				self.V,self.R = utils.H_to_V(cs.A_p, cs.b_p);
-				self.V = torch.Tensor(self.V)
-				self.R = torch.Tensor(self.R)
-				self.num_vertices=self.V.shape[1];
-				self.num_rays=self.R.shape[1];
-				assert (self.num_vertices+self.num_rays)>0
-				print(f"vertices={self.V}")
-				print(f"rays={self.R}")
-				# exit()
+		if(self.method=='barycentric'):
+			print(f"A_p={cs.A_p}")
+			print(f"b_p={cs.b_p}")
+			print("Computing vertices and rays...")
+			self.V,self.R = utils.H_to_V(cs.A_p, cs.b_p);
+			self.V = torch.Tensor(self.V)
+			self.R = torch.Tensor(self.R)
+			self.num_vertices=self.V.shape[1];
+			self.num_rays=self.R.shape[1];
+			assert (self.num_vertices+self.num_rays)>0
+			print(f"vertices={self.V}")
+			print(f"rays={self.R}")
+			# exit()
 
 
 
@@ -84,7 +84,7 @@ class ConstraintLayer(torch.nn.Module):
 		if(self.method=='walker'):
 			return (self.cs.k+1)
 		if(self.method=='unconstrained'):
-			return self.lc.dimAmbSpace()
+			return self.cs.dim_ambient_space
 		if(self.method=='barycentric'):
 			return self.num_vertices + self.num_rays
 		if(self.method=='proj_train_test' or self.method=='proj_test'):

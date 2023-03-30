@@ -338,11 +338,11 @@ class linearAndConvexQuadraticConstraints():
 			b_p=b_I-A_I@y1
 					
 
-			print(f"A_p=\n{A_p}")
-			print(f"b_p=\n{b_p}")
+			# print(f"A_p=\n{A_p}")
+			# print(f"b_p=\n{b_p}")
 
-			assert A_p.ndim == 2, f"Aineq.shape={A_p.shape}"
-			assert b_p.ndim == 2, f"bineq.shape={b_p.shape}"
+			assert A_p.ndim == 2, f"A_p.shape={A_p.shape}"
+			assert b_p.ndim == 2, f"b_p.shape={b_p.shape}"
 			assert b_p.shape[1] ==1
 			assert A_p.shape[0] == b_p.shape[0]
 
@@ -925,13 +925,13 @@ def plot3DPolytopeVRepresentation(V, limits, ax):
 			"blue"
 		)
 
-	ax.set_xlabel("x")
-	ax.set_ylabel("y")
-	ax.set_zlabel("z")
+	# ax.set_xlabel("x")
+	# ax.set_ylabel("y")
+	# ax.set_zlabel("z")
 
-	ax.set_xlim3d(limits[0],limits[1])
-	ax.set_ylim3d(limits[2],limits[3])
-	ax.set_zlim3d(limits[4],limits[5])
+	# ax.set_xlim3d(limits[0],limits[1])
+	# ax.set_ylim3d(limits[2],limits[3])
+	# ax.set_zlim3d(limits[4],limits[5])
 
 
 
