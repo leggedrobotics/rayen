@@ -103,6 +103,7 @@ class ConstraintLayer(torch.nn.Module):
 
 		# print("In forward pass")
 
+		num_batches=x.shape[0];
 
 		##################  MAPPER LAYER ####################
 		# x has dimensions [num_batches, numel_input_mapper, 1]
@@ -121,6 +122,9 @@ class ConstraintLayer(torch.nn.Module):
 			
 			u=torch.nn.functional.normalize(v, dim=1);
 
+
+			kappa_linear=torch.zeros(num_batches,1,1)
+			kappa_quadratic=torch.zeros(num_batches,1,1)
 
 			## THIRD OPTION
 			if(self.cs.has_linear_constraints):
@@ -151,23 +155,18 @@ class ConstraintLayer(torch.nn.Module):
 					discriminant = torch.square(b) - 4*(a)*(c)
 
 					assert torch.all(discriminant >= 0) 
-					lamb_positive=torch.div(  -(b)  + torch.sqrt(discriminant) , 2*a)
-					assert torch.all(lamb_positive >= 0) #If not, then either the feasible set is infeasible (note that z0 is inside the feasible set)
+					lamb_positive_i=torch.div(  -(b)  + torch.sqrt(discriminant) , 2*a)
+					assert torch.all(lamb_positive_i >= 0) #If not, then either the feasible set is infeasible (note that z0 is inside the feasible set)
 					
-					kappa_quadratic=1/lamb_positive;
+					kappa_quadratic_i=1/lamb_positive_i;
+
+					kappa_quadratic = torch.maximum(kappa_quadratic, kappa_quadratic_i)
 
 					assert torch.all(kappa_quadratic >= 0)
 
 
 			################################# Obtain kappa
-			if(self.cs.has_linear_constraints and self.cs.has_quadratic_constraints):
-				kappa=torch.maximum(kappa_linear, kappa_quadratic)
-			elif(self.cs.has_linear_constraints):
-				kappa=kappa_linear
-			elif(self.cs.has_quadratic_constraints):
-				kappa=kappa_quadratic
-			else:
-				assert False, "There are no constraints"
+			kappa = torch.maximum(kappa_quadratic, kappa_quadratic)
 		
 			assert torch.all(kappa >= 0)
 			#################################
