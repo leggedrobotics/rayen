@@ -25,10 +25,7 @@ class ConstraintLayer(torch.nn.Module):
 		self.n=cs.n #Dimension of the embeded space
 
 		if(cs.has_linear_constraints):
-			if(cs.Z_is_unconstrained==False):
-				D=cs.A_p/((cs.b_p-cs.A_p@cs.z0)@np.ones((1,cs.n))) 
-			else:
-				D=np.zeros_like(cs.A_p)
+			D=cs.A_p/((cs.b_p-cs.A_p@cs.z0)@np.ones((1,cs.n)))
 			
 			self.register_buffer("D", torch.tensor(D))
 

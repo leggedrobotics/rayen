@@ -17,10 +17,11 @@ import scipy
 
 
 methods=['walker','barycentric', 'unconstrained', 'proj_train_test', 'proj_test']
+methods=['walker']
 
 
-# examples_to_run=list(range(9))
-index_examples_to_run=[10]
+index_examples_to_run=list(range(9))
+# index_examples_to_run=[10]
 num_of_examples=len(index_examples_to_run)
 ###############
 rows=math.ceil(math.sqrt(num_of_examples))

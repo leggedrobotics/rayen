@@ -324,8 +324,8 @@ class linearAndConvexQuadraticConstraints():
 				A_I=A[I,:];
 				b_I=b[I,:];
 			else:
-				A_I=np.zeros((1,A.shape[1]));
-				b_I=np.zeros((1,1));	
+				A_I=np.zeros((1,A.shape[1])); # 0z<=1
+				b_I=np.ones((1,1));	
 
 			#At this point, A_E, b_E, A_I, and b_I have at least one row
 
@@ -357,44 +357,39 @@ class linearAndConvexQuadraticConstraints():
 			self.n=self.dim_ambient_space
 			NA_E=np.eye(self.n);
 			y1=np.zeros((self.n,1));
-			A_p=np.zeros((1,self.n))
-			b_p=np.zeros((1,1))
-
-		self.Z_is_unconstrained= (isZero(A_p))  and (isZero(b_p)); #A_p is the zero matrix and b_p the zero vector
+			A_p=np.zeros((1,self.n)) # 0z<=1
+			b_p=np.ones((1,1))
 
 		#############Obtain a strictly feasible point z0
 		###################################################
 
-		if(self.Z_is_unconstrained==True and self.has_quadratic_constraints==False):
-			z0=np.zeros((self.n,1)) #Any point is feasible. We just take the origin
-		else:
-			epsilon=cp.Variable()
-			z0 = cp.Variable((self.n,1))
+		epsilon=cp.Variable()
+		z0 = cp.Variable((self.n,1))
 
-			constraints=[]
+		constraints=[]
 
-			if(self.has_linear_constraints and self.Z_is_unconstrained==False): #I need to include the second condition becase there are no strictly feasible points with 0<=0 
-				constraints+=[A_p@z0 - b_p <= -epsilon*np.ones((A_p.shape[0],1))]
+		if(self.has_linear_constraints):
+			constraints+=[A_p@z0 - b_p <= -epsilon*np.ones((A_p.shape[0],1))]
 
-			if(self.has_quadratic_constraints):
-				x0=NA_E@z0 + y1
-				for i in range(len(self.all_P)):
-					constraints.append( 0.5*cp.quad_form(x0, self.all_P[i]) + self.all_q[i].T@x0 + self.all_r[i] <= -epsilon) 
+		if(self.has_quadratic_constraints):
+			x0=NA_E@z0 + y1
+			for i in range(len(self.all_P)):
+				constraints.append( 0.5*cp.quad_form(x0, self.all_P[i]) + self.all_q[i].T@x0 + self.all_r[i] <= -epsilon) 
 
-			constraints.append(epsilon>=0)
-			constraints.append(epsilon<=5.0) #This constraint is needed for the case where the set is unbounded.
-			
-			objective = cp.Minimize(-epsilon)
-			prob = cp.Problem(objective, constraints)
+		constraints.append(epsilon>=0)
+		constraints.append(epsilon<=5.0) #This constraint is needed for the case where the set is unbounded.
+		
+		objective = cp.Minimize(-epsilon)
+		prob = cp.Problem(objective, constraints)
 
-			result = prob.solve(verbose=False);
-			if(prob.status != 'optimal' and prob.status!='optimal_inaccurate'):
-				raise Exception(f"Value is not optimal, prob_status={prob.status}")
+		result = prob.solve(verbose=False);
+		if(prob.status != 'optimal' and prob.status!='optimal_inaccurate'):
+			raise Exception(f"Value is not optimal, prob_status={prob.status}")
 
-			assert epsilon.value>1e-8 #If not, there are no strictly feasible points in the subspace
-									  #TODO: change hand-coded tolerance
-	
-			z0= z0.value
+		assert epsilon.value>1e-8 #If not, there are no strictly feasible points in the subspace
+								  #TODO: change hand-coded tolerance
+
+		z0= z0.value
 
 
 		####Store data in the class
