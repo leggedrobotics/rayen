@@ -392,6 +392,12 @@ classdef MyClampedUniformSpline < handle
         function result=getCPsAsMatrix(obj)
             result=convertCellArrayCPsToMatrix(obj, obj.CPoints);
         end
+
+        function result=getCPsAsVector(obj)
+            result=obj.getCPsAsMatrix();
+            result=result(:);
+        end
+
         
         function result=getCPsofIntervalAsMatrix(obj,j)
             result=convertCellArrayCPsToMatrix(obj, obj.getCPsofInterval(j));
