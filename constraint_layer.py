@@ -9,7 +9,7 @@ from cvxpylayers.torch import CvxpyLayer
 
 
 class ConstraintLayer(torch.nn.Module):
-	def __init__(self, cs, method='walker'):
+	def __init__(self, cs, method='walker_2'):
 		super().__init__()
 
 		assert cp.__version__=='1.2.3' #See this issue: https://github.com/cvxgrp/cvxpylayers/issues/143
@@ -76,8 +76,10 @@ class ConstraintLayer(torch.nn.Module):
 		self.cs=cs;
 
 	def getNumelOutputMapper(self):
-		if(self.method=='walker'):
+		if(self.method=='walker_2'):
 			return (self.cs.n+1)
+		if(self.method=='walker_1'):
+			return (self.cs.n)
 		if(self.method=='unconstrained'):
 			return self.cs.dim_ambient_space
 		if(self.method=='barycentric'):
@@ -112,20 +114,18 @@ class ConstraintLayer(torch.nn.Module):
 		#Here z has dimensions [num_batches, numel_output_mapper, 1]
 		####################################################
 
-		if(self.method=='walker'):
+		if(self.method=='walker_2' or self.method=='walker_1'):
 			
 			v = z[:,  0:self.cs.n,0:1] #0:1 to keep the dimension. Other option is torch.unsqueeze(z[:,  0:self.cs.n,0],2) 
-			beta= z[:, self.cs.n:(self.cs.n+1),0:1]#0:1 to keep the dimension. Other option istorch.unsqueeze(z[:, self.cs.n:(self.cs.n+1),0],2)
 			
-			u=torch.nn.functional.normalize(v, dim=1);
+			v_bar=torch.nn.functional.normalize(v, dim=1);
 
 
 			kappa_linear=torch.zeros(num_batches,1,1)
 			kappa_quadratic=torch.zeros(num_batches,1,1)
 
-			## THIRD OPTION
 			if(self.cs.has_linear_constraints):
-				kappa_linear=torch.relu( torch.max(self.D@u, dim=1, keepdim=True).values  )
+				kappa_linear=torch.relu( torch.max(self.D@v_bar, dim=1, keepdim=True).values  )
 
 				assert torch.all(kappa_linear >= 0)
 
@@ -137,18 +137,14 @@ class ConstraintLayer(torch.nn.Module):
 					q=self.all_q[i,:,:]
 					r=self.all_r[i,:,:]
 
-					rho = self.NA_E@u
-					w = self.NA_E@self.z0 + self.y1 #Do this in the constructor of this class
+					rho = self.NA_E@v_bar
+					w = self.NA_E@self.z0 + self.y1 #Do this in the constructor of this class. This is actually y0
 
 					rhoT=torch.transpose(rho,dim0=1, dim1=2)
 
 					a=0.5*rhoT@P@rho;
 					b=(w.T@P@rho + q.T@rho);
 					c=(0.5*w.T@P@w + q.T@w +r)
-
-					aprime=rhoT@rho;
-					bprime=2*w.T@rho;
-					cprime=w.T@w - 1;
 
 					discriminant = torch.square(b) - 4*(a)*(c)
 
@@ -172,8 +168,15 @@ class ConstraintLayer(torch.nn.Module):
 			#################################
 
 
-			alpha=1/(torch.exp(beta) + kappa)
-			z0_new = self.z0 + alpha*u 
+			if(self.method=='walker_2'):
+				beta= z[:, self.cs.n:(self.cs.n+1),0:1]#0:1 to keep the dimension. Other option istorch.unsqueeze(z[:, self.cs.n:(self.cs.n+1),0],2)
+
+				alpha=1/(torch.exp(beta) + kappa)
+			else: #method is walker_1
+				norm_v=torch.linalg.vector_norm(v, dim=(1,2), keepdim=True)
+				alpha=torch.minimum( 1/kappa , norm_v )
+
+			z0_new = self.z0 + alpha*v_bar 
 			
 			#Now lift back to the original space
 			y0_new =self.liftBack(z0_new)

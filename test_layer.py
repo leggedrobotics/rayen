@@ -16,8 +16,8 @@ import numpy as np
 import scipy
 
 
-methods=['walker','barycentric', 'unconstrained', 'proj_train_test', 'proj_test']
-methods=['walker']
+methods=['walker_2', 'walker_1', 'barycentric', 'unconstrained', 'proj_train_test', 'proj_test']
+methods=['walker_2', 'walker_1']
 
 
 index_examples_to_run=list(range(9))
@@ -59,7 +59,7 @@ for method in methods:
 
 		numel_output_mapper=my_layer.getNumelOutputMapper()
 
-		x_batched=torch.Tensor(1000, numel_output_mapper, 1).uniform_(-8, 8)
+		x_batched=torch.Tensor(1000, numel_output_mapper, 1).uniform_(-5, 5)
 
 		# mapper=nn.Sequential(nn.Linear(x_batched.shape[1], numel_output_mapper))
 		mapper=nn.Sequential() #do nothing.
