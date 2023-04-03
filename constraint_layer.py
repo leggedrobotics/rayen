@@ -22,11 +22,11 @@ class ConstraintLayer(torch.nn.Module):
 
 		# if(self.method=='walker' or self.method=='barycentric' or self.method=='proj_train_test' or self.method=='proj_test'):
 
-		self.k=cs.k #Dimension of the embeded space
+		self.n=cs.n #Dimension of the embeded space
 
 		if(cs.has_linear_constraints):
 			if(cs.Z_is_unconstrained==False):
-				D=cs.A_p/((cs.b_p-cs.A_p@cs.z0)@np.ones((1,cs.k))) 
+				D=cs.A_p/((cs.b_p-cs.A_p@cs.z0)@np.ones((1,cs.n))) 
 			else:
 				D=np.zeros_like(cs.A_p)
 			
@@ -49,8 +49,8 @@ class ConstraintLayer(torch.nn.Module):
 
 		if(self.method=='proj_train_test' or self.method=='proj_test'):
 			#Section 8.1.1 of https://web.stanford.edu/~boyd/cvxbook/bv_cvxbook.pdf
-			self.z_projected = cp.Variable((cs.k,1))         #projected point
-			self.z_to_be_projected = cp.Parameter((cs.k,1))  #original point
+			self.z_projected = cp.Variable((cs.n,1))         #projected point
+			self.z_to_be_projected = cp.Parameter((cs.n,1))  #original point
 			constraints= cs.getConstraintsInSubspaceCvxpy(self.z_projected)
 			objective = cp.Minimize(cp.sum_squares(self.z_projected - self.z_to_be_projected))
 			self.prob_projection = cp.Problem(objective, constraints)
@@ -80,13 +80,13 @@ class ConstraintLayer(torch.nn.Module):
 
 	def getNumelOutputMapper(self):
 		if(self.method=='walker'):
-			return (self.cs.k+1)
+			return (self.cs.n+1)
 		if(self.method=='unconstrained'):
 			return self.cs.dim_ambient_space
 		if(self.method=='barycentric'):
 			return self.num_vertices + self.num_rays
 		if(self.method=='proj_train_test' or self.method=='proj_test'):
-			return self.cs.k
+			return self.cs.n
 
 
 	def setMapper(self, mapper):
@@ -117,8 +117,8 @@ class ConstraintLayer(torch.nn.Module):
 
 		if(self.method=='walker'):
 			
-			v = z[:,  0:self.cs.k,0:1] #0:1 to keep the dimension. Other option is torch.unsqueeze(z[:,  0:self.cs.k,0],2) 
-			beta= z[:, self.cs.k:(self.cs.k+1),0:1]#0:1 to keep the dimension. Other option istorch.unsqueeze(z[:, self.cs.k:(self.cs.k+1),0],2)
+			v = z[:,  0:self.cs.n,0:1] #0:1 to keep the dimension. Other option is torch.unsqueeze(z[:,  0:self.cs.n,0],2) 
+			beta= z[:, self.cs.n:(self.cs.n+1),0:1]#0:1 to keep the dimension. Other option istorch.unsqueeze(z[:, self.cs.n:(self.cs.n+1),0],2)
 			
 			u=torch.nn.functional.normalize(v, dim=1);
 
@@ -134,6 +134,7 @@ class ConstraintLayer(torch.nn.Module):
 
 
 			if(self.cs.has_quadratic_constraints):
+				lambda_quadratic=torch.empty((num_batches,0,1))
 				for i in range(self.all_P.shape[0]): #for each of the quadratic constraints
 					P=self.all_P[i,:,:]
 					q=self.all_q[i,:,:]
@@ -158,15 +159,17 @@ class ConstraintLayer(torch.nn.Module):
 					lamb_positive_i=torch.div(  -(b)  + torch.sqrt(discriminant) , 2*a)
 					assert torch.all(lamb_positive_i >= 0) #If not, then either the feasible set is infeasible (note that z0 is inside the feasible set)
 					
-					kappa_quadratic_i=1/lamb_positive_i;
+					lambda_quadratic = torch.cat((lambda_quadratic, lamb_positive_i), dim=1)
 
-					kappa_quadratic = torch.maximum(kappa_quadratic, kappa_quadratic_i)
 
-					assert torch.all(kappa_quadratic >= 0)
+				print(f"Shape={lambda_quadratic.shape}")
+				tmp=(torch.min(lambda_quadratic, dim=1, keepdim=True).values)
+				kappa_quadratic=1.0/tmp
+				assert torch.all(lambda_quadratic >= 0)
 
 
 			################################# Obtain kappa
-			kappa = torch.maximum(kappa_quadratic, kappa_quadratic)
+			kappa = torch.maximum(kappa_linear, kappa_quadratic)
 		
 			assert torch.all(kappa >= 0)
 			#################################
@@ -186,8 +189,8 @@ class ConstraintLayer(torch.nn.Module):
 			y0_new=z
 
 		if (self.method=='barycentric'):
-			tmp1 = z[:,  0:self.num_vertices,0:1] #0:1 to keep the dimension. Other option is torch.unsqueeze(z[:,  0:self.cs.k,0],2) 
-			tmp2 = z[:,  self.num_vertices:(self.num_vertices+self.num_rays),0:1] #0:1 to keep the dimension. Other option is torch.unsqueeze(z[:,  0:self.cs.k,0],2) 
+			tmp1 = z[:,  0:self.num_vertices,0:1] #0:1 to keep the dimension. Other option is torch.unsqueeze(z[:,  0:self.cs.n,0],2) 
+			tmp2 = z[:,  self.num_vertices:(self.num_vertices+self.num_rays),0:1] #0:1 to keep the dimension. Other option is torch.unsqueeze(z[:,  0:self.cs.n,0],2) 
 			
 			lambdas=nn.functional.softmax(tmp1, dim=1)
 			mus=torch.abs(tmp2)

@@ -351,13 +351,13 @@ class linearAndConvexQuadraticConstraints():
 
 			printInBoldGreen(f"A_p is {A_p.shape} and b_p is {b_p.shape}")
 
-			self.k=A_p.shape[1] #dimension of the linear subspace
+			self.n=A_p.shape[1] #dimension of the linear subspace
 
 		else:
-			self.k=self.dim_ambient_space
-			NA_E=np.eye(self.k);
-			y1=np.zeros((self.k,1));
-			A_p=np.zeros((1,self.k))
+			self.n=self.dim_ambient_space
+			NA_E=np.eye(self.n);
+			y1=np.zeros((self.n,1));
+			A_p=np.zeros((1,self.n))
 			b_p=np.zeros((1,1))
 
 		self.Z_is_unconstrained= (isZero(A_p))  and (isZero(b_p)); #A_p is the zero matrix and b_p the zero vector
@@ -366,10 +366,10 @@ class linearAndConvexQuadraticConstraints():
 		###################################################
 
 		if(self.Z_is_unconstrained==True and self.has_quadratic_constraints==False):
-			z0=np.zeros((self.k,1)) #Any point is feasible. We just take the origin
+			z0=np.zeros((self.n,1)) #Any point is feasible. We just take the origin
 		else:
 			epsilon=cp.Variable()
-			z0 = cp.Variable((self.k,1))
+			z0 = cp.Variable((self.n,1))
 
 			constraints=[]
 
@@ -433,12 +433,12 @@ class linearAndConvexQuadraticConstraints():
     ######################### CONSTRAINTS IN THE SUBSPACE
 	def getLinearConstraintsInSubspaceCvxpy(self, variable):
 		assert variable.shape[1]==1
-		assert variable.shape[0]==self.k		 
+		assert variable.shape[0]==self.n		 
 		return [self.A_p@variable<=self.b_p] 
 
 	def getQuadraticConstraintsInSubspaceCvxpy(self, variable):
 		assert variable.shape[1]==1
-		assert variable.shape[0]==self.k		 
+		assert variable.shape[0]==self.n		 
 		return self.getQuadraticConstraintsCvxpy(self.NA_E@variable + self.y1)
 
 	def getConstraintsInSubspaceCvxpy(self, variable):
