@@ -11,17 +11,18 @@ import utils
 
 # create custom dataset class
 class CustomDataset(Dataset):
-	def __init__(self, all_x, all_y):
+	def __init__(self, all_x, all_y, all_Pobj, all_qobj, all_robj):
 		self.all_x = all_x
 		self.all_y = all_y
+		self.all_Pobj = all_Pobj
+		self.all_qobj = all_qobj
+		self.all_robj = all_robj
 
 	def __len__(self):
 		return len(self.all_y)
 
 	def __getitem__(self, idx):
-		x = self.all_x[idx]
-		y = self.all_y[idx]
-		return x, y
+		return self.all_x[idx], self.all_y[idx], self.all_Pobj[idx], self.all_qobj[idx], self.all_robj[idx]
 
 	def getNumelX(self):
 		return self.all_x[0].size #Using the first element
@@ -29,27 +30,27 @@ class CustomDataset(Dataset):
 	def getNumelY(self):
 		return self.all_y[0].size #Using the first element
 
-	def plot(self, ax):
-		dim=self.all_x[0].shape[0]
+	# def plot(self, ax):
+	# 	dim=self.all_x[0].shape[0]
 
-		# print(f"x[0]={x[0]}")
+	# 	# print(f"x[0]={x[0]}")
 
-		all_x_np=np.concatenate(self.all_x, axis=1 )
-		all_y_np=np.concatenate(self.all_y, axis=1 )
+	# 	all_x_np=np.concatenate(self.all_x, axis=1 )
+	# 	all_y_np=np.concatenate(self.all_y, axis=1 )
 
-		print(f"dim={dim}")
-		print(f"dim={dim}")
+	# 	print(f"dim={dim}")
+	# 	print(f"dim={dim}")
 
 
-		if(dim==3):
-			ax.scatter3D(all_x_np[0,:], all_x_np[1,:], all_x_np[2,:],color='red')
-			ax.scatter3D(all_y_np[0,:], all_y_np[1,:], all_y_np[2,:],color='blue')
+	# 	if(dim==3):
+	# 		ax.scatter3D(all_x_np[0,:], all_x_np[1,:], all_x_np[2,:],color='red')
+	# 		ax.scatter3D(all_y_np[0,:], all_y_np[1,:], all_y_np[2,:],color='blue')
 
-			print(f"all_x_np={all_x_np}")
+	# 		print(f"all_x_np={all_x_np}")
 
-		if(dim==2):
-			ax.scatter(all_x_np[0,:], all_x_np[1,:],color='red')
-			ax.scatter(all_y_np[0,:], all_y_np[1,:],color='blue')
+	# 	if(dim==2):
+	# 		ax.scatter(all_x_np[0,:], all_x_np[1,:],color='red')
+	# 		ax.scatter(all_y_np[0,:], all_y_np[1,:],color='blue')
 
 def createProjectionDataset(num_samples, cs, bbox_half_side): 
 
@@ -83,9 +84,15 @@ def getCorridorDatasetsAndConstraints():
 
 	all_x=list(mat["all_x"][0])
 	all_y=list(mat["all_y"][0])
+	all_Pobj=list(mat["all_Pobj"][0])
+	all_qobj=list(mat["all_qobj"][0])
+	all_robj=list(mat["all_robj"][0])
 
 	all_x_out_dist=list(mat["all_x_out_dist"][0])
 	all_y_out_dist=list(mat["all_y_out_dist"][0])
+	all_Pobj_out_dist=list(mat["all_Pobj_out_dist"][0])
+	all_qobj_out_dist=list(mat["all_qobj_out_dist"][0])
+	all_robj_out_dist=list(mat["all_robj_out_dist"][0])
 
 	polyhedron=mat["polyhedron"]
 
@@ -101,8 +108,8 @@ def getCorridorDatasetsAndConstraints():
 	assert all_y_out_dist[0].shape[1]==1
 
 	cs=utils.linearAndConvexQuadraticConstraints(A1, b1, None, None, None, None, None)
-	my_dataset = CustomDataset(all_x, all_y)
-	my_dataset_out_dist = CustomDataset(all_x_out_dist, all_y_out_dist)
+	my_dataset = CustomDataset(all_x, all_y, all_Pobj, all_qobj, all_robj)
+	my_dataset_out_dist = CustomDataset(all_x_out_dist, all_y_out_dist, all_Pobj_out_dist, all_qobj_out_dist, all_robj_out_dist)
 
 	# print(all_x[0].shape)
 	# print(all_x_out_dist[0].shape)

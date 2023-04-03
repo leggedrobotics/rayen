@@ -171,16 +171,25 @@ all_wj=0:0.3:0.3;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Generate samples inside the distribution
 all_x={};
 all_y={};
+all_Pobj={};
+all_qobj={};
+all_robj={};
 for wv=all_wv
     for wa=all_wa
         for wj=all_wj
-            [wv;wa;wj]'
-            opti.set_value(weights,[wv;wa;wj]);
+            weights_value=[wv;wa;wj];
+            weights_value'
+            opti.set_value(weights,weights_value);
             sol = opti.solve();
             checkSolverSucceeded(sol, my_solver)
-            control_points=sol.value(sp.getCPsAsMatrix);
-            all_x{end+1}=[wv;wa;wj];
+            control_points=sol.value(sp.getCPsAsVector());
+            all_x{end+1}=weights_value;
             all_y{end+1}=control_points(:);
+            cost_substituted=casadi.substitute(cost,weights,weights_value);
+            [P,q,r]=getPandqandrOfQuadraticExpressionCasadi(cost_substituted, sp.getCPsAsVector());
+            all_Pobj{end+1}=P;   
+            all_qobj{end+1}=q;
+            all_robj{end+1}=r;
         end
     end
 end
@@ -188,17 +197,26 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Generate samples outside the distribution
 all_x_out_dist={};
 all_y_out_dist={};
+all_Pobj_out_dist={};
+all_qobj_out_dist={};
+all_robj_out_dist={};
 factor=5;
 for wv=factor*all_wv
     for wa=factor*all_wa
         for wj=factor*all_wj
-            [wv;wa;wj]'
-            opti.set_value(weights,[wv;wa;wj]);
+            weights_value=[wv;wa;wj];
+            weights_value'
+            opti.set_value(weights,weights_value);
             sol = opti.solve();
             checkSolverSucceeded(sol, my_solver)
-            control_points=sol.value(sp.getCPsAsMatrix);
-            all_x_out_dist{end+1}=[wv;wa;wj];
+            control_points=sol.value(sp.getCPsAsVector());
+            all_x_out_dist{end+1}=weights_value;
             all_y_out_dist{end+1}=control_points(:);
+            cost_substituted=casadi.substitute(cost,weights,weights_value);
+            [P,q,r]=getPandqandrOfQuadraticExpressionCasadi(cost_substituted, sp.getCPsAsVector());
+            all_Pobj_out_dist{end+1}=P;   
+            all_qobj_out_dist{end+1}=q;
+            all_robj_out_dist{end+1}=r;
         end
     end
 end
@@ -221,10 +239,20 @@ polyhedron.A1=A1;
 polyhedron.b1=b1;
 
 
-save('corridor.mat','all_x','all_y','all_x_out_dist','all_y_out_dist','polyhedron');
+save('corridor.mat','all_x','all_y','all_Pobj','all_qobj','all_robj', ...
+    'all_x_out_dist','all_y_out_dist','all_Pobj_out_dist','all_qobj_out_dist','all_robj_out_dist', ...
+    'polyhedron');
 
 sol = opti.solve();
 
+%%
+%%%%%
+% control_points=sp.getCPsAsMatrix();
+% variables=;
+% 
+
+%%%%%
+%%
 sp.updateCPsWithSolution(sol.value(sp.getCPsAsMatrix()));
 
 
@@ -250,6 +278,10 @@ xlabel('x (m)'); ylabel('y (m)'); zlabel('z (m)');
 % figure; hold on;
 % p1=[0;0;0];
 % p2=[1;1;1];
+
+
+
+
 
 function checkSolverSucceeded(sol, my_solver)
     if (strcmp(my_solver,'ipopt'))

@@ -121,8 +121,8 @@ class ConstraintLayer(torch.nn.Module):
 			v_bar=torch.nn.functional.normalize(v, dim=1);
 
 
-			kappa_linear=torch.zeros(num_batches,1,1)
-			kappa_quadratic=torch.zeros(num_batches,1,1)
+			kappa_linear=torch.zeros((num_batches,1,1), device=x.device)
+			kappa_quadratic=torch.zeros((num_batches,1,1), device=x.device)
 
 			if(self.cs.has_linear_constraints):
 				kappa_linear=torch.relu( torch.max(self.D@v_bar, dim=1, keepdim=True).values  )

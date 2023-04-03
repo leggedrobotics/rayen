@@ -51,6 +51,9 @@ class SplittedDatasetAndGenerator():
 			utils.printInBoldRed(f"Test batches {len(self.test_generator)}")
 
 
+	# def getLoss()
+	# 	self.loss = nn.MSELoss(reduction='mean')
+
 		# utils.printInBoldRed(f"Created DataLoader with batches [train, val, test]={[len(self.train_generator), len(self.val_generator), len(self.test_generator)]}")
 
 	
@@ -77,14 +80,20 @@ def train_model(model, params, sdag):
 		model.train()
 		sum_all_squares = 0
 		######################### TRAIN
-		for x, y in sdag.train_generator:
+		for x, y, Pobj, qobj, robj in sdag.train_generator:
 			optimizer.zero_grad()
 
 			#----------------------
 			x = x.to(device)
 			y = y.to(device)
+			Pobj = Pobj.to(device)
+			qobj = qobj.to(device)
+			robj = robj.to(device)
 			y_predicted = model(x)
-			loss = loss_fn(y_predicted, y)
+			if(params['use_supervised']):
+				loss = loss_fn(y_predicted, y)
+			else:
+				loss = torch.mean(0.5*torch.transpose(y_predicted, 1, 2)@Pobj@y_predicted  + torch.transpose(qobj, 1, 2)@y_predicted + robj)
 			sum_all_squares = sum_all_squares + loss.item()*torch.numel(x);
 			#----------------------
 
@@ -102,13 +111,19 @@ def train_model(model, params, sdag):
 
 		with torch.set_grad_enabled(False):
 			sum_all_squares = 0
-			for x, y in sdag.val_generator:
+			for x, y, Pobj, qobj, robj in sdag.val_generator:
 
 				#----------------------
 				x = x.to(device)
 				y = y.to(device)
+				Pobj = Pobj.to(device)
+				qobj = qobj.to(device)
+				robj = robj.to(device)
 				y_predicted = model(x)
-				loss = loss_fn(y_predicted, y)
+				if(params['use_supervised']):
+					loss = loss_fn(y_predicted, y)
+				else:
+					loss = torch.mean(0.5*torch.transpose(y_predicted, 1, 2)@Pobj@y_predicted  + torch.transpose(qobj, 1, 2)@y_predicted + robj)
 				sum_all_squares = sum_all_squares + loss.item()*torch.numel(x);
 				#----------------------
 
@@ -156,15 +171,19 @@ def test_model(model, params, sdag, cs):
 	with torch.set_grad_enabled(False):
 		sum_all_squares = 0.0
 		total_time_s=0.0;
-		for x, y in sdag.test_generator:
+		for x, y, Pobj, qobj, robj in sdag.test_generator:
 
 			#----------------------
 			x = x.to(device)
 			y = y.to(device)
-			start_time = time.time()
+			Pobj = Pobj.to(device)
+			qobj = qobj.to(device)
+			robj = robj.to(device)
 			y_predicted = model(x)
-			total_time_s = total_time_s + (time.time() -start_time)
-			loss = loss_fn(y_predicted, y)
+			if(params['use_supervised']):
+				loss = loss_fn(y_predicted, y)
+			else:
+				loss = torch.mean(0.5*torch.transpose(y_predicted, 1, 2)@Pobj@y_predicted  + torch.transpose(qobj, 1, 2)@y_predicted + robj)
 			sum_all_squares = sum_all_squares + loss.item()*torch.numel(x);
 			#----------------------
 
@@ -242,7 +261,8 @@ if __name__ == '__main__':
 
 
 	parser = argparse.ArgumentParser()
-	parser.add_argument('--method', type=str, default='barycentric') #walker or barycentric, unconstrained, proj_train_test, proj_test
+	parser.add_argument('--method', type=str, default='walker_2') #walker_2, walker_1  or barycentric, unconstrained, proj_train_test, proj_test
+	parser.add_argument('--use_supervised', type=bool, default=False)
 	parser.add_argument('--result_dir', type=str, default='results')
 	parser.add_argument('--device', type=int, default=0)
 	parser.add_argument('--num_epochs', type=int, default=7000)
