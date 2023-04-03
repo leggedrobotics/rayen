@@ -14,6 +14,9 @@ V=keepOnlyVerticesConvexHull(V);
 [A,b,Aeq,beq]=vert2lcon(V');
 assert(numel(Aeq)==0); assert(numel(beq)==0)
 
+
+
+
 % center=[0.5,0.5,0.5];
 % side=[1.0 1.0 1.0];
 % box =getAb_Box3D(center,side)
@@ -29,16 +32,41 @@ plot3dConvHullAndVertices(V, 'g', 0.02)
 
 syms x y z
 tol_for_aliasing=0.0001;
-fimplicit3(Aeq*[x;y;z]-beq+tol_for_aliasing,[-0.5 0.4 -0.2 0.8 -1 1],'FaceColor','b','EdgeColor','none','FaceAlpha',0.3)
+plane_color=[0.98, 0.33, 0.06];
+fimplicit3(Aeq*[x;y;z]-beq+tol_for_aliasing,[-0.5 0.4 -0.2 0.8 -1 1],'FaceColor',plane_color,'EdgeColor','none','FaceAlpha',0.3)
 
 NAeq=null(Aeq);
 
 %See slide 8-6 here: https://see.stanford.edu/materials/lsoeldsee263/08-min-norm.pdf
-x0=pinv(Aeq)*beq
+y1=pinv(Aeq)*beq
 % plotSphere(x0,0.05, 'r');
 
+
+%%%% Plot Ellipsoid (x-c)'*E*(x-c)<=1
+% E=[3 0 0;
+%    0 3 0;
+%    0 0 5];
+% c=[-0.5;0.8;0];
+E=[5 0 0;
+   0 5 0;
+   0 0 7];
+c=[-0.45;0.5;0];
+syms x y z 
+tmp=[x y z]';
+P=2*E;
+q=(-2*E*c)
+r=c'*E*c-1
+
+f=0.5*tmp'*P*tmp + q'*tmp + r ; 
+
+ellipsoid_color=[0.94, 0.85, 1];
+fimplicit3(  f   ,'EdgeColor','none','FaceAlpha',0.2 ,'MeshDensity',40 ,'LineWidth',0.0001,'FaceColor',ellipsoid_color)
+%%%%
+
+
+
 Ap=A*NAeq;
-bp=b-A*x0;
+bp=b-A*y1;
 [Vp,nr,nre]=lcon2vert(Ap,bp,[],[]);
 Vp=Vp'; %my convention
 figure;hold on;
@@ -50,17 +78,25 @@ figure;hold on;
 
 plot2dConvHullAndVertices(Vp,'r','r');
 
+%%%%%%%%%%%%
+
+tmp=NAeq*[x y]' + y1;
+f=0.5*tmp'*P*tmp + q'*tmp + r 
+fimplicit(f,'Color','b','LineWidth',2.0)
+
+%%%%%%%%%%%%%%%%%%%%%%
+
 Vp_lifted=[];
 for i=1:size(Vp,2)
-    Vp_lifted=[Vp_lifted NAeq*Vp(:,i)+x0];
+    Vp_lifted=[Vp_lifted NAeq*Vp(:,i)+y1];
 end
 axis off
 figure(2)
 export_fig intersection.png -m2.5
 
 figure(1)
-shp = alphaShape(Vp_lifted(1,:)',Vp_lifted(2,:)',Vp_lifted(3,:)')
-plot(shp,'EdgeColor','none','FaceColor','r')
+shp = alphaShape(Vp_lifted(1,:)',Vp_lifted(2,:)',Vp_lifted(3,:)');
+% plot(shp,'EdgeColor','none','FaceColor','r')
 axis off; axis equal;
 view([63.6 20.59])
 set(gcf,'Position',[394         288        1603         981])
