@@ -144,23 +144,23 @@ class ConstraintLayer(torch.nn.Module):
 		########################################################################
 
 
-		#########################################################
-		nsib=y.shape[0]; #number of samples in the batch
-		assert nsib==all_inequalities.shape[0]
-		tmp=all_inequalities.shape[1]
+		# #########################################################
+		# nsib=y.shape[0]; #number of samples in the batch
+		# assert nsib==all_inequalities.shape[0]
+		# tmp=all_inequalities.shape[1]
 
-		violation_squared=torch.square(torch.nn.functional.relu(all_inequalities));     #violation_squared is [nsib, tmp, 1]
-		sum_violation_squared=torch.sum(violation_squared, dim=1, keepdim=True)         #sum_violation_squared is [nsib, 1, 1]
+		# violation_squared=torch.square(torch.nn.functional.relu(all_inequalities));     #violation_squared is [nsib, tmp, 1]
+		# sum_violation_squared=torch.sum(violation_squared, dim=1, keepdim=True)         #sum_violation_squared is [nsib, 1, 1]
 		
-		assert violation_squared.shape==(nsib, tmp, 1), f"violation_squared.shape={violation_squared.shape}"
-		assert sum_violation_squared.shape==(nsib, 1, 1), f"sum_violation_squared.shape={sum_violation_squared.shape}"
-		###########################################################
+		# assert violation_squared.shape==(nsib, tmp, 1), f"violation_squared.shape={violation_squared.shape}"
+		# assert sum_violation_squared.shape==(nsib, 1, 1), f"sum_violation_squared.shape={sum_violation_squared.shape}"
+		# ###########################################################
 
 
-		assert torch.all(sum_violation_squared>=0)
+		# assert torch.all(sum_violation_squared>=0)
 
-		# return torch.mean(sum_violation_squared)
-		return torch.sum(sum_violation_squared)
+		# # return torch.mean(sum_violation_squared)
+		return torch.sum(torch.square(torch.nn.functional.relu(all_inequalities)))
 
 
 	def getSumObjCostAllSamples(self, y, Pobj, qobj, robj):
@@ -171,15 +171,14 @@ class ConstraintLayer(torch.nn.Module):
 		return torch.sum(tmp)
 
 	def getSumSupervisedCostAllSamples(self, y, y_predicted):
-		difference_squared=torch.square(y-y_predicted);
-		sum_difference_squared=torch.sum(difference_squared, dim=1, keepdim=True) 
+		# difference_squared=torch.square(y-y_predicted);
+		# sum_difference_squared=torch.sum(difference_squared, dim=1, keepdim=True) 
 
-		assert sum_difference_squared.shape==(y.shape[0], 1, 1)
-
-		assert torch.all(sum_difference_squared>=0)
+		# assert sum_difference_squared.shape==(y.shape[0], 1, 1)
+		# assert torch.all(sum_difference_squared>=0)
 
 		# return torch.mean(sum_difference_squared)
-		return torch.sum(sum_difference_squared)
+		return torch.sum(torch.square(y-y_predicted))
 
 	def getSumLossAllSamples(self, params, y, y_predicted, Pobj, qobj, robj, isTesting=False):
 		loss=params['use_supervised']*self.getSumSupervisedCostAllSamples(y, y_predicted) + \
