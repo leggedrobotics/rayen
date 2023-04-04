@@ -69,8 +69,6 @@ def train_model(model, params, sdag):
 
 	# scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.5, patience=5, cooldown=5)
 
-	loss_fn = nn.MSELoss(reduction='mean')
-
 	metrics = {'train_loss_per_sample': [], 'val_loss_per_sample': []}
 	
 	my_early_stopping = EarlyStopping(patience=1000, verbose=True)
@@ -78,56 +76,42 @@ def train_model(model, params, sdag):
 	#See https://pytorch.org/tutorials/beginner/blitz/cifar10_tutorial.html
 	for epoch in range(params['num_epochs']): #Loop over the dataset multiple times
 		model.train()
-		sum_all_squares = 0
+		sum_all_losses = 0
 		######################### TRAIN
-		for x, y, Pobj, qobj, robj in sdag.train_generator:
+		for x, y, Pobj, qobj, robj, opt_time_s in sdag.train_generator:
 			optimizer.zero_grad()
 
 			#----------------------
 			x = x.to(device)
 			y = y.to(device)
-			Pobj = Pobj.to(device)
-			qobj = qobj.to(device)
-			robj = robj.to(device)
 			y_predicted = model(x)
-			if(params['use_supervised']):
-				loss = loss_fn(y_predicted, y)
-			else:
-				loss = torch.mean(0.5*torch.transpose(y_predicted, 1, 2)@Pobj@y_predicted  + torch.transpose(qobj, 1, 2)@y_predicted + robj)
-			sum_all_squares = sum_all_squares + loss.item()*torch.numel(x);
+			loss=model.getSumLossAllSamples(params, y, y_predicted, Pobj, qobj, robj)
+			sum_all_losses = sum_all_losses + loss.item();
 			#----------------------
-
-			# assert abs(loss.item()*torch.numel(x)-nn.MSELoss(reduction='sum')(y_predicted, y))<1e-7
 
 			loss.backward()
 			optimizer.step()
 
 
-		metrics['train_loss_per_sample'].append(sum_all_squares/len(sdag.train_generator.dataset))
+		metrics['train_loss_per_sample'].append(sum_all_losses/len(sdag.train_generator.dataset))
 
 
 		######################### VALIDATION
 		model.eval()
 
 		with torch.set_grad_enabled(False):
-			sum_all_squares = 0
-			for x, y, Pobj, qobj, robj in sdag.val_generator:
+			sum_all_losses = 0
+			for x, y, Pobj, qobj, robj ,opt_time_s in sdag.val_generator:
 
 				#----------------------
 				x = x.to(device)
 				y = y.to(device)
-				Pobj = Pobj.to(device)
-				qobj = qobj.to(device)
-				robj = robj.to(device)
 				y_predicted = model(x)
-				if(params['use_supervised']):
-					loss = loss_fn(y_predicted, y)
-				else:
-					loss = torch.mean(0.5*torch.transpose(y_predicted, 1, 2)@Pobj@y_predicted  + torch.transpose(qobj, 1, 2)@y_predicted + robj)
-				sum_all_squares = sum_all_squares + loss.item()*torch.numel(x);
+				loss=model.getSumLossAllSamples(params, y, y_predicted, Pobj, qobj, robj)
+				sum_all_losses = sum_all_losses + loss.item();
 				#----------------------
 
-			val_loss_per_sample_of_this_epoch=sum_all_squares/len(sdag.val_generator.dataset)
+			val_loss_per_sample_of_this_epoch=sum_all_losses/len(sdag.val_generator.dataset)
 			metrics['val_loss_per_sample'].append(val_loss_per_sample_of_this_epoch)
 
 		if epoch % params['verbosity'] == 0:
@@ -166,39 +150,53 @@ def test_model(model, params, sdag, cs):
 
 	violations = np.empty((0,1))
 
-	loss_fn = nn.MSELoss(reduction='mean')
+	violations_optimization = np.empty((0,1))
+
+	# loss_fn = nn.MSELoss(reduction='mean')
 
 	with torch.set_grad_enabled(False):
-		sum_all_squares = 0.0
+		sum_all_losses = 0.0
+		sum_all_losses_optimization = 0.0
 		total_time_s=0.0;
-		for x, y, Pobj, qobj, robj in sdag.test_generator:
+		total_time_s_optimization=0.0;
+		for x, y, Pobj, qobj, robj, opt_time_s in sdag.test_generator:
 
 			#----------------------
 			x = x.to(device)
 			y = y.to(device)
-			Pobj = Pobj.to(device)
-			qobj = qobj.to(device)
-			robj = robj.to(device)
+			time_start=time.time()
 			y_predicted = model(x)
-			if(params['use_supervised']):
-				loss = loss_fn(y_predicted, y)
-			else:
-				loss = torch.mean(0.5*torch.transpose(y_predicted, 1, 2)@Pobj@y_predicted  + torch.transpose(qobj, 1, 2)@y_predicted + robj)
-			sum_all_squares = sum_all_squares + loss.item()*torch.numel(x);
+			total_time_s += (time.time()-time_start)
+			loss=model.getSumLossAllSamples(params, y, y_predicted, Pobj, qobj, robj, isTesting=True)
+			sum_all_losses +=  loss.item();
 			#----------------------
 
-			violations_of_this_batch=np.apply_along_axis(cs.getViolation,axis=1, arr=y_predicted.cpu().numpy())
-			#Shape of violations_of_this_batch is [batch_size, 1]
+			violations_of_this_batch=np.apply_along_axis(cs.getViolation,axis=1, arr=y_predicted.cpu().numpy()) ##Shape of violations_of_this_batch is [batch_size, 1]
 			violations=np.concatenate((violations, violations_of_this_batch), axis=0)
+
+			###### compute the results from the optimization. TODO: Change to a different place?
+			y_predicted=y
+			loss=model.getSumLossAllSamples(params, y, y_predicted, Pobj, qobj, robj, isTesting=True)
+			sum_all_losses_optimization += loss.item();
+			violations_of_this_batch=np.apply_along_axis(cs.getViolation,axis=1, arr=y_predicted.cpu().numpy()) ##Shape of violations_of_this_batch is [batch_size, 1]
+			violations_optimization=np.concatenate((violations_optimization, violations_of_this_batch), axis=0)
+			total_time_s_optimization += torch.sum(opt_time_s).item()
+			#########################################################
+
 
 	
 	assert np.all(violations>=0) #violations, by definition are nonnegative
+	assert np.all(violations_optimization>=0) #violations, by definition are nonnegative
 	assert violations.shape[0]==len(sdag.test_dataset), f"violations.shape[0]={violations.shape[0]}, len(sdag.test_dataset)={len(sdag.test_dataset)}"
+	assert violations_optimization.shape[0]==len(sdag.test_dataset), f"violations_optimization.shape[0]={violations_optimization.shape[0]}, len(sdag.test_dataset)={len(sdag.test_dataset)}"
 	
 	num_samples=len(sdag.test_dataset);
-	metrics = {"test_loss_per_sample": sum_all_squares/num_samples,
+	metrics = {"test_loss_per_sample": sum_all_losses/num_samples,
 			   "violation_per_sample": np.mean(violations),
-			   "total_time_s_per_sample": total_time_s/num_samples}
+			   "total_time_s_per_sample": total_time_s/num_samples,
+			   "optimization_test_loss_per_sample": sum_all_losses_optimization/num_samples,
+			   "optimization_violation_per_sample": np.mean(violations_optimization),
+			   "optimization_total_time_s_per_sample": total_time_s_optimization/num_samples,}
 	
 	return metrics
 
@@ -213,6 +211,21 @@ def main(params):
 
 	## CORRIDOR EXAMPLES
 	my_dataset, my_dataset_out_dist, cs=getCorridorDatasetsAndConstraints()
+
+	############### THIS AVOIDS CREATING the dataset all the time
+	# import pickle
+
+	# try:
+	# 	my_dataset = utils.loadpickle("my_dataset.pkl",)
+	# 	my_dataset_out_dist = utils.loadpickle("my_dataset_out_dist.pkl",)
+	# 	cs = utils.loadpickle("cs.pkl",)
+	# except:
+	# 	my_dataset, my_dataset_out_dist, cs=getCorridorDatasetsAndConstraints()
+	# 	utils.savepickle(my_dataset, "my_dataset.pkl")
+	# 	utils.savepickle(my_dataset_out_dist, "my_dataset_out_dist.pkl")
+	# 	utils.savepickle(cs, "cs.pkl")
+
+	###################
 
 	sdag=SplittedDatasetAndGenerator(my_dataset, percent_train=0.6, percent_val=0.2, batch_size=params['batch_size'])
 	sdag_out_dist=SplittedDatasetAndGenerator(my_dataset_out_dist, percent_train=0.0, percent_val=0.0, batch_size=params['batch_size'])
@@ -238,41 +251,48 @@ def main(params):
 
 	#####PRINT STUFF
 	print("\n\n-----------------------------------------------------")
-	print(f"Method={params['method']}")
+	# print(f"Method={params['method']}")
+	method=params['method']
 	print(f"Num of trainable params={sum(	p.numel() for p in model.parameters() if p.requires_grad)}")
 	utils.printInBoldBlue(f"Training: \n"\
-						  f"    loss: {training_metrics['train_loss_per_sample'][-1]:.2e} \n"\
-						  f"    val loss: {training_metrics['val_loss_per_sample'][-1]:.2e}")
+						  f"[{method}] loss: {training_metrics['train_loss_per_sample'][-1]:.2e} \n"\
+						  f"[{method}] val loss: {training_metrics['val_loss_per_sample'][-1]:.2e}")
 
 
 	######################### TESTING
 	utils.printInBoldRed(f"Testing: \n"\
-						 f"  loss: {testing_metrics['test_loss_per_sample']:.2e} \n"\
-						 f"  violation: {testing_metrics['violation_per_sample']:.2e} \n"\
-						 f"  total_time_ms_per_sample: {1000.0*testing_metrics['total_time_s_per_sample']:.2e}")
+						 f"  [{method}] loss: {testing_metrics['test_loss_per_sample']:.2e} \n"\
+						 f"  [{method}] violation: {testing_metrics['violation_per_sample']:.2e} \n"\
+						 f"  [{method}] total_time_ms_per_sample: {1000.0*testing_metrics['total_time_s_per_sample']:.2e} \n"\
+						 f"  [Opt] loss: {testing_metrics['optimization_test_loss_per_sample']:.2e} \n"\
+						 f"  [Opt] violation: {testing_metrics['optimization_violation_per_sample']:.2e} \n"\
+						 f"  [Opt] total_time_ms_per_sample: {1000.0*testing_metrics['optimization_total_time_s_per_sample']:.2e} \n")
 
 	utils.printInBoldRed(f"Testing outside distrib: \n"\
-						 f"  loss: {testing_metrics_out_dist['test_loss_per_sample']:.2e} \n"\
-						 f"  violation: {testing_metrics_out_dist['violation_per_sample']:.2e} \n"\
-						 f"  total_time_ms_per_sample: {1000.0*testing_metrics_out_dist['total_time_s_per_sample']:.2e}")
+						 f"  [{method}] loss: {testing_metrics_out_dist['test_loss_per_sample']:.2e} \n"\
+						 f"  [{method}] violation: {testing_metrics_out_dist['violation_per_sample']:.2e} \n"\
+						 f"  [{method}] total_time_ms_per_sample: {1000.0*testing_metrics_out_dist['total_time_s_per_sample']:.2e} \n"\
+						 f"  [Opt] loss: {testing_metrics_out_dist['optimization_test_loss_per_sample']:.2e} \n"\
+						 f"  [Opt] violation: {testing_metrics_out_dist['optimization_violation_per_sample']:.2e} \n"\
+						 f"  [Opt] total_time_ms_per_sample: {1000.0*testing_metrics_out_dist['optimization_total_time_s_per_sample']:.2e} \n")
+
+
+
 
 
 if __name__ == '__main__':
 
-
 	parser = argparse.ArgumentParser()
 	parser.add_argument('--method', type=str, default='walker_2') #walker_2, walker_1  or barycentric, unconstrained, proj_train_test, proj_test
 	parser.add_argument('--use_supervised', type=bool, default=False)
+	parser.add_argument('--weight_soft_cost', type=float, default=0.0)
 	parser.add_argument('--result_dir', type=str, default='results')
 	parser.add_argument('--device', type=int, default=0)
 	parser.add_argument('--num_epochs', type=int, default=7000)
-	# parser.add_argument('--n_trials', type=int, default=1)
 	parser.add_argument('--batch_size', type=int, default=256)
-	parser.add_argument('--n_evals', type=int, default=1)
 	parser.add_argument('--verbosity', type=int, default=1)
 	parser.add_argument('--learning_rate', type=float, default=1e-3)
 	parser.add_argument('--log_to_file', dest='log_to_file', action='store_true', default=True)
-	parser.add_argument('--box_constraints', dest='box_constraints', action='store_true', default=False)
 	args = parser.parse_args()
 	params = vars(args)
 

@@ -45,7 +45,7 @@ for method in methods:
 			continue
 
 		# fig = plt.figure()
-		if(constraint.dim_ambient_space==3):
+		if(constraint.k==3):
 			ax = fig.add_subplot(rows,cols,i+1, projection="3d")
 			if(constraint.has_linear_ineq_constraints):
 				utils.plot3DPolytopeHRepresentation(constraint.A1,constraint.b1,[-1, 2, -1, 2, -1, 2], ax)
@@ -72,7 +72,7 @@ for method in methods:
 
 		y0=my_layer.gety0();
 
-		if(constraint.dim_ambient_space==3):
+		if(constraint.k==3):
 			ax.scatter(y0[0,0], y0[1,0], y0[2,0],color='r',s=500)
 			ax.scatter(result[:,0,0], result[:,1,0], result[:,2,0])
 			# ax.plot3D(y0[0,0], y0[1,0])
@@ -89,7 +89,7 @@ for method in methods:
 			# 		utils.printInBoldRed("E is singular, not plotting")
 
 
-		if(constraint.dim_ambient_space==2):
+		if(constraint.k==2):
 			ax.scatter(result[:,0,0], result[:,1,0])
 			utils.plot2DPolyhedron(constraint.A1,constraint.b1,ax)
 			
@@ -150,8 +150,8 @@ plt.show()
 # 	x_batched[i,:,:]=tmp
 
 
-# E=1.7*np.eye(constraint.dim_ambient_space)
-# ellipsoid=utils.Ellipsoid(E=E, c=np.zeros((constraint.dim_ambient_space,1)))
+# E=1.7*np.eye(constraint.k)
+# ellipsoid=utils.Ellipsoid(E=E, c=np.zeros((constraint.k,1)))
 # cqc_list=[ellipsoid.convertToQuadraticConstraint()]
 
 # print(f"P={cqc_list[0].P}")

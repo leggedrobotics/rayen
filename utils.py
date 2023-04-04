@@ -146,6 +146,28 @@ class Ellipsoid():
 		r=self.c.T@self.E@self.c-1
 		return convexQuadraticConstraint(P,q,r)
 
+#Pytorch
+def quadExpression(y, P, q, r):
+
+	P = P.to(y.device)
+	q = q.to(y.device)
+	r = r.to(y.device)
+
+	# print(f"P.shape={P.shape}")
+	# print(f"q.shape={q.shape}")
+	# print(f"r.shape={r.shape}")
+	# print(f"y.shape={y.shape}")
+
+	if (q.ndim==2):
+		qT=q.T
+	else: #q is a batch
+		assert q.ndim==3 
+		qT=torch.transpose(q,1,2)
+
+	result=0.5*torch.transpose(y,1,2)@P@y + qT@y + r;
+	assert result.shape==(y.shape[0],1,1)
+	return result
+
 class linearAndConvexQuadraticConstraints():
 	#Constraints are
 	# A1<=b
@@ -165,14 +187,14 @@ class linearAndConvexQuadraticConstraints():
 			assert b1.ndim == 2, f"b1.shape={b1.shape}"
 			assert b1.shape[1] ==1
 			assert A1.shape[0] == b1.shape[0]
-			self.dim_ambient_space=A1.shape[1]
+			self.k=A1.shape[1]
 
 		if(self.has_linear_eq_constraints):
 			assert A2.ndim == 2, f"A2.shape={A2.shape}"
 			assert b2.ndim == 2, f"b2.shape={b2.shape}"
 			assert b2.shape[1] ==1
 			assert A2.shape[0] == b2.shape[0]
-			self.dim_ambient_space=A2.shape[1]
+			self.k=A2.shape[1]
 
 		if(self.has_linear_eq_constraints and self.has_linear_ineq_constraints):
 			assert A1.shape[1] == A2.shape[1]
@@ -203,9 +225,9 @@ class linearAndConvexQuadraticConstraints():
 				checkMatrixisPsd(all_P[i]);
 
 			if(self.has_linear_constraints):
-				assert self.dim_ambient_space==tmp
+				assert self.k==tmp
 			else:
-				self.dim_ambient_space=tmp
+				self.k=tmp
 
 
 		#################################
@@ -222,7 +244,7 @@ class linearAndConvexQuadraticConstraints():
 
 		###########################################
 		# Ensure that the feasible set is not empty
-		z = cp.Variable((self.dim_ambient_space,1))
+		z = cp.Variable((self.k,1))
 		objective = cp.Minimize(0.0)
 		constraints_cvxpy = self.getConstraintsCvxpy(z)
 		prob = cp.Problem(objective, constraints_cvxpy)
@@ -255,7 +277,7 @@ class linearAndConvexQuadraticConstraints():
 			#See also https://mathoverflow.net/a/69667
 			printInBoldBlue("Removing redundant constraints...")
 			TOL=1e-7;
-			z = cp.Variable((self.dim_ambient_space,1))
+			z = cp.Variable((self.k,1))
 			indexes_const_removed=[]
 			reversed_indexes=list(reversed(range(A.shape[0])));
 			for i in tqdm(reversed_indexes):
@@ -354,7 +376,7 @@ class linearAndConvexQuadraticConstraints():
 			self.n=A_p.shape[1] #dimension of the linear subspace
 
 		else:
-			self.n=self.dim_ambient_space
+			self.n=self.k
 			NA_E=np.eye(self.n);
 			y1=np.zeros((self.n,1));
 			A_p=np.zeros((1,self.n)) # 0z<=1
@@ -399,12 +421,19 @@ class linearAndConvexQuadraticConstraints():
 		self.NA_E=NA_E	
 		self.z0=z0	
 
+		# self.A_p_pytorch=torch.tensor(A_p)
+		# self.b_p_pytorch=torch.tensor(b_p)
+		# self.y1_pytorch=torch.tensor(y1)
+		# self.NA_E_pytorch=torch.tensor(NA_E)
+		# self.z0_pytorch=torch.tensor(z0)
+
+		assert np.allclose(NA_E.T@NA_E, np.eye(NA_E.shape[1])) #By definition, N'*N=I
 
 		###################### SET UP PROBLEM FOR PROJECTION
 		###################################################
 		#Section 8.1.1 of https://web.stanford.edu/~boyd/cvxbook/bv_cvxbook.pdf
-		self.x_projected = cp.Variable((self.dim_ambient_space,1))         #projected point
-		self.x_to_be_projected = cp.Parameter((self.dim_ambient_space,1))  #original point
+		self.x_projected = cp.Variable((self.k,1))         #projected point
+		self.x_to_be_projected = cp.Parameter((self.k,1))  #original point
 		constraints=self.getConstraintsCvxpy(self.x_projected)
 		objective = cp.Minimize(cp.sum_squares(self.x_projected - self.x_to_be_projected))
 		self.prob_projection = cp.Problem(objective, constraints)
@@ -734,14 +763,14 @@ class linearAndConvexQuadraticConstraints():
 # 			assert b1.ndim == 2, f"b1.shape={b1.shape}"
 # 			assert b1.shape[1] ==1
 # 			assert A1.shape[0] == b1.shape[0]
-# 			self.dim_ambient_space=A1.shape[1]
+# 			self.k=A1.shape[1]
 
 # 		if(self.has_eq_constraints):
 # 			assert A2.ndim == 2, f"A2.shape={A2.shape}"
 # 			assert b2.ndim == 2, f"b2.shape={b2.shape}"
 # 			assert b2.shape[1] ==1
 # 			assert A2.shape[0] == b2.shape[0]
-# 			self.dim_ambient_space=A2.shape[1]
+# 			self.k=A2.shape[1]
 
 # 		if(self.has_eq_constraints and self.has_ineq_constraints):
 # 			assert A1.shape[1] == A2.shape[1]
@@ -754,9 +783,18 @@ class linearAndConvexQuadraticConstraints():
 # 		return self.has_eq_constraints
 
 # 	def dimAmbSpace(self):
-# 		return self.dim_ambient_space
+# 		return self.k
 
+def loadpickle(name_file):
+	import pickle
+	with open(name_file, "rb") as input_file:
+	    result = pickle.load(input_file)
+	return result	
 
+def savepickle(variable, name_file):
+	import pickle
+	with open(name_file, 'wb') as output_file:
+	    pickle.dump(variable, output_file, pickle.HIGHEST_PROTOCOL)	
 
 #This function has been taken (and modified) from https://github.com/DLR-RM/stable-baselines3/blob/201fbffa8c40a628ecb2b30fd0973f3b171e6c4c/stable_baselines3/common/torch_layers.py#L96
 def create_mlp(

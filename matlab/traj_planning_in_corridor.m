@@ -164,62 +164,75 @@ end
 opti.solver(my_solver,opts); %{"ipopt.hessian_approximation":"limited-memory"} 
 
 
-
-all_wv=0:0.3:0.3; %0.05
-all_wa=0:0.3:0.3;
-all_wj=0:0.3:0.3;
+eps=0.001;
+all_wv=eps:0.1:(0.3+eps); %0.05
+all_wa=eps:0.1:(0.3+eps);
+all_wj=eps:0.1:(0.3+eps);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Generate samples inside the distribution
-all_x={};
-all_y={};
-all_Pobj={};
-all_qobj={};
-all_robj={};
-for wv=all_wv
-    for wa=all_wa
-        for wj=all_wj
-            weights_value=[wv;wa;wj];
-            weights_value'
-            opti.set_value(weights,weights_value);
-            sol = opti.solve();
-            checkSolverSucceeded(sol, my_solver)
-            control_points=sol.value(sp.getCPsAsVector());
-            all_x{end+1}=weights_value;
-            all_y{end+1}=control_points(:);
-            cost_substituted=casadi.substitute(cost,weights,weights_value);
-            [P,q,r]=getPandqandrOfQuadraticExpressionCasadi(cost_substituted, sp.getCPsAsVector());
-            all_Pobj{end+1}=P;   
-            all_qobj{end+1}=q;
-            all_robj{end+1}=r;
-        end
-    end
-end
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Generate samples outside the distribution
-all_x_out_dist={};
-all_y_out_dist={};
-all_Pobj_out_dist={};
-all_qobj_out_dist={};
-all_robj_out_dist={};
+[all_x, all_y, all_Pobj, all_qobj, all_robj, all_costs, all_times_s]=solveProblemForDifferentGamma(all_wv, all_wa, all_wj, weights, my_solver, opti, sp, cost);
 factor=5;
-for wv=factor*all_wv
-    for wa=factor*all_wa
-        for wj=factor*all_wj
-            weights_value=[wv;wa;wj];
-            weights_value'
-            opti.set_value(weights,weights_value);
-            sol = opti.solve();
-            checkSolverSucceeded(sol, my_solver)
-            control_points=sol.value(sp.getCPsAsVector());
-            all_x_out_dist{end+1}=weights_value;
-            all_y_out_dist{end+1}=control_points(:);
-            cost_substituted=casadi.substitute(cost,weights,weights_value);
-            [P,q,r]=getPandqandrOfQuadraticExpressionCasadi(cost_substituted, sp.getCPsAsVector());
-            all_Pobj_out_dist{end+1}=P;   
-            all_qobj_out_dist{end+1}=q;
-            all_robj_out_dist{end+1}=r;
-        end
-    end
-end
+[all_x_out_dist, all_y_out_dist, all_Pobj_out_dist, all_qobj_out_dist, all_robj_out_dist, all_costs_out_dist, all_times_s_out_dist]=solveProblemForDifferentGamma(factor*all_wv, factor*all_wa, factor*all_wj, weights, my_solver, opti, sp, cost);
+
+% all_x={};
+% all_y={};
+% all_Pobj={};
+% all_qobj={};
+% all_robj={};
+% all_costs={};
+% all_times_s={};
+% for wv=all_wv
+%     for wa=all_wa
+%         for wj=all_wj
+%             weights_value=[wv;wa;wj];
+%             weights_value'
+%             opti.set_value(weights,weights_value);
+%             sol = opti.solve();
+%             checkSolverSucceeded(sol, my_solver)
+%             control_points=sol.value(sp.getCPsAsVector());
+%             all_x{end+1}=weights_value;
+%             all_y{end+1}=control_points(:);
+%             cost_substituted=casadi.substitute(cost,weights,weights_value);
+%             [P,q,r]=getPandqandrOfQuadraticExpressionCasadi(cost_substituted, sp.getCPsAsVector());
+%             all_Pobj{end+1}=P;   
+%             all_qobj{end+1}=q;
+%             all_robj{end+1}=r;
+%             all_costs{end+1}=sol.value(cost);
+%             all_times_s{end+1}=opti.stats().t_wall_solver; %This is the time the solver takes to solve the problem, see (for Gurobi) https://github.com/casadi/casadi/blob/e5d6977d621e3b7a0cd0b2e24cdd2b73a6c3a8fe/casadi/interfaces/gurobi/gurobi_interface.cpp#L447
+%         end
+%     end
+% end
+% 
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Generate samples outside the distribution
+% all_x_out_dist={};
+% all_y_out_dist={};
+% all_Pobj_out_dist={};
+% all_qobj_out_dist={};
+% all_robj_out_dist={};
+% all_costs_out_dist={};
+% all_times_s_out_dist={};
+% factor=5;
+% for wv=factor*all_wv
+%     for wa=factor*all_wa
+%         for wj=factor*all_wj
+%             weights_value=[wv;wa;wj];
+%             weights_value'
+%             opti.set_value(weights,weights_value);
+%             sol = opti.solve();
+%             checkSolverSucceeded(sol, my_solver)
+%             control_points=sol.value(sp.getCPsAsVector());
+%             all_x_out_dist{end+1}=weights_value;
+%             all_y_out_dist{end+1}=control_points(:);
+%             cost_substituted=casadi.substitute(cost,weights,weights_value);
+%             [P,q,r]=getPandqandrOfQuadraticExpressionCasadi(cost_substituted, sp.getCPsAsVector());
+%             all_Pobj_out_dist{end+1}=P;   
+%             all_qobj_out_dist{end+1}=q;
+%             all_robj_out_dist{end+1}=r;
+%             all_costs_out_dist{end+1}=sol.value(cost);
+%             all_times_s_out_dist{end+1}=opti.stats().t_wall_solver; %This is the time the solver takes to solve the problem, see (for Gurobi) https://github.com/casadi/casadi/blob/e5d6977d621e3b7a0cd0b2e24cdd2b73a6c3a8fe/casadi/interfaces/gurobi/gurobi_interface.cpp#L447
+%         end
+%     end
+% end
 
 %%%%%%Plotting
 num_sol=numel(all_y);
@@ -239,9 +252,9 @@ polyhedron.A1=A1;
 polyhedron.b1=b1;
 
 
-save('corridor.mat','all_x','all_y','all_Pobj','all_qobj','all_robj', ...
-    'all_x_out_dist','all_y_out_dist','all_Pobj_out_dist','all_qobj_out_dist','all_robj_out_dist', ...
-    'polyhedron');
+save('corridor.mat','all_x','all_y','all_Pobj','all_qobj','all_robj','all_costs','all_times_s', ...
+     'all_x_out_dist','all_y_out_dist','all_Pobj_out_dist','all_qobj_out_dist','all_robj_out_dist','all_costs_out_dist','all_times_s_out_dist', ...
+     'polyhedron');
 
 sol = opti.solve();
 
@@ -280,6 +293,36 @@ xlabel('x (m)'); ylabel('y (m)'); zlabel('z (m)');
 % p2=[1;1;1];
 
 
+function [all_x, all_y, all_Pobj, all_qobj, all_robj, all_costs, all_times_s]=solveProblemForDifferentGamma(all_wv, all_wa, all_wj, weights, my_solver, opti, sp, cost)
+    all_x={};
+    all_y={};
+    all_Pobj={};
+    all_qobj={};
+    all_robj={};
+    all_costs={};
+    all_times_s={};
+    for wv=all_wv
+        for wa=all_wa
+            for wj=all_wj
+                weights_value=[wv;wa;wj];
+                weights_value'
+                opti.set_value(weights,weights_value);
+                sol = opti.solve();
+                checkSolverSucceeded(sol, my_solver)
+                control_points=sol.value(sp.getCPsAsVector());
+                all_x{end+1}=weights_value;
+                all_y{end+1}=control_points(:);
+                cost_substituted=casadi.substitute(cost,weights,weights_value);
+                [P,q,r]=getPandqandrOfQuadraticExpressionCasadi(cost_substituted, sp.getCPsAsVector());
+                all_Pobj{end+1}=P;   
+                all_qobj{end+1}=q;
+                all_robj{end+1}=r;
+                all_costs{end+1}=sol.value(cost);
+                all_times_s{end+1}=opti.stats().t_wall_solver; %This is the time the solver takes to solve the problem, see (for Gurobi) https://github.com/casadi/casadi/blob/e5d6977d621e3b7a0cd0b2e24cdd2b73a6c3a8fe/casadi/interfaces/gurobi/gurobi_interface.cpp#L447
+            end
+        end
+    end
+end
 
 
 

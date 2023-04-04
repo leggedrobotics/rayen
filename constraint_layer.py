@@ -7,6 +7,26 @@ import cvxpy as cp
 import math
 from cvxpylayers.torch import CvxpyLayer
 
+# class OptimizationLayer(torch.nn.Module):
+# 	def __init__(self, cs):
+
+# 		variable = cp.Parameter((cs.k,1))  
+# 		Pobj = cp.Parameter((cs.k,cs.k))  
+# 		qobj = cp.Parameter((cs.k,1))  
+# 		robj = cp.Parameter((1,1))  
+
+# 		#Problem is https://github.com/cvxgrp/cvxpylayers/issues/136#issuecomment-1410563781
+# 		objective=cp.Minimize(0.5*cp.quad_form(variable, Pobj) + qobj.T@variable + robj)
+# 		constraints=cs.getConstraintsCvxpy(variable);
+
+# 		self.prob_projection = cp.Problem(objective, constraints)
+
+# 		self.problem = CvxpyLayer(self.prob_projection, parameters=[Pobj, qobj, robj], variables=[variable])
+
+# 	def forward(self, Pobj, qobj, robj):
+# 		solution, = self.problem(Pobj, qobj, robj)
+# 		return solution
+
 
 class ConstraintLayer(torch.nn.Module):
 	def __init__(self, cs, method='walker_2'):
@@ -81,7 +101,7 @@ class ConstraintLayer(torch.nn.Module):
 		if(self.method=='walker_1'):
 			return (self.cs.n)
 		if(self.method=='unconstrained'):
-			return self.cs.dim_ambient_space
+			return self.cs.k
 		if(self.method=='barycentric'):
 			return self.num_vertices + self.num_rays
 		if(self.method=='proj_train_test' or self.method=='proj_test'):
@@ -92,26 +112,100 @@ class ConstraintLayer(torch.nn.Module):
 		self.mapper=mapper
 		utils.printInBoldRed(f"Setting the following mapper: {self.mapper}")
 
-	def liftBack(self, z0_new):
-		return self.NA_E@z0_new + self.y1
-
 	def gety0(self):
-		return self.liftBack(self.z0)
+		return self.getyFromz(self.z0)
+
+	def getyFromz(self, z):
+		y=self.NA_E@z + self.y1
+		return y
+
+	def getzFromy(self, y):
+		z=self.NA_E.T@(y - self.y1)
+		return z
+
+	def getSumSoftCostAllSamples(self, y):
+		z=self.getzFromy(y);
+
+
+		#Note that in the projected subspace we don't have equalities
+
+		################## STACK THE VALUES OF ALL THE INEQUALITIES (Ap*z-bp<=0 and g(y)<=0)
+		all_inequalities=torch.empty((y.shape[0],0,1), device=y.device)
+		##### Ap*z<=bp
+		if(self.cs.has_linear_constraints):
+			all_inequalities=torch.cat((all_inequalities, self.A_p@z-self.b_p), dim=1);
+		##### g(y)<=0
+		if(self.cs.has_quadratic_constraints):
+			for i in range(self.all_P.shape[0]):
+				P=self.all_P[i,:,:]
+				q=self.all_q[i,:,:]
+				r=self.all_r[i,:,:]
+				all_inequalities=torch.cat((all_inequalities, utils.quadExpression(y=y,P=P,q=q,r=r)), dim=1)
+		########################################################################
+
+
+		#########################################################
+		nsib=y.shape[0]; #number of samples in the batch
+		assert nsib==all_inequalities.shape[0]
+		tmp=all_inequalities.shape[1]
+
+		violation_squared=torch.square(torch.nn.functional.relu(all_inequalities));     #violation_squared is [nsib, tmp, 1]
+		sum_violation_squared=torch.sum(violation_squared, dim=1, keepdim=True)         #sum_violation_squared is [nsib, 1, 1]
+		
+		assert violation_squared.shape==(nsib, tmp, 1), f"violation_squared.shape={violation_squared.shape}"
+		assert sum_violation_squared.shape==(nsib, 1, 1), f"sum_violation_squared.shape={sum_violation_squared.shape}"
+		###########################################################
+
+
+		assert torch.all(sum_violation_squared>=0)
+
+		# return torch.mean(sum_violation_squared)
+		return torch.sum(sum_violation_squared)
+
+
+	def getSumObjCostAllSamples(self, y, Pobj, qobj, robj):
+		tmp=utils.quadExpression(y=y,P=Pobj,q=qobj,r=robj)
+		assert tmp.shape==(y.shape[0], 1, 1)
+		assert torch.all(tmp>=0)
+		# return torch.mean(tmp)
+		return torch.sum(tmp)
+
+	def getSumSupervisedCostAllSamples(self, y, y_predicted):
+		difference_squared=torch.square(y-y_predicted);
+		sum_difference_squared=torch.sum(difference_squared, dim=1, keepdim=True) 
+
+		assert sum_difference_squared.shape==(y.shape[0], 1, 1)
+
+		assert torch.all(sum_difference_squared>=0)
+
+		# return torch.mean(sum_difference_squared)
+		return torch.sum(sum_difference_squared)
+
+	def getSumLossAllSamples(self, params, y, y_predicted, Pobj, qobj, robj, isTesting=False):
+		loss=params['use_supervised']*self.getSumSupervisedCostAllSamples(y, y_predicted) + \
+			 (1-isTesting)*params['weight_soft_cost']*self.getSumSoftCostAllSamples(y_predicted) + \
+			 (1-params['use_supervised'])*self.getSumObjCostAllSamples(y_predicted, Pobj, qobj, robj)
+
+		assert loss>=0
+
+		return loss
+
 
 	def forward(self, x):
 
+		device=x.device
 		# print("In forward pass")
 
-		num_batches=x.shape[0];
+		nsib=x.shape[0]; #number of samples in the batch
 
 		##################  MAPPER LAYER ####################
-		# x has dimensions [num_batches, numel_input_mapper, 1]
+		# x has dimensions [nsib, numel_input_mapper, 1]
 		y = x.view(x.size(0), -1)
-		# y has dimensions [num_batches, numel_input_mapper] This is needed to be able to pass it through the linear layer
+		# y has dimensions [nsib, numel_input_mapper] This is needed to be able to pass it through the linear layer
 		z = self.mapper(y)
-		#Here z has dimensions [num_batches, numel_output_mapper]
+		#Here z has dimensions [nsib, numel_output_mapper]
 		z = torch.unsqueeze(z,dim=2)
-		#Here z has dimensions [num_batches, numel_output_mapper, 1]
+		#Here z has dimensions [nsib, numel_output_mapper, 1]
 		####################################################
 
 		if(self.method=='walker_2' or self.method=='walker_1'):
@@ -121,8 +215,8 @@ class ConstraintLayer(torch.nn.Module):
 			v_bar=torch.nn.functional.normalize(v, dim=1);
 
 
-			kappa_linear=torch.zeros((num_batches,1,1), device=x.device)
-			kappa_quadratic=torch.zeros((num_batches,1,1), device=x.device)
+			kappa_linear=torch.zeros((nsib,1,1), device=device)
+			kappa_quadratic=torch.zeros((nsib,1,1), device=device)
 
 			if(self.cs.has_linear_constraints):
 				kappa_linear=torch.relu( torch.max(self.D@v_bar, dim=1, keepdim=True).values  )
@@ -131,7 +225,7 @@ class ConstraintLayer(torch.nn.Module):
 
 
 			if(self.cs.has_quadratic_constraints):
-				lambda_quadratic=torch.empty((num_batches,0,1))
+				lambda_quadratic=torch.empty((nsib,0,1), device=device)
 				for i in range(self.all_P.shape[0]): #for each of the quadratic constraints
 					P=self.all_P[i,:,:]
 					q=self.all_q[i,:,:]
@@ -155,7 +249,7 @@ class ConstraintLayer(torch.nn.Module):
 					lambda_quadratic = torch.cat((lambda_quadratic, lamb_positive_i), dim=1)
 
 
-				print(f"Shape={lambda_quadratic.shape}")
+				# print(f"Shape={lambda_quadratic.shape}")
 				tmp=(torch.min(lambda_quadratic, dim=1, keepdim=True).values)
 				kappa_quadratic=1.0/tmp
 				assert torch.all(lambda_quadratic >= 0)
@@ -179,7 +273,7 @@ class ConstraintLayer(torch.nn.Module):
 			z0_new = self.z0 + alpha*v_bar 
 			
 			#Now lift back to the original space
-			y0_new =self.liftBack(z0_new)
+			y0_new =self.getyFromz(z0_new)
 
 			if(torch.isnan(y0_new).any()):
 				print("at least one element is nan")
@@ -199,12 +293,12 @@ class ConstraintLayer(torch.nn.Module):
 
 			print(z0_new.shape)
 			#Now lift back to the original space
-			y0_new =self.liftBack(z0_new)
+			y0_new =self.getyFromz(z0_new)
 
 		if(self.method=='proj_train_test'):
 			z0_new, = self.proj_layer(z)
 			#Now lift back to the original space
-			y0_new =self.liftBack(z0_new)
+			y0_new =self.getyFromz(z0_new)
 
 		if(self.method=='proj_test'):
 			if(self.training==False):
@@ -212,7 +306,7 @@ class ConstraintLayer(torch.nn.Module):
 			else:
 				z0_new = z
 
-			y0_new =self.liftBack(z0_new)
+			y0_new =self.getyFromz(z0_new)
 
 
 
@@ -241,7 +335,7 @@ class ConstraintLayer(torch.nn.Module):
 			# #Note that we know that self.x0 is a strictly feasible point of the set
 			# max_distance = torch.min(all_max_distances, dim=1, keepdim=True).values
 
-			# #Here, the size of max_distance is [num_batches, 1, 1]
+			# #Here, the size of max_distance is [nsib, 1, 1]
 
 			# alpha=torch.where(torch.isfinite(max_distance), 
 			# 				   max_distance*torch.sigmoid(beta),  #If it's bounded in that direction --> apply sigmoid function
