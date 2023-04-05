@@ -296,7 +296,8 @@ class ConstraintLayer(torch.nn.Module):
 
 		if(self.method=='proj_test'):
 			if(self.training==False):
-				z_new, = self.proj_layer(z)
+				#If you use ECOS, remember to set solver_args={'eps': 1e-6} (or smaller) for better solutions, see https://github.com/cvxpy/cvxpy/issues/880#issuecomment-557278620
+				z_new, = self.proj_layer(z, solver_args={'solve_method':'ECOS'}) #Supported: ECOS (fast, accurate), SCS (slower, less accurate).   NOT supported: GUROBI
 			else:
 				z_new = z
 
