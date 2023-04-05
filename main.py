@@ -17,6 +17,8 @@ from examples_sets import getExample
 import utils
 import tqdm
 
+from torch.utils.tensorboard import SummaryWriter
+
 class SplittedDatasetAndGenerator():
 	def __init__(self, dataset, percent_train, percent_val, batch_size):
 		assert percent_train<=1
@@ -99,12 +101,7 @@ def onePassOverDataset(model, params, sdag, my_type):
 
 
 	with torch.set_grad_enabled(enable_grad):
-		for x, y, Pobj, qobj, robj, opt_time_s, cost in generator: #For each of the batches
-
-			if(my_type=='train'):
-				optimizer.zero_grad()
-
-			
+		for x, y, Pobj, qobj, robj, opt_time_s, cost in generator: #For each of the batches	
 
 			#----------------------
 			x = x.to(device)
@@ -120,6 +117,7 @@ def onePassOverDataset(model, params, sdag, my_type):
 			if(my_type=='train'):
 				num_samples_this_batch=x.shape[0];
 				loss_per_sample_in_batch=loss/num_samples_this_batch;
+				optimizer.zero_grad()
 				loss_per_sample_in_batch.backward()
 				optimizer.step()
 
@@ -159,7 +157,7 @@ def onePassOverDataset(model, params, sdag, my_type):
 
 
 
-def train_model(model, params, sdag):
+def train_model(model, params, sdag, tensorboard_writer):
 	model = model.to(torch.device('cuda:{}'.format(params['device']) if params['device'] >= 0 else 'cpu'))
 	optimizer = torch.optim.Adam(model.parameters(),lr=params['learning_rate'])
 
@@ -189,6 +187,13 @@ def train_model(model, params, sdag):
 				metrics_all_epochs['val_loss'][-1],
 				optimizer.param_groups[0]['lr']))
 
+		#This creates two separate plots
+		# tensorboard_writer.add_scalar("Loss/train", metrics_all_epochs['train_loss'][-1], epoch)
+		# tensorboard_writer.add_scalar("Loss/val", metrics_all_epochs['val_loss'][-1], epoch)
+
+		#This createst one plot
+		tensorboard_writer.add_scalars('loss', {'train':metrics_all_epochs['train_loss'][-1], 'val':metrics_all_epochs['val_loss'][-1]}, epoch)
+
 		# pbar.set_postfix(loss=metrics_all_epochs['train_loss'][-1], val=metrics_all_epochs['val_loss'][-1])
 
 		if my_early_stopping.early_stop:
@@ -200,11 +205,26 @@ def train_model(model, params, sdag):
 
 	my_early_stopping.load_best_model(model)
 
+	tensorboard_writer.flush()
+
 
 	return metrics_all_epochs
 
 
 def main(params):
+
+
+	################# To launch tensorboard directly
+	import os
+	import subprocess
+	folder="runs"
+	os.system("pkill -f tensorboard")
+	os.system("rm -rf "+folder)
+	proc1 = subprocess.Popen(["tensorboard","--logdir",folder,"--bind_all"], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
+	proc2 = subprocess.Popen(["google-chrome","http://localhost:6006/"], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
+	############################################
+
+	tensorboard_writer = SummaryWriter()
 
 	torch.set_default_dtype(torch.float64) ##Use float32 here??
 
@@ -241,7 +261,7 @@ def main(params):
 	model.setMapper(mapper)
 
 
-	training_metrics = train_model(model, params, sdag)
+	training_metrics = train_model(model, params, sdag, tensorboard_writer)
 
 	# model.load_state_dict(torch.load('checkpoint.pt'))
 
@@ -277,6 +297,8 @@ def main(params):
 						 f"  [Opt] violation: {testing_metrics_out_dist['optimization_violation']:.3} \n"\
 						 f"  [Opt] time_ms: {1000.0*testing_metrics_out_dist['optimization_time_s']:.3} \n")
 
+	tensorboard_writer.close()
+
 
 if __name__ == '__main__':
 
@@ -290,10 +312,20 @@ if __name__ == '__main__':
 	parser.add_argument('--batch_size', type=int, default=50)
 	parser.add_argument('--verbosity', type=int, default=1)
 	parser.add_argument('--learning_rate', type=float, default=1e-3)
-	parser.add_argument('--log_to_file', dest='log_to_file', action='store_true', default=True)
 	args = parser.parse_args()
 	params = vars(args)
 
+	has_unconstrained_training=(params['method']=='proj_test') or (params['method']=='unconstrained')
+
+	if(has_unconstrained_training and params['use_supervised']==False):
+		assert params['weight_soft_cost']>0
+
+	shouldnt_have_soft_cost=(params['method']=='walker_2' or params['method']=='walker_1' or params['method']=='barycentric')
+
+	if(shouldnt_have_soft_cost):
+		assert params['weight_soft_cost']==0
+
 	print('Parameters:\n', params)
+
 
 	main(params)
