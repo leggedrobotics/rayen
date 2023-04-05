@@ -269,17 +269,13 @@ class ConstraintLayer(torch.nn.Module):
 				norm_v=torch.linalg.vector_norm(v, dim=(1,2), keepdim=True)
 				alpha=torch.minimum( 1/kappa , norm_v )
 
-			z0_new = self.z0 + alpha*v_bar 
+			z_new = self.z0 + alpha*v_bar 
 			
 			#Now lift back to the original space
-			y0_new =self.getyFromz(z0_new)
-
-			if(torch.isnan(y0_new).any()):
-				print("at least one element is nan")
-				raise Exception("exiting")
+			y_new =self.getyFromz(z_new)
 
 		if(self.method=='unconstrained'):
-			y0_new=z
+			y_new=z
 
 		if (self.method=='barycentric'):
 			tmp1 = z[:,  0:self.num_vertices,0:1] #0:1 to keep the dimension. Other option is torch.unsqueeze(z[:,  0:self.cs.n,0],2) 
@@ -288,28 +284,29 @@ class ConstraintLayer(torch.nn.Module):
 			lambdas=nn.functional.softmax(tmp1, dim=1)
 			mus=torch.abs(tmp2)
 
-			z0_new=self.V@lambdas + self.R@mus
+			z_new=self.V@lambdas + self.R@mus
 
-			print(z0_new.shape)
 			#Now lift back to the original space
-			y0_new =self.getyFromz(z0_new)
+			y_new =self.getyFromz(z_new)
 
 		if(self.method=='proj_train_test'):
-			z0_new, = self.proj_layer(z)
+			z_new, = self.proj_layer(z)
 			#Now lift back to the original space
-			y0_new =self.getyFromz(z0_new)
+			y_new =self.getyFromz(z_new)
 
 		if(self.method=='proj_test'):
 			if(self.training==False):
-				z0_new, = self.proj_layer(z)
+				z_new, = self.proj_layer(z)
 			else:
-				z0_new = z
+				z_new = z
 
-			y0_new =self.getyFromz(z0_new)
+			y_new =self.getyFromz(z_new)
 
 
+		assert (torch.isnan(y_new).any())==False
 
-		return y0_new
+
+		return y_new
 
 
 			#########################################################3
