@@ -445,6 +445,8 @@ class linearAndConvexQuadraticConstraints():
 		installed_solvers=cp.installed_solvers();
 		if 'GUROBI' in installed_solvers:
 			self.solver='GUROBI' #You need to do `python -m pip install gurobipy`
+		elif 'ECOS' in installed_solvers:
+			self.solver='ECOS'
 		elif 'OSQP' in installed_solvers:
 			self.solver='OSQP'
 		elif 'CVXOPT' in installed_solvers:	
