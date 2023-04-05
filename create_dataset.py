@@ -11,19 +11,20 @@ import utils
 
 # create custom dataset class
 class CustomDataset(Dataset):
-	def __init__(self, all_x, all_y, all_Pobj, all_qobj, all_robj, all_times_s):
+	def __init__(self, all_x, all_y, all_Pobj, all_qobj, all_robj, all_times_s, all_costs):
 		self.all_x = all_x
 		self.all_y = all_y
 		self.all_Pobj = all_Pobj
 		self.all_qobj = all_qobj
 		self.all_robj = all_robj
 		self.all_times_s = all_times_s
+		self.all_costs = all_costs
 
 	def __len__(self):
 		return len(self.all_y)
 
 	def __getitem__(self, idx):
-		return self.all_x[idx], self.all_y[idx], self.all_Pobj[idx], self.all_qobj[idx], self.all_robj[idx], self.all_times_s[idx]
+		return self.all_x[idx], self.all_y[idx], self.all_Pobj[idx], self.all_qobj[idx], self.all_robj[idx], self.all_times_s[idx], self.all_costs[idx]
 
 	def getNumelX(self):
 		return self.all_x[0].size #Using the first element
@@ -108,6 +109,7 @@ def getCorridorDatasetsAndConstraints():
 	all_qobj=list(mat["all_qobj"][0])
 	all_robj=list(mat["all_robj"][0])
 	all_times_s=list(mat["all_times_s"][0])
+	all_costs=list(mat["all_costs"][0])
 
 	all_x_out_dist=list(mat["all_x_out_dist"][0])
 	all_y_out_dist=list(mat["all_y_out_dist"][0])
@@ -115,6 +117,7 @@ def getCorridorDatasetsAndConstraints():
 	all_qobj_out_dist=list(mat["all_qobj_out_dist"][0])
 	all_robj_out_dist=list(mat["all_robj_out_dist"][0])
 	all_times_s_out_dist=list(mat["all_times_s_out_dist"][0])
+	all_costs_out_dist=list(mat["all_costs_out_dist"][0])
 
 	polyhedron=mat["polyhedron"]
 
@@ -130,8 +133,8 @@ def getCorridorDatasetsAndConstraints():
 	assert all_y_out_dist[0].shape[1]==1
 
 	cs=utils.linearAndConvexQuadraticConstraints(A1, b1, None, None, None, None, None)
-	my_dataset = CustomDataset(all_x, all_y, all_Pobj, all_qobj, all_robj, all_times_s)
-	my_dataset_out_dist = CustomDataset(all_x_out_dist, all_y_out_dist, all_Pobj_out_dist, all_qobj_out_dist, all_robj_out_dist, all_times_s_out_dist)
+	my_dataset = CustomDataset(all_x, all_y, all_Pobj, all_qobj, all_robj, all_times_s, all_costs)
+	my_dataset_out_dist = CustomDataset(all_x_out_dist, all_y_out_dist, all_Pobj_out_dist, all_qobj_out_dist, all_robj_out_dist, all_times_s_out_dist, all_costs_out_dist)
 
 	# print(all_x[0].shape)
 	# print(all_x_out_dist[0].shape)

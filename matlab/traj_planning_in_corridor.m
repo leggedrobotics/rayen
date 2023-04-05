@@ -164,10 +164,12 @@ end
 opti.solver(my_solver,opts); %{"ipopt.hessian_approximation":"limited-memory"} 
 
 
-eps=0.001;
-all_wv=eps:0.1:(0.3+eps); %0.05
-all_wa=eps:0.1:(0.3+eps);
-all_wj=eps:0.1:(0.3+eps);
+a=0.001;
+b=0.3;
+N=7;
+all_wv=[a + (b-a).*rand(N,1)]'; 
+all_wa=[a + (b-a).*rand(N,1)]'; 
+all_wj=[a + (b-a).*rand(N,1)]'; 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Generate samples inside the distribution
 
 [all_x, all_y, all_Pobj, all_qobj, all_robj, all_costs, all_times_s]=solveProblemForDifferentGamma(all_wv, all_wa, all_wj, weights, my_solver, opti, sp, cost);
@@ -301,13 +303,18 @@ function [all_x, all_y, all_Pobj, all_qobj, all_robj, all_costs, all_times_s]=so
     all_robj={};
     all_costs={};
     all_times_s={};
+    i=0
+    total_iterations=numel(all_wv)*numel(all_wa)*numel(all_wj);
     for wv=all_wv
         for wa=all_wa
             for wj=all_wj
+                i=i+1;
+                i/total_iterations
                 weights_value=[wv;wa;wj];
-                weights_value'
                 opti.set_value(weights,weights_value);
+                display("Going to solve")
                 sol = opti.solve();
+                display("Solved")
                 checkSolverSucceeded(sol, my_solver)
                 control_points=sol.value(sp.getCPsAsVector());
                 all_x{end+1}=weights_value;
