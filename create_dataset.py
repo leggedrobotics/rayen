@@ -7,6 +7,7 @@ import cvxpy as cp
 import matplotlib.pyplot as plt
 import scipy.io
 import utils
+import time
 
 
 # create custom dataset class
@@ -61,11 +62,16 @@ def createProjectionDataset(num_samples, cs, bbox_half_side):
 	all_Pobj=[];
 	all_qobj=[];
 	all_robj=[];
+	all_times_s=[];
+	all_costs=[];
 
 	for i in range(num_samples):
-		x=np.random.uniform(low=-bbox_half_side, high=bbox_half_side, size=(cs.dim_ambient_space,1))
+		x=np.random.uniform(low=-bbox_half_side, high=bbox_half_side, size=(cs.k,1))
 		all_x.append(x)
-		y, _ = cs.project(x)
+		start=time.time();
+		y, cost = cs.project(x)
+		all_times_s.append(time.time()-start)
+		all_costs.append(cost)
 		all_y.append(y)
 
 		assert x.shape[1]==1
@@ -83,7 +89,7 @@ def createProjectionDataset(num_samples, cs, bbox_half_side):
 		all_qobj.append(qobj)
 		all_robj.append(robj)
 
-	my_dataset = CustomDataset(all_x, all_y, all_Pobj, all_qobj, all_robj)
+	my_dataset = CustomDataset(all_x, all_y, all_Pobj, all_qobj, all_robj, all_times_s, all_costs)
 
 
 	###plotting stuff
