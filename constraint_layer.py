@@ -80,8 +80,7 @@ class CostComputer(nn.Module): #Using nn.Module to be able to use register_buffe
 	def getSumObjCostAllSamples(self, y, Pobj, qobj, robj):
 		tmp=utils.quadExpression(y=y,P=Pobj,q=qobj,r=robj)
 		assert tmp.shape==(y.shape[0], 1, 1)
-		assert torch.all(tmp>=0)
-		# return torch.mean(tmp)
+
 		return torch.sum(tmp)
 
 	def getSumSupervisedCostAllSamples(self, y, y_predicted):
@@ -91,8 +90,6 @@ class CostComputer(nn.Module): #Using nn.Module to be able to use register_buffe
 		loss=params['use_supervised']*self.getSumSupervisedCostAllSamples(y, y_predicted) + \
 			 (1-isTesting)*params['weight_soft_cost']*self.getSumSoftCostAllSamples(y_predicted) + \
 			 (1-params['use_supervised'])*self.getSumObjCostAllSamples(y_predicted, Pobj, qobj, robj)
-
-		assert loss>=0
 
 		return loss
 
