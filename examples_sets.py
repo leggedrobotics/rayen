@@ -47,7 +47,7 @@ def getNoneLinearConstraints():
 	return None, None, None, None
 
 def getNoneQuadraticConstraints():
-	return None, None, None
+	return [], [], []
 
 def getExample(example):
 

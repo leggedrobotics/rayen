@@ -201,10 +201,10 @@ class linearAndConvexQuadraticConstraints():
 		#################################
 
 		############################CHECKS for the quadratic constraints
-		if( (all_P is None) or (all_q is None) or (all_r is None)):
-			assert (all_P is None)
-			assert (all_q is None)
-			assert (all_r is None)
+		if( (len(all_P)==0) or (len(all_q)==0) or (len(all_r)==0)):
+			assert len(all_P)==0
+			assert len(all_q)==0
+			assert len(all_r)==0
 			self.has_quadratic_constraints=False;
 		else:
 			self.has_quadratic_constraints=True;
@@ -390,13 +390,11 @@ class linearAndConvexQuadraticConstraints():
 
 		constraints=[]
 
-		if(self.has_linear_constraints):
-			constraints+=[A_p@z0 - b_p <= -epsilon*np.ones((A_p.shape[0],1))]
+		constraints+=[A_p@z0 - b_p <= -epsilon*np.ones((A_p.shape[0],1))]
 
-		if(self.has_quadratic_constraints):
-			x0=NA_E@z0 + y1
-			for i in range(len(self.all_P)):
-				constraints.append( 0.5*cp.quad_form(x0, self.all_P[i]) + self.all_q[i].T@x0 + self.all_r[i] <= -epsilon) 
+		x0=NA_E@z0 + y1
+		for i in range(len(self.all_P)):
+			constraints.append( 0.5*cp.quad_form(x0, self.all_P[i]) + self.all_q[i].T@x0 + self.all_r[i] <= -epsilon) 
 
 		constraints.append(epsilon>=0)
 		constraints.append(epsilon<=5.0) #This constraint is needed for the case where the set is unbounded.
@@ -485,12 +483,9 @@ class linearAndConvexQuadraticConstraints():
 	def getQuadraticConstraintsCvxpy(self, variable):
 		assert variable.shape[1]==1 
 		constraints=[]
-		if((self.has_quadratic_constraints==False)):
-			return constraints
-		else:
-			for i in range(len(self.all_P)):
-				constraints.append( 0.5*cp.quad_form(variable, self.all_P[i]) + self.all_q[i].T@variable + self.all_r[i] <= 0) #https://www.cvxpy.org/api_reference/cvxpy.atoms.other_atoms.html#cvxpy.atoms.quad_form.quad_form
-			return constraints 	 #will be empty if there are no constraints
+		for i in range(len(self.all_P)):
+			constraints.append( 0.5*cp.quad_form(variable, self.all_P[i]) + self.all_q[i].T@variable + self.all_r[i] <= 0) #https://www.cvxpy.org/api_reference/cvxpy.atoms.other_atoms.html#cvxpy.atoms.quad_form.quad_form
+		return constraints 	 #will be empty if there are no constraints
 
 
 	def getConstraintsCvxpy(self, variable):

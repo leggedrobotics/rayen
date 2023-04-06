@@ -55,15 +55,15 @@ for method in methods:
 			ax = fig.add_subplot(rows,cols,i+1) 
 
 		num_steps=4; #Only used in the ellipsoid_walker method
-		my_layer=ConstraintLayer(constraint, method=method)
+		my_layer=ConstraintLayer(constraint, method=method, create_map=False)
 
-		numel_output_mapper=my_layer.getNumelOutputMapper()
+		numel_output_mapper=my_layer.getDimAfterMap()
 
 		x_batched=torch.Tensor(1000, numel_output_mapper, 1).uniform_(-5, 5)
 
 		# mapper=nn.Sequential(nn.Linear(x_batched.shape[1], numel_output_mapper))
-		mapper=nn.Sequential() #do nothing.
-		my_layer.setMapper(mapper)
+		# mapper=nn.Sequential() #do nothing.
+		# my_layer.setMapper(mapper)
 
 		my_layer.eval() #This changes the self.training variable of the module
 		result=my_layer(x_batched)

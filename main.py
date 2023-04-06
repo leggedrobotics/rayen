@@ -263,7 +263,7 @@ def main(params):
 						  nn.Linear(my_dataset.getNumelX(), 256), nn.ReLU(),
 						  nn.Linear(256, 256), nn.ReLU(),
 						  nn.Linear(256, 64),
-						  ConstraintLayer(cs, q=64, method=params['method'], create_map=True) 
+						  ConstraintLayer(cs, input_dim=64, method=params['method'], create_map=True) 
 						             ) 
 
 	training_metrics = train_model(model, params, sdag, tensorboard_writer, cs)

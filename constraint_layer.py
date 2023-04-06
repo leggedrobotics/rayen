@@ -98,7 +98,7 @@ class CostComputer(nn.Module): #Using nn.Module to be able to use register_buffe
 
 
 class ConstraintLayer(torch.nn.Module):
-	def __init__(self, cs, q, method='walker_2', create_map=True):
+	def __init__(self, cs, input_dim=None, method='walker_2', create_map=True):
 		super().__init__()
 
 		assert cp.__version__=='1.2.3' #See this issue: https://github.com/cvxgrp/cvxpylayers/issues/143
@@ -106,26 +106,19 @@ class ConstraintLayer(torch.nn.Module):
 		self.method=method
 
 		if(self.method=='barycentric' and cs.has_quadratic_constraints):
-			utils.printInBoldRed(f"Method {self.method} cannot be used with quadratic constraints")
-			exit();
+			raise Exception(f"Method {self.method} cannot be used with quadratic constraints")
 
-		# if(self.method=='walker' or self.method=='barycentric' or self.method=='proj_train_test' or self.method=='proj_test'):
+		self.k=cs.k #Dimension of the ambient space
+		self.n=cs.n #Dimension of the embedded space
 
-		self.n=cs.n #Dimension of the embeded space
-
-		if(cs.has_linear_constraints):
-			D=cs.A_p/((cs.b_p-cs.A_p@cs.z0)@np.ones((1,cs.n)))
+		D=cs.A_p/((cs.b_p-cs.A_p@cs.z0)@np.ones((1,cs.n)))
 			
-			self.register_buffer("D", torch.tensor(D))
-
-
-		if(cs.has_quadratic_constraints):
-			self.register_buffer("all_P", torch.Tensor(np.array(cs.all_P)))
-			self.register_buffer("all_q", torch.Tensor(np.array(cs.all_q)))
-			self.register_buffer("all_r", torch.Tensor(np.array(cs.all_r)))
-	
 		#See https://discuss.pytorch.org/t/model-cuda-does-not-convert-all-variables-to-cuda/114733/9
 		# and https://discuss.pytorch.org/t/keeping-constant-value-in-module-on-correct-device/10129
+		self.register_buffer("D", torch.tensor(D))
+		self.register_buffer("all_P", torch.Tensor(np.array(cs.all_P)))
+		self.register_buffer("all_q", torch.Tensor(np.array(cs.all_q)))
+		self.register_buffer("all_r", torch.Tensor(np.array(cs.all_r)))
 		self.register_buffer("A_p", torch.tensor(cs.A_p))
 		self.register_buffer("b_p", torch.tensor(cs.b_p))
 		self.register_buffer("y1", torch.tensor(cs.y1))
@@ -144,8 +137,6 @@ class ConstraintLayer(torch.nn.Module):
 			assert self.prob_projection.is_dpp()
 			self.proj_layer = CvxpyLayer(self.prob_projection, parameters=[self.z_to_be_projected], variables=[self.z_projected])
 
-
-
 		if(self.method=='barycentric'):
 			print(f"A_p={cs.A_p}")
 			print(f"b_p={cs.b_p}")
@@ -158,31 +149,119 @@ class ConstraintLayer(torch.nn.Module):
 			assert (self.num_vertices+self.num_rays)>0
 			print(f"vertices={self.V}")
 			print(f"rays={self.R}")
-			# exit()
 
 
-		self.cs=cs;
+		if(self.method=='walker_2'):
+			self.forwardForMethod=self.forwardForWalker2
+			self.dim_after_map=(self.n+1)
+		elif(self.method=='walker_1'):
+			self.forwardForMethod=self.forwardForWalker1
+			self.dim_after_map=self.n
+		elif(self.method=='unconstrained'):
+			self.forwardForMethod=self.forwardForUnconstrained
+			self.dim_after_map=self.k
+		elif(self.method=='barycentric'):
+			self.forwardForMethod=self.forwardForBarycentric
+			self.dim_after_map=(self.num_vertices + self.num_rays)
+		elif(self.method=='proj_train_test'):
+			self.forwardForMethod=self.forwardForProjTrainTest
+			self.dim_after_map=(self.n)
+		elif(self.method=='proj_test'):
+			self.forwardForMethod=self.forwardForProjTest
+			self.dim_after_map=(self.n)
+		else:
+			raise NotImplementedError
 
 		if(create_map):
-			self.mapper=nn.Linear(q, self.getDimInput());
+			assert input_dim is not None, "input_dim needs to be provided"
+			self.mapper=nn.Linear(input_dim, self.dim_after_map);
 		else:
-			assert q==self.getDimInput() 
 			self.mapper=nn.Sequential(); #Mapper does nothing
 
+	def computeKappa(self,v_bar):
+
+		kappa=torch.relu( torch.max(self.D@v_bar, dim=1, keepdim=True).values  )
+
+		if(len(self.all_P)>0):
+			nsib=v_bar.shape[0]; #number of samples in the batch
+			lambda_quadratic=torch.empty((nsib,0,1), device=v_bar.device)
+			for i in range(self.all_P.shape[0]): #for each of the quadratic constraints
+				P=self.all_P[i,:,:]
+				q=self.all_q[i,:,:]
+				r=self.all_r[i,:,:]
+
+				rho = self.NA_E@v_bar
+				w = self.NA_E@self.z0 + self.y1 #Do this in the constructor of this class. This is actually y0
+
+				rhoT=torch.transpose(rho,dim0=1, dim1=2)
+
+				a=0.5*rhoT@P@rho;
+				b=(w.T@P@rho + q.T@rho);
+				c=(0.5*w.T@P@w + q.T@w +r)
+
+				discriminant = torch.square(b) - 4*(a)*(c)
+
+				assert torch.all(discriminant >= 0) 
+				lamb_positive_i=torch.div(  -(b)  + torch.sqrt(discriminant) , 2*a)
+				assert torch.all(lamb_positive_i >= 0) #If not, then either the feasible set is infeasible (note that z0 is inside the feasible set)
+				
+				lambda_quadratic = torch.cat((lambda_quadratic, lamb_positive_i), dim=1)
+
+				tmp=(torch.min(lambda_quadratic, dim=1, keepdim=True).values)
+				assert torch.all(lambda_quadratic >= 0)
+
+				kappa = torch.maximum(kappa, 1.0/tmp)
+
+
+		assert torch.all(kappa >= 0)
+
+		return kappa
+
+	def forwardForWalker2(self, q):
+		v = q[:,  0:self.n,0:1]
+		v_bar=torch.nn.functional.normalize(v, dim=1)
+		kappa=self.computeKappa(v_bar)
+		beta= q[:, self.n:(self.n+1),0:1]#0:1 to keep the dimension.
+		alpha=1/(torch.exp(beta) + kappa) 
+		return self.getyFromz(self.z0 + alpha*v_bar)
+
+	def forwardForWalker1(self, q):
+		v = q[:,  0:self.n,0:1]
+		v_bar=torch.nn.functional.normalize(v, dim=1)
+		kappa=self.computeKappa(v_bar)
+		norm_v=torch.linalg.vector_norm(v, dim=(1,2), keepdim=True)
+		alpha=torch.minimum( 1/kappa , norm_v )
+		return self.getyFromz(self.z0 + alpha*v_bar)
+
+	def forwardForUnconstrained(self, q):
+		return q
+
+	def forwardForBarycentric(self, q):
+		tmp1 = q[:,  0:self.num_vertices,0:1] #0:1 to keep the dimension. 
+		tmp2 = q[:,  self.num_vertices:(self.num_vertices+self.num_rays),0:1] #0:1 to keep the dimension. 
 		
+		lambdas=nn.functional.softmax(tmp1, dim=1)
+		mus=torch.abs(tmp2)
 
-	def getDimInput(self):
-		if(self.method=='walker_2'):
-			return (self.cs.n+1)
-		if(self.method=='walker_1'):
-			return (self.cs.n)
-		if(self.method=='unconstrained'):
-			return self.cs.k
-		if(self.method=='barycentric'):
-			return self.num_vertices + self.num_rays
-		if(self.method=='proj_train_test' or self.method=='proj_test'):
-			return self.cs.n
+		return self.getyFromz(self.V@lambdas + self.R@mus)
 
+	def forwardForProjTrainTest(self, q):
+		z, = self.proj_layer(q)
+		#Now lift back to the original space
+		return self.getyFromz(z)
+
+
+	def forwardForProjTest(self, q):
+		if(self.training==False):
+			#If you use ECOS, remember to set solver_args={'eps': 1e-6} (or smaller) for better solutions, see https://github.com/cvxpy/cvxpy/issues/880#issuecomment-557278620
+			z, = self.proj_layer(z, solver_args={'solve_method':'ECOS'}) #Supported: ECOS (fast, accurate), SCS (slower, less accurate).   NOT supported: GUROBI
+		else:
+			z = q
+
+		return self.getyFromz(z)
+
+	def getDimAfterMap(self):
+		return self.dim_after_map
 
 	def gety0(self):
 		return self.getyFromz(self.z0)
@@ -198,157 +277,14 @@ class ConstraintLayer(torch.nn.Module):
 
 	def forward(self, x):
 
-		device=x.device
-		# print("In forward pass")
-
-		nsib=x.shape[0]; #number of samples in the batch
-
 		##################  MAPPER LAYER ####################
-		# x has dimensions [nsib, numel_input_mapper, 1]
-		y = x.view(x.size(0), -1)
-		# y has dimensions [nsib, numel_input_mapper] This is needed to be able to pass it through the linear layer
-		z = self.mapper(y)
-		#Here z has dimensions [nsib, numel_output_mapper]
-		z = torch.unsqueeze(z,dim=2)
-		#Here z has dimensions [nsib, numel_output_mapper, 1]
+		# x has dimensions [nsib, numel_input_mapper, 1]. nsib is the number of samples in the batch (i.e., x.shape[0]=x.shape[0])
+		q = self.mapper(x.view(x.size(0), -1)) #After this, q has dimensions [nsib, numel_output_mapper]
+		q = torch.unsqueeze(q,dim=2)  #After this, q has dimensions [nsib, numel_output_mapper, 1]
 		####################################################
 
-		if(self.method=='walker_2' or self.method=='walker_1'):
-			
-			v = z[:,  0:self.cs.n,0:1] #0:1 to keep the dimension. Other option is torch.unsqueeze(z[:,  0:self.cs.n,0],2) 
-			
-			v_bar=torch.nn.functional.normalize(v, dim=1);
+		y=self.forwardForMethod(q)
 
+		assert (torch.isnan(y).any())==False
 
-			kappa_linear=torch.zeros((nsib,1,1), device=device)
-			kappa_quadratic=torch.zeros((nsib,1,1), device=device)
-
-			if(self.cs.has_linear_constraints):
-				kappa_linear=torch.relu( torch.max(self.D@v_bar, dim=1, keepdim=True).values  )
-
-				assert torch.all(kappa_linear >= 0)
-
-
-			if(self.cs.has_quadratic_constraints):
-				lambda_quadratic=torch.empty((nsib,0,1), device=device)
-				for i in range(self.all_P.shape[0]): #for each of the quadratic constraints
-					P=self.all_P[i,:,:]
-					q=self.all_q[i,:,:]
-					r=self.all_r[i,:,:]
-
-					rho = self.NA_E@v_bar
-					w = self.NA_E@self.z0 + self.y1 #Do this in the constructor of this class. This is actually y0
-
-					rhoT=torch.transpose(rho,dim0=1, dim1=2)
-
-					a=0.5*rhoT@P@rho;
-					b=(w.T@P@rho + q.T@rho);
-					c=(0.5*w.T@P@w + q.T@w +r)
-
-					discriminant = torch.square(b) - 4*(a)*(c)
-
-					assert torch.all(discriminant >= 0) 
-					lamb_positive_i=torch.div(  -(b)  + torch.sqrt(discriminant) , 2*a)
-					assert torch.all(lamb_positive_i >= 0) #If not, then either the feasible set is infeasible (note that z0 is inside the feasible set)
-					
-					lambda_quadratic = torch.cat((lambda_quadratic, lamb_positive_i), dim=1)
-
-
-				# print(f"Shape={lambda_quadratic.shape}")
-				tmp=(torch.min(lambda_quadratic, dim=1, keepdim=True).values)
-				kappa_quadratic=1.0/tmp
-				assert torch.all(lambda_quadratic >= 0)
-
-
-			################################# Obtain kappa
-			kappa = torch.maximum(kappa_linear, kappa_quadratic)
-		
-			assert torch.all(kappa >= 0)
-			#################################
-
-
-			if(self.method=='walker_2'):
-				beta= z[:, self.cs.n:(self.cs.n+1),0:1]#0:1 to keep the dimension. Other option istorch.unsqueeze(z[:, self.cs.n:(self.cs.n+1),0],2)
-
-				alpha=1/(torch.exp(beta) + kappa)
-			else: #method is walker_1
-				norm_v=torch.linalg.vector_norm(v, dim=(1,2), keepdim=True)
-				alpha=torch.minimum( 1/kappa , norm_v )
-
-			z_new = self.z0 + alpha*v_bar 
-			
-			#Now lift back to the original space
-			y_new =self.getyFromz(z_new)
-
-		if(self.method=='unconstrained'):
-			y_new=z
-
-		if (self.method=='barycentric'):
-			tmp1 = z[:,  0:self.num_vertices,0:1] #0:1 to keep the dimension. Other option is torch.unsqueeze(z[:,  0:self.cs.n,0],2) 
-			tmp2 = z[:,  self.num_vertices:(self.num_vertices+self.num_rays),0:1] #0:1 to keep the dimension. Other option is torch.unsqueeze(z[:,  0:self.cs.n,0],2) 
-			
-			lambdas=nn.functional.softmax(tmp1, dim=1)
-			mus=torch.abs(tmp2)
-
-			z_new=self.V@lambdas + self.R@mus
-
-			#Now lift back to the original space
-			y_new =self.getyFromz(z_new)
-
-		if(self.method=='proj_train_test'):
-			z_new, = self.proj_layer(z)
-			#Now lift back to the original space
-			y_new =self.getyFromz(z_new)
-
-		if(self.method=='proj_test'):
-			if(self.training==False):
-				#If you use ECOS, remember to set solver_args={'eps': 1e-6} (or smaller) for better solutions, see https://github.com/cvxpy/cvxpy/issues/880#issuecomment-557278620
-				z_new, = self.proj_layer(z, solver_args={'solve_method':'ECOS'}) #Supported: ECOS (fast, accurate), SCS (slower, less accurate).   NOT supported: GUROBI
-			else:
-				z_new = z
-
-			y_new =self.getyFromz(z_new)
-
-
-		assert (torch.isnan(y_new).any())==False
-
-
-		return y_new
-
-
-			#########################################################3
-			###For the convex quadratic constraints constraints
-			# if(self.has_ellipsoid_constraints):
-			# 	for i in range(self.all_E.shape[0]): #for each of the ellipsoids
-			# 		E=self.all_E[i,:,:]
-			# 		q=self.all_q[i,:,:]
-			# 		r=self.NA_E@u;
-			# 		rT=torch.transpose(r,dim0=1, dim1=2)
-			# 		discriminant = torch.square(2*rT@E@q) - 4*(rT@E@r)*(q.T@E@q-1)
-			# 		assert torch.all(discriminant >= 0) 
-			# 		lamb_positive=torch.div(  -2*rT@E@q  + torch.sqrt(discriminant) , 2*rT@E@r)
-			# 		assert torch.all(lamb_positive >= 0) #If not, then either the feasible set is infeasible, or z0 was taken outside the feasible set
-			# 		kappa=torch.maximum(kappa, 1/lamb_positive)
-
-
-			## FIRST OPTION
-			# bp_minus_Apz0=torch.sub(self.b_p,self.A_p@self.z0)
-			# all_max_distances=torch.div(bp_minus_Apz0,self.A_p@u)
-			# all_max_distances[all_max_distances<=0]=float("Inf")
-			# #Note that we know that self.x0 is a strictly feasible point of the set
-			# max_distance = torch.min(all_max_distances, dim=1, keepdim=True).values
-
-			# #Here, the size of max_distance is [nsib, 1, 1]
-
-			# alpha=torch.where(torch.isfinite(max_distance), 
-			# 				   max_distance*torch.sigmoid(beta),  #If it's bounded in that direction --> apply sigmoid function
-			# 				   torch.abs(beta)) #If it's not bounded in that direction --> just use the beta
-
-
-			## SECOND OPTION
-			# if(self.Z_is_unconstrained==False):
-			# 	my_lambda=torch.max(torch.div(self.A_p@u, bp_minus_Apz0), dim=1, keepdim=True).values
-			# else:
-			# 	my_lambda=torch.zeros((x.shape[0],1,1))
-
-			# alpha=torch.where(my_lambda<=0, torch.abs(beta), torch.sigmoid(beta)/my_lambda)
+		return y

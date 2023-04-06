@@ -132,7 +132,7 @@ def getCorridorDatasetsAndConstraints():
 	assert all_x_out_dist[0].shape[1]==1
 	assert all_y_out_dist[0].shape[1]==1
 
-	cs=utils.linearAndConvexQuadraticConstraints(A1, b1, None, None, None, None, None)
+	cs=utils.linearAndConvexQuadraticConstraints(A1, b1, None, None, [], [], [])
 	my_dataset = CustomDataset(all_x, all_y, all_Pobj, all_qobj, all_robj, all_times_s, all_costs)
 	my_dataset_out_dist = CustomDataset(all_x_out_dist, all_y_out_dist, all_Pobj_out_dist, all_qobj_out_dist, all_robj_out_dist, all_times_s_out_dist, all_costs_out_dist)
 
