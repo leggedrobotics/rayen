@@ -81,9 +81,9 @@ class ConstraintLayer(torch.nn.Module):
 			print(f"A_p={cs.A_p}")
 			print(f"b_p={cs.b_p}")
 			print("Computing vertices and rays...")
-			self.V,self.R = utils.H_to_V(cs.A_p, cs.b_p);
-			self.V = torch.Tensor(self.V)
-			self.R = torch.Tensor(self.R)
+			V, R = utils.H_to_V(cs.A_p, cs.b_p);
+			self.register_buffer("V", torch.tensor(V))
+			self.register_buffer("R", torch.tensor(R))
 			self.num_vertices=self.V.shape[1];
 			self.num_rays=self.R.shape[1];
 			assert (self.num_vertices+self.num_rays)>0
