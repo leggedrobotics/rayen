@@ -221,7 +221,7 @@ class ConstraintLayer(torch.nn.Module):
 		v = q[:,  0:self.n,0:1]
 		v_bar=torch.nn.functional.normalize(v, dim=1)
 		kappa=self.computeKappa(v_bar)
-		beta= q[:, self.n:(self.n+1),0:1]#0:1 to keep the dimension.
+		beta= q[:, self.n:(self.n+1),0:1]
 		alpha=1/(torch.exp(beta) + kappa) 
 		return self.getyFromz(self.z0 + alpha*v_bar)
 
@@ -245,16 +245,19 @@ class ConstraintLayer(torch.nn.Module):
 
 		return self.getyFromz(self.V@lambdas + self.R@mus)
 
+	def project(self, q):
+		#If you use ECOS, remember to set solver_args={'eps': 1e-6} (or smaller) for better solutions, see https://github.com/cvxpy/cvxpy/issues/880#issuecomment-557278620
+		z, = self.proj_layer(q, solver_args={'solve_method':'ECOS'}) #Supported: ECOS (fast, accurate), SCS (slower, less accurate).   NOT supported: GUROBI
+		return z
+
 	def forwardForProjTrainTest(self, q):
-		z, = self.proj_layer(q)
-		#Now lift back to the original space
+		z=self.project(q)
 		return self.getyFromz(z)
 
 
 	def forwardForProjTest(self, q):
 		if(self.training==False):
-			#If you use ECOS, remember to set solver_args={'eps': 1e-6} (or smaller) for better solutions, see https://github.com/cvxpy/cvxpy/issues/880#issuecomment-557278620
-			z, = self.proj_layer(z, solver_args={'solve_method':'ECOS'}) #Supported: ECOS (fast, accurate), SCS (slower, less accurate).   NOT supported: GUROBI
+			z=self.project(q)
 		else:
 			z = q
 
@@ -273,7 +276,6 @@ class ConstraintLayer(torch.nn.Module):
 	def getzFromy(self, y):
 		z=self.NA_E.T@(y - self.y1)
 		return z
-
 
 	def forward(self, x):
 
