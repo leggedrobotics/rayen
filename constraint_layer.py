@@ -28,8 +28,77 @@ from cvxpylayers.torch import CvxpyLayer
 # 		return solution
 
 
+
+class CostComputer(nn.Module): #Using nn.Module to be able to use register_buffer (and hence to be able to have the to() method)
+	def __init__(self, cs):
+		super().__init__()
+
+		if(cs.has_quadratic_constraints):
+			self.register_buffer("all_P", torch.Tensor(np.array(cs.all_P)))
+			self.register_buffer("all_q", torch.Tensor(np.array(cs.all_q)))
+			self.register_buffer("all_r", torch.Tensor(np.array(cs.all_r)))
+	
+		#See https://discuss.pytorch.org/t/model-cuda-does-not-convert-all-variables-to-cuda/114733/9
+		# and https://discuss.pytorch.org/t/keeping-constant-value-in-module-on-correct-device/10129
+		self.register_buffer("A_p", torch.tensor(cs.A_p))
+		self.register_buffer("b_p", torch.tensor(cs.b_p))
+		self.register_buffer("y1", torch.tensor(cs.y1))
+		self.register_buffer("NA_E", torch.tensor(cs.NA_E))
+		self.register_buffer("z0", torch.tensor(cs.z0))
+
+		self.has_quadratic_constraints=cs.has_quadratic_constraints
+
+	def getyFromz(self, z):
+		y=self.NA_E@z + self.y1
+		return y
+
+	def getzFromy(self, y):
+		z=self.NA_E.T@(y - self.y1)
+		return z
+
+	def getSumSoftCostAllSamples(self, y):
+		z=self.getzFromy(y);
+
+		#Note that in the projected subspace we don't have equalities
+
+		################## STACK THE VALUES OF ALL THE INEQUALITIES (Ap*z-bp<=0 and g(y)<=0)
+		all_inequalities=torch.empty((y.shape[0],0,1), device=y.device)
+		##### Ap*z<=bp
+		all_inequalities=torch.cat((all_inequalities, self.A_p@z-self.b_p), dim=1);
+		##### g(y)<=0
+		if(self.has_quadratic_constraints):
+			for i in range(self.all_P.shape[0]):
+				P=self.all_P[i,:,:]
+				q=self.all_q[i,:,:]
+				r=self.all_r[i,:,:]
+				all_inequalities=torch.cat((all_inequalities, utils.quadExpression(y=y,P=P,q=q,r=r)), dim=1)
+		########################################################################
+
+		return torch.sum(torch.square(torch.nn.functional.relu(all_inequalities)))
+
+
+	def getSumObjCostAllSamples(self, y, Pobj, qobj, robj):
+		tmp=utils.quadExpression(y=y,P=Pobj,q=qobj,r=robj)
+		assert tmp.shape==(y.shape[0], 1, 1)
+		assert torch.all(tmp>=0)
+		# return torch.mean(tmp)
+		return torch.sum(tmp)
+
+	def getSumSupervisedCostAllSamples(self, y, y_predicted):
+		return torch.sum(torch.square(y-y_predicted))
+
+	def getSumLossAllSamples(self, params, y, y_predicted, Pobj, qobj, robj, isTesting=False):
+		loss=params['use_supervised']*self.getSumSupervisedCostAllSamples(y, y_predicted) + \
+			 (1-isTesting)*params['weight_soft_cost']*self.getSumSoftCostAllSamples(y_predicted) + \
+			 (1-params['use_supervised'])*self.getSumObjCostAllSamples(y_predicted, Pobj, qobj, robj)
+
+		assert loss>=0
+
+		return loss
+
+
 class ConstraintLayer(torch.nn.Module):
-	def __init__(self, cs, method='walker_2'):
+	def __init__(self, cs, q, method='walker_2', create_map=True):
 		super().__init__()
 
 		assert cp.__version__=='1.2.3' #See this issue: https://github.com/cvxgrp/cvxpylayers/issues/143
@@ -92,10 +161,17 @@ class ConstraintLayer(torch.nn.Module):
 			# exit()
 
 
-		self.mapper=nn.Sequential();
 		self.cs=cs;
 
-	def getNumelOutputMapper(self):
+		if(create_map):
+			self.mapper=nn.Linear(q, self.getDimInput());
+		else:
+			assert q==self.getDimInput() 
+			self.mapper=nn.Sequential(); #Mapper does nothing
+
+		
+
+	def getDimInput(self):
 		if(self.method=='walker_2'):
 			return (self.cs.n+1)
 		if(self.method=='walker_1'):
@@ -108,10 +184,6 @@ class ConstraintLayer(torch.nn.Module):
 			return self.cs.n
 
 
-	def setMapper(self, mapper):
-		self.mapper=mapper
-		utils.printInBoldRed(f"Setting the following mapper: {self.mapper}")
-
 	def gety0(self):
 		return self.getyFromz(self.z0)
 
@@ -122,72 +194,6 @@ class ConstraintLayer(torch.nn.Module):
 	def getzFromy(self, y):
 		z=self.NA_E.T@(y - self.y1)
 		return z
-
-	def getSumSoftCostAllSamples(self, y):
-		z=self.getzFromy(y);
-
-
-		#Note that in the projected subspace we don't have equalities
-
-		################## STACK THE VALUES OF ALL THE INEQUALITIES (Ap*z-bp<=0 and g(y)<=0)
-		all_inequalities=torch.empty((y.shape[0],0,1), device=y.device)
-		##### Ap*z<=bp
-		if(self.cs.has_linear_constraints):
-			all_inequalities=torch.cat((all_inequalities, self.A_p@z-self.b_p), dim=1);
-		##### g(y)<=0
-		if(self.cs.has_quadratic_constraints):
-			for i in range(self.all_P.shape[0]):
-				P=self.all_P[i,:,:]
-				q=self.all_q[i,:,:]
-				r=self.all_r[i,:,:]
-				all_inequalities=torch.cat((all_inequalities, utils.quadExpression(y=y,P=P,q=q,r=r)), dim=1)
-		########################################################################
-
-
-		# #########################################################
-		# nsib=y.shape[0]; #number of samples in the batch
-		# assert nsib==all_inequalities.shape[0]
-		# tmp=all_inequalities.shape[1]
-
-		# violation_squared=torch.square(torch.nn.functional.relu(all_inequalities));     #violation_squared is [nsib, tmp, 1]
-		# sum_violation_squared=torch.sum(violation_squared, dim=1, keepdim=True)         #sum_violation_squared is [nsib, 1, 1]
-		
-		# assert violation_squared.shape==(nsib, tmp, 1), f"violation_squared.shape={violation_squared.shape}"
-		# assert sum_violation_squared.shape==(nsib, 1, 1), f"sum_violation_squared.shape={sum_violation_squared.shape}"
-		# ###########################################################
-
-
-		# assert torch.all(sum_violation_squared>=0)
-
-		# # return torch.mean(sum_violation_squared)
-		return torch.sum(torch.square(torch.nn.functional.relu(all_inequalities)))
-
-
-	def getSumObjCostAllSamples(self, y, Pobj, qobj, robj):
-		tmp=utils.quadExpression(y=y,P=Pobj,q=qobj,r=robj)
-		assert tmp.shape==(y.shape[0], 1, 1)
-		assert torch.all(tmp>=0)
-		# return torch.mean(tmp)
-		return torch.sum(tmp)
-
-	def getSumSupervisedCostAllSamples(self, y, y_predicted):
-		# difference_squared=torch.square(y-y_predicted);
-		# sum_difference_squared=torch.sum(difference_squared, dim=1, keepdim=True) 
-
-		# assert sum_difference_squared.shape==(y.shape[0], 1, 1)
-		# assert torch.all(sum_difference_squared>=0)
-
-		# return torch.mean(sum_difference_squared)
-		return torch.sum(torch.square(y-y_predicted))
-
-	def getSumLossAllSamples(self, params, y, y_predicted, Pobj, qobj, robj, isTesting=False):
-		loss=params['use_supervised']*self.getSumSupervisedCostAllSamples(y, y_predicted) + \
-			 (1-isTesting)*params['weight_soft_cost']*self.getSumSoftCostAllSamples(y_predicted) + \
-			 (1-params['use_supervised'])*self.getSumObjCostAllSamples(y_predicted, Pobj, qobj, robj)
-
-		assert loss>=0
-
-		return loss
 
 
 	def forward(self, x):

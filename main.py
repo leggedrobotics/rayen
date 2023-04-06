@@ -10,7 +10,7 @@ import pandas as pd
 from torch.utils.data import DataLoader
 from early_stopping import EarlyStopping
 
-from constraint_layer import ConstraintLayer
+from constraint_layer import ConstraintLayer, CostComputer
 from create_dataset import createProjectionDataset, getCorridorDatasetsAndConstraints
 from examples_sets import getExample
 
@@ -64,11 +64,14 @@ class SplittedDatasetAndGenerator():
 
 
 
-def onePassOverDataset(model, params, sdag, my_type):
+def onePassOverDataset(model, params, sdag, my_type, cs):
+
+	cost_computer=CostComputer(cs)
 
 	device_id = params['device']
 	device = torch.device('cuda:{}'.format(device_id) if device_id >= 0 else 'cpu')
 	model = model.to(device)
+	cost_computer = cost_computer.to(device)
 
 	if(my_type=='train'):
 		model.train()
@@ -109,7 +112,7 @@ def onePassOverDataset(model, params, sdag, my_type):
 			time_start=time.time()
 			y_predicted = model(x)
 			sum_time_s += (time.time()-time_start)
-			loss=model.getSumLossAllSamples(params, y, y_predicted, Pobj, qobj, robj, isTesting=(my_type=='test'))
+			loss=cost_computer.getSumLossAllSamples(params, y, y_predicted, Pobj, qobj, robj, isTesting=(my_type=='test'))
 			# print(f"Loss={loss.item()}")
 			sum_all_losses +=  loss.item();
 			#----------------------
@@ -123,17 +126,17 @@ def onePassOverDataset(model, params, sdag, my_type):
 
 
 			if(my_type=='test'):
-				sum_all_violations += np.sum(np.apply_along_axis(model.cs.getViolation,axis=1, arr=y_predicted.cpu().numpy())).item()
+				sum_all_violations += np.sum(np.apply_along_axis(cs.getViolation,axis=1, arr=y_predicted.cpu().numpy())).item()
 
 				###### compute the results from the optimization. TODO: Change to a different place?
 				y_predicted=y
-				loss_optimization=model.getSumLossAllSamples(params, y, y_predicted, Pobj, qobj, robj, isTesting=True)
+				loss_optimization=cost_computer.getSumLossAllSamples(params, y, y_predicted, Pobj, qobj, robj, isTesting=True)
 				sum_all_losses_optimization += loss_optimization.item();
 				# print(f"Loss Opt={loss_optimization.item()}")
 				# print(f"Original Loss Opt={torch.sum(cost).item()}")
 				assert abs(loss_optimization.item()-torch.sum(cost).item())<0.001
 
-				sum_all_violations_optimization += np.sum(np.apply_along_axis(model.cs.getViolation,axis=1, arr=y_predicted.cpu().numpy())).item()
+				sum_all_violations_optimization += np.sum(np.apply_along_axis(cs.getViolation,axis=1, arr=y_predicted.cpu().numpy())).item()
 				sum_all_time_s_optimization += torch.sum(opt_time_s).item()
 				#########################################################
 
@@ -157,13 +160,13 @@ def onePassOverDataset(model, params, sdag, my_type):
 
 
 
-def train_model(model, params, sdag, tensorboard_writer):
+def train_model(model, params, sdag, tensorboard_writer, cs):
 	model = model.to(torch.device('cuda:{}'.format(params['device']) if params['device'] >= 0 else 'cpu'))
 	optimizer = torch.optim.Adam(model.parameters(),lr=params['learning_rate'])
 
 	metrics_all_epochs = {'train_loss': [], 'val_loss': []}
 	
-	my_early_stopping = EarlyStopping(patience=1000, verbose=False)
+	my_early_stopping = EarlyStopping(patience=1e100, verbose=False)
 
 	#See https://pytorch.org/tutorials/beginner/blitz/cifar10_tutorial.html
 
@@ -173,8 +176,8 @@ def train_model(model, params, sdag, tensorboard_writer):
 
 		# pbar.set_description(f"Epoch {epoch}")
 
-		metrics_training_this_epoch=onePassOverDataset(model, params, sdag, 'train')
-		metrics_validation_this_epoch=onePassOverDataset(model, params, sdag, 'val')
+		metrics_training_this_epoch=onePassOverDataset(model, params, sdag, 'train', cs)
+		metrics_validation_this_epoch=onePassOverDataset(model, params, sdag, 'val', cs)
 		my_early_stopping(metrics_validation_this_epoch['loss'], model)
 
 		metrics_all_epochs['train_loss'].append(metrics_training_this_epoch['loss']) 
@@ -215,13 +218,13 @@ def main(params):
 
 
 	################# To launch tensorboard directly
-	import os
-	import subprocess
-	folder="runs"
-	os.system("pkill -f tensorboard")
-	os.system("rm -rf "+folder)
-	proc1 = subprocess.Popen(["tensorboard","--logdir",folder,"--bind_all"], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
-	proc2 = subprocess.Popen(["google-chrome","http://localhost:6006/"], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
+	# import os
+	# import subprocess
+	# folder="runs"
+	# os.system("pkill -f tensorboard")
+	# os.system("rm -rf "+folder)
+	# proc1 = subprocess.Popen(["tensorboard","--logdir",folder,"--bind_all"], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
+	# proc2 = subprocess.Popen(["google-chrome","http://localhost:6006/"], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
 	############################################
 
 	tensorboard_writer = SummaryWriter()
@@ -255,19 +258,21 @@ def main(params):
 	sdag_out_dist=SplittedDatasetAndGenerator(my_dataset_out_dist, percent_train=0.0, percent_val=0.0, batch_size=params['batch_size'])
 
 	######################### TRAINING
-	model = ConstraintLayer(cs, method=params['method']) 
-	mapper=utils.create_mlp(input_dim=my_dataset.getNumelX(), output_dim=model.getNumelOutputMapper(), net_arch=[64,64])
-	# mapper=nn.Sequential() #do nothing.
-	model.setMapper(mapper)
+	#Slide 4 of https://fleuret.org/dlc/materials/dlc-handout-4-6-writing-a-module.pdf
+	model = nn.Sequential(nn.Flatten(),
+						  nn.Linear(my_dataset.getNumelX(), 256), nn.ReLU(),
+						  nn.Linear(256, 256), nn.ReLU(),
+						  nn.Linear(256, 64),
+						  ConstraintLayer(cs, q=64, method=params['method'], create_map=True) 
+						             ) 
 
-
-	training_metrics = train_model(model, params, sdag, tensorboard_writer)
+	training_metrics = train_model(model, params, sdag, tensorboard_writer, cs)
 
 	# model.load_state_dict(torch.load('checkpoint.pt'))
 
 	print("Testing model...")
-	testing_metrics = onePassOverDataset(model, params, sdag, 'test')
-	testing_metrics_out_dist = onePassOverDataset(model, params, sdag_out_dist, 'test')
+	testing_metrics = onePassOverDataset(model, params, sdag, 'test', cs)
+	testing_metrics_out_dist = onePassOverDataset(model, params, sdag_out_dist, 'test', cs)
 	print("Model tested...")
 
 	#####PRINT STUFF
