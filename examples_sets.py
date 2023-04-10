@@ -2,16 +2,16 @@ import numpy as np
 import utils
 
 def getCube():
-	A1=np.array([ [1, 0, 0],
-				 [0, 1, 0],
-				 [0, 0, 1],
-				 [-1, 0, 0],
-				 [0, -1, 0],
-				 [0, 0, -1]]);
+	A1=np.array([ [1.0, 0, 0],
+				 [0, 1.0, 0],
+				 [0, 0, 1.0],
+				 [-1.0, 0, 0],
+				 [0, -1.0, 0],
+				 [0, 0, -1.0]]);
 
-	b1=np.array([[1],
-				[1],
-				[1],
+	b1=np.array([[1.0],
+				[1.0],
+				[1.0],
 				[0],
 				[0],
 				[0]])
@@ -55,16 +55,16 @@ def getExample(example):
 	all_P, all_q, all_r = getNoneQuadraticConstraints()
 
 
-	if example==0: #A polygon embeded in 3D
+	if example==0: #A 2D polygon embeded in 3D
 		A1, b1=getCube()
-		A2=np.array([[1, 1, 1]]);
-		b2=np.array([[1]]);
+		A2=np.array([[1.0, 1.0, 1.0]]);
+		b2=np.array([[1.0]]);
 
 	elif example==1: #A polygon embeded in 3D with an sphere
 
 		A1, b1=getCube()
-		A2=np.array([[1, 1, 1]]);
-		b2=np.array([[1]]);
+		A2=np.array([[1.0, 1.0, 1.0]]);
+		b2=np.array([[1.0]]);
 
 		P,q,r=getSphere(0.8,np.zeros((3,1)))
 
@@ -94,8 +94,8 @@ def getExample(example):
 	#A 2d polyhedron with a cirle
 	     or example==5):   
 		A1=np.array([[-1,0],
-					 [0, -1],
-					 [0, 1],
+					 [0, -1.0],
+					 [0, 1.0],
 					 [0.2425,    0.9701]]);
 
 		b1=np.array([[0],
@@ -111,21 +111,21 @@ def getExample(example):
 
 
 
-	elif example==6: #The intersection between a cube and a plane 3d cube 
+	elif example==6: #The intersection between a cube and two planes 
 		A1, b1=getCube()
-		A2=np.array([[1, 1, 1],
-					  [-1, 1, 1] ]);
-		b2=np.array([[1],[0.1]]);
+		A2=np.array([[1.0, 1.0, 1.0],
+					  [-1.0, 1.0, 1.0] ]);
+		b2=np.array([[1.0],[0.1]]);
 
 	elif example==7: #Just a plane
-		A2=np.array([[1, 1, 1]]);
-		b2=np.array([[1]]);	
+		A2=np.array([[1.0, 1.0, 1.0]]);
+		b2=np.array([[1.0]]);	
 
 
 	elif example==8: #Unbounded 2d polyhedron. It has two vertices and two rays
 
-		A1=np.array([[0,-1], [2,-4], [-2,1]]);
-		b1=np.array([[-2], [8], [-5]]);
+		A1=np.array([[0.0,-1.0], [2.0,-4.0], [-2.0,1.0]]);
+		b1=np.array([[-2.0], [8.0], [-5.0]]);
 
 	elif example==9: #A paraboloid and a plane
 		P,q,r=getParaboloid3D()
@@ -134,8 +134,8 @@ def getExample(example):
 		all_q=[q]
 		all_r=[r]	
 
-		A2=np.array([[1, 1, 1]]);
-		b2=np.array([[1]]);		
+		A2=np.array([[1.0, 1.0, 1.0]]);
+		b2=np.array([[1.0]]);		
 
 	elif example==10: #A paraboloid and a shpere
 		P1,q1,r1=getParaboloid3D()

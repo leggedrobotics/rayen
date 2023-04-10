@@ -147,6 +147,75 @@ class ConstraintLayer(torch.nn.Module):
 			print(f"vertices={self.V}")
 			print(f"rays={self.R}")
 
+		if(self.method=='dc3'):
+
+			A_E_b_E=np.concatenate((cs.A_E, cs.b_E), axis=1)
+
+			##################################################
+			####### Remove the rows that are linearly dependent
+
+			##First detect the rows that are zero
+			rows_that_are_zero=[]
+			for i in range(A_E_b_E.shape[0]):
+				if(utils.isZero(A_E_b_E[i,:])):
+					rows_that_are_zero.append(i)
+
+			rows_to_remove=[]
+			for i in range(A_E_b_E.shape[0]):
+
+				row_i=A_E_b_E[i,:];
+
+				if(utils.isZero(row_i)):
+					rows_to_remove.append(i)
+					continue
+
+				for j in range(i+1, A_E_b_E.shape[0]):
+
+					row_j=A_E_b_E[j,:];
+
+					if(utils.isZero(row_j)):
+						continue
+
+					tmp=(row_i/row_j)
+					if(tmp.ptp() == 0.0): #All the elements of tmp are the same --> linearly dependent
+						rows_to_remove.append(i)
+
+			##################################################
+			##################################################
+
+			A2_dc3 = np.delete(cs.A_E, rows_to_remove, axis=0)
+			b2_dc3 = np.delete(cs.b_E, rows_to_remove, axis=0)
+
+			print(f"cs.A_E={cs.A_E}")
+			print(f"cs.b_E={cs.b_E}")
+
+			print(f"A2_dc3={A2_dc3}")
+			print(f"b2_dc3={b2_dc3}")
+
+			self.register_buffer("A2", torch.tensor(A2_dc3))
+			self.register_buffer("b2", torch.tensor(b2_dc3))
+			self.register_buffer("A1", torch.tensor(cs.A_I))
+			self.register_buffer("b1", torch.tensor(cs.b_I))
+
+			det = 0
+			i = 0
+			self._neq = self.A2.shape[0]
+			self._nineq = self.A1.shape[0]
+			while abs(det) < 0.0001 and i < 100:
+				# print(f"A2 is {self.A2}")
+				# print(f"b2 is {self.b2}")
+				self.partial_vars = np.random.choice(self.k, self.k - self._neq, replace=False)
+				self.other_vars = np.setdiff1d( np.arange(self.k), self.partial_vars)
+				novale=self.A2[:, self.other_vars];
+				det = torch.det(self.A2[:, self.other_vars])
+				i += 1
+			if i == 100:
+				raise Exception
+			else:
+				self.A2_partial = self.A2[:, self.partial_vars]
+				self.A2_other_inv = torch.inverse(self.A2[:, self.other_vars])			
+			print(f"A2_partial is {self.A2_partial}")
+			print(f"A2_other_inv is {self.A2_other_inv}")
 
 		if(self.method=='walker_2'):
 			self.forwardForMethod=self.forwardForWalker2
@@ -166,6 +235,9 @@ class ConstraintLayer(torch.nn.Module):
 		elif(self.method=='proj_test'):
 			self.forwardForMethod=self.forwardForProjTest
 			self.dim_after_map=(self.n)
+		elif(self.method=='dc3'):
+			self.forwardForMethod=self.forwardForDc3
+			self.dim_after_map=(self.k - self._neq)
 		else:
 			raise NotImplementedError
 
@@ -174,6 +246,105 @@ class ConstraintLayer(torch.nn.Module):
 			self.mapper=nn.Linear(input_dim, self.dim_after_map);
 		else:
 			self.mapper=nn.Sequential(); #Mapper does nothing
+
+	# Solves for the full set of variables
+	# def complete_partial(self, Z):
+	#     Y = torch.zeros(X.shape[0], self.ydim, device=self.device)
+	#     Y[:, self.partial_vars] = Z
+	#     Y[:, self.other_vars] = (self.b_E - Z @ self.A_E_partial.T) @ self.A_E_other_inv.T
+	#     return Y
+
+	def eq_resid(self, y):
+		return self.b2 - self.A2@y
+
+	def ineq_resid(self, y):
+		return self.A1@y - self.b1
+
+	def ineq_dist(self, y):
+		resids = self.ineq_resid(y)
+		return torch.clamp(resids, 0)
+
+	def eq_grad(self, y):
+		return 2*(self.A2@y - self.b2) @ self.A2
+
+	def ineq_grad(self, y):
+		ineq_dist = self.ineq_dist(y)
+		return 2*ineq_dist@self.A1
+
+	def ineq_partial_grad(self, y):
+
+		A1p=self.A1[:, self.partial_vars];
+		A1o=self.A1[:, self.other_vars];
+		A2p=self.A2_partial;
+		A2oi=self.A2_other_inv;
+
+		A1_effective = A1p - A1o @ (A2oi @ A2p)
+		b1_effective = self.b1 - A1o @ A2oi @ self.b2;
+
+		#constraint is    A1_effective yp - b1_effective <= 0
+		#function is w(z)=||relu(A1_effective yp - b1_effective)||^2
+
+		grad = 2 * A1_effective.T @ torch.clamp(A1_effective@y[:, self.partial_vars,:] - b1_effective, 0)
+		y = torch.zeros_like(y)
+		y[:, self.partial_vars, :] = grad
+		y[:, self.other_vars, :] = - A2oi @ A2p @ grad
+		return y
+
+	def forwardForDc3(self, q):
+		
+		#### Complete partial
+		y = torch.zeros((q.shape[0], self.k, 1), device=q.device)
+		y[:, self.partial_vars, :] = q
+		y[:, self.other_vars, :] = self.A2_other_inv @ (self.b2 - self.A2_partial @ q)
+
+		#### Grad steps all
+		lr = 1e-2
+		eps_converge = 1e-4
+		max_steps = 1000
+		momentum = 0.5
+
+		y_new = y
+		i = 0
+		old_y_step = 0
+		old_ineq_step = 0
+		old_eq_step = 0
+
+		if(self.training):
+			num_steps=10
+		else:
+			num_steps=10
+
+		print(f"BEFORE: {y}")
+
+		while True:
+
+			y_step = self.ineq_partial_grad(y_new)
+			
+			new_y_step = lr * y_step + momentum * old_y_step
+
+			print(f"new_y_step={new_y_step}")
+
+			y_new = y_new - new_y_step
+
+			old_y_step = new_y_step
+			i += 1
+
+			# converged_eq = (torch.max(torch.abs(self.eq_resid(y_new))) < eps_converge) #It's always converged when using completion
+			converged_ineq = (torch.max(self.ineq_dist(y_new)) < eps_converge)
+			max_iter_reached= (i >= max_steps)
+
+			if(max_iter_reached):
+				break
+
+			if(self.training==False and converged_ineq):
+				break
+
+		print(f"AFTER: {y_new}")
+
+
+		return y_new
+
+
 
 	def computeKappa(self,v_bar):
 

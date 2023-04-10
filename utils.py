@@ -13,64 +13,64 @@ import math
 from tqdm import tqdm
 
 def printInBoldBlue(data_string):
-    print(Style.BRIGHT+Fore.BLUE+data_string+Style.RESET_ALL)
+	print(Style.BRIGHT+Fore.BLUE+data_string+Style.RESET_ALL)
 def printInBoldRed(data_string):
-    print(Style.BRIGHT+Fore.RED+data_string+Style.RESET_ALL)
+	print(Style.BRIGHT+Fore.RED+data_string+Style.RESET_ALL)
 def printInBoldGreen(data_string):
-    print(Style.BRIGHT+Fore.GREEN+data_string+Style.RESET_ALL)
+	print(Style.BRIGHT+Fore.GREEN+data_string+Style.RESET_ALL)
 
 
 #Ellisoid is represented by {x | x'*E*x <=1}
 def plotEllipsoid(E, x0, ax):
-    #Partly taken from https://github.com/CircusMonkey/covariance-ellipsoid/blob/master/ellipsoid.py
-    """
-    Return the 3d points representing the covariance matrix
-    cov centred at mu and scaled by the factor nstd.
-    Plot on your favourite 3d axis. 
-    Example 1:  ax.plot_wireframe(X,Y,Z,alpha=0.1)
-    Example 2:  ax.plot_surface(X,Y,Z,alpha=0.1)
-    """
+	#Partly taken from https://github.com/CircusMonkey/covariance-ellipsoid/blob/master/ellipsoid.py
+	"""
+	Return the 3d points representing the covariance matrix
+	cov centred at mu and scaled by the factor nstd.
+	Plot on your favourite 3d axis. 
+	Example 1:  ax.plot_wireframe(X,Y,Z,alpha=0.1)
+	Example 2:  ax.plot_surface(X,Y,Z,alpha=0.1)
+	"""
 
-    assert E.shape==(3,3)
+	assert E.shape==(3,3)
 
-    B=np.linalg.inv(scipy.linalg.sqrtm(E))
+	B=np.linalg.inv(scipy.linalg.sqrtm(E))
 
-    #Ellisoid is now represented by { Bp+x0 | ||p|| <=1}
-    # Find and sort eigenvalues 
-    eigvals, eigvecs = np.linalg.eigh(B)
-    idx = np.sum(B,axis=0).argsort()
-    eigvals_temp = eigvals[idx]
-    idx = eigvals_temp.argsort()
-    eigvals = eigvals[idx]
-    eigvecs = eigvecs[:,idx]
+	#Ellisoid is now represented by { Bp+x0 | ||p|| <=1}
+	# Find and sort eigenvalues 
+	eigvals, eigvecs = np.linalg.eigh(B)
+	idx = np.sum(B,axis=0).argsort()
+	eigvals_temp = eigvals[idx]
+	idx = eigvals_temp.argsort()
+	eigvals = eigvals[idx]
+	eigvecs = eigvecs[:,idx]
 
-    # Set of all spherical angles to draw our ellipsoid
-    n_points = 100
-    theta = np.linspace(0, 2*np.pi, n_points)
-    phi = np.linspace(0, np.pi, n_points)
+	# Set of all spherical angles to draw our ellipsoid
+	n_points = 100
+	theta = np.linspace(0, 2*np.pi, n_points)
+	phi = np.linspace(0, np.pi, n_points)
 
-    # Width, height and depth of ellipsoid
-    rx, ry, rz = np.sqrt(eigvals)
+	# Width, height and depth of ellipsoid
+	rx, ry, rz = np.sqrt(eigvals)
 
-    # Get the xyz points for plotting
-    # Cartesian coordinates that correspond to the spherical angles:
-    X = rx * np.outer(np.cos(theta), np.sin(phi))
-    Y = ry * np.outer(np.sin(theta), np.sin(phi))
-    Z = rz * np.outer(np.ones_like(theta), np.cos(phi))
+	# Get the xyz points for plotting
+	# Cartesian coordinates that correspond to the spherical angles:
+	X = rx * np.outer(np.cos(theta), np.sin(phi))
+	Y = ry * np.outer(np.sin(theta), np.sin(phi))
+	Z = rz * np.outer(np.ones_like(theta), np.cos(phi))
 
-    # Rotate ellipsoid for off axis alignment
-    old_shape = X.shape
-    # Flatten to vectorise rotation
-    X,Y,Z = X.flatten(), Y.flatten(), Z.flatten()
-    X,Y,Z = np.matmul(eigvecs, np.array([X,Y,Z]))
-    X,Y,Z = X.reshape(old_shape), Y.reshape(old_shape), Z.reshape(old_shape)
+	# Rotate ellipsoid for off axis alignment
+	old_shape = X.shape
+	# Flatten to vectorise rotation
+	X,Y,Z = X.flatten(), Y.flatten(), Z.flatten()
+	X,Y,Z = np.matmul(eigvecs, np.array([X,Y,Z]))
+	X,Y,Z = X.reshape(old_shape), Y.reshape(old_shape), Z.reshape(old_shape)
    
-    # Add in offsets for the center
-    X = X + x0[0]
-    Y = Y + x0[1]
-    Z = Z + x0[2]
+	# Add in offsets for the center
+	X = X + x0[0]
+	Y = Y + x0[1]
+	Z = Z + x0[2]
 
-    ax.plot_wireframe(X,Y,Z, color='r', alpha=0.1)
+	ax.plot_wireframe(X,Y,Z, color='r', alpha=0.1)
 
 #It operates on numpy stuff 
 #polytope defined as Ax<=b
@@ -334,6 +334,7 @@ class linearAndConvexQuadraticConstraints():
 
 			I=[i for i in range(A.shape[0]) if i not in E];
 
+
 			#Obtain A_E, b_E and A_I, b_I
 			if(len(E)>0):
 				A_E=A[E,:];
@@ -381,6 +382,18 @@ class linearAndConvexQuadraticConstraints():
 			y1=np.zeros((self.n,1));
 			A_p=np.zeros((1,self.n)) # 0z<=1
 			b_p=np.ones((1,1))
+
+			A_E=np.zeros((1,self.k)); # 0y=0
+			b_E=np.zeros((1,1));	
+
+			A_I=np.zeros((1,self.k)); # 0y<=1
+			b_I=np.ones((1,1));	
+
+
+		self.A_E=A_E
+		self.b_E=b_E
+		self.A_I=A_I
+		self.b_I=b_I
 
 		#############Obtain a strictly feasible point z0
 		###################################################
@@ -454,7 +467,7 @@ class linearAndConvexQuadraticConstraints():
 			raise Exception(f"Which solver do you have installed?")
 		###################################################
 
-    ######################### CONSTRAINTS IN THE SUBSPACE
+	######################### CONSTRAINTS IN THE SUBSPACE
 	def getLinearConstraintsInSubspaceCvxpy(self, variable):
 		assert variable.shape[1]==1
 		assert variable.shape[0]==self.n		 
@@ -785,51 +798,51 @@ class linearAndConvexQuadraticConstraints():
 def loadpickle(name_file):
 	import pickle
 	with open(name_file, "rb") as input_file:
-	    result = pickle.load(input_file)
+		result = pickle.load(input_file)
 	return result	
 
 def savepickle(variable, name_file):
 	import pickle
 	with open(name_file, 'wb') as output_file:
-	    pickle.dump(variable, output_file, pickle.HIGHEST_PROTOCOL)	
+		pickle.dump(variable, output_file, pickle.HIGHEST_PROTOCOL)	
 
 #This function has been taken (and modified) from https://github.com/DLR-RM/stable-baselines3/blob/201fbffa8c40a628ecb2b30fd0973f3b171e6c4c/stable_baselines3/common/torch_layers.py#L96
 def create_mlp(
-    input_dim: int,
-    output_dim: int,
-    net_arch: typing.List[int],
-    activation_fn: typing.Type[nn.Module] = nn.ReLU,
-    squash_output: bool = False):
-    """
-    Create a multi layer perceptron (MLP), which is
-    a collection of fully-connected layers each followed by an activation function.
-    :param input_dim: Dimension of the input vector
-    :param output_dim:
-    :param net_arch: Architecture of the neural net
-        It represents the number of units per layer.
-        The length of this list is the number of layers.
-    :param activation_fn: The activation function
-        to use after each layer.
-    :param squash_output: Whether to squash the output using a Tanh
-        activation function
-    :return:
-    """
+	input_dim: int,
+	output_dim: int,
+	net_arch: typing.List[int],
+	activation_fn: typing.Type[nn.Module] = nn.ReLU,
+	squash_output: bool = False):
+	"""
+	Create a multi layer perceptron (MLP), which is
+	a collection of fully-connected layers each followed by an activation function.
+	:param input_dim: Dimension of the input vector
+	:param output_dim:
+	:param net_arch: Architecture of the neural net
+		It represents the number of units per layer.
+		The length of this list is the number of layers.
+	:param activation_fn: The activation function
+		to use after each layer.
+	:param squash_output: Whether to squash the output using a Tanh
+		activation function
+	:return:
+	"""
 
-    if len(net_arch) > 0:
-        modules = [nn.Linear(input_dim, net_arch[0]), activation_fn()]
-    else:
-        modules = []
+	if len(net_arch) > 0:
+		modules = [nn.Linear(input_dim, net_arch[0]), activation_fn()]
+	else:
+		modules = []
 
-    for idx in range(len(net_arch) - 1):
-        modules.append(nn.Linear(net_arch[idx], net_arch[idx + 1]))
-        modules.append(activation_fn())
+	for idx in range(len(net_arch) - 1):
+		modules.append(nn.Linear(net_arch[idx], net_arch[idx + 1]))
+		modules.append(activation_fn())
 
-    if output_dim > 0:
-        last_layer_dim = net_arch[-1] if len(net_arch) > 0 else input_dim
-        modules.append(nn.Linear(last_layer_dim, output_dim))
-    if squash_output:
-        modules.append(nn.Tanh())
-    return nn.Sequential(*modules)
+	if output_dim > 0:
+		last_layer_dim = net_arch[-1] if len(net_arch) > 0 else input_dim
+		modules.append(nn.Linear(last_layer_dim, output_dim))
+	if squash_output:
+		modules.append(nn.Tanh())
+	return nn.Sequential(*modules)
 
 #https://stackoverflow.com/questions/65154622/sample-uniformly-at-random-from-a-simplex-in-python
 def runif_in_simplex(n):
@@ -911,6 +924,7 @@ def H_to_V(A, b):
 
 
 def plot3DPolytopeHRepresentation(A,b, limits, ax):
+	print("here")
 	points, R=H_to_V(A,b)
 	plot3DPolytopeVRepresentation(points, limits, ax)
 

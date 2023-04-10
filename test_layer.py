@@ -16,12 +16,10 @@ import numpy as np
 import scipy
 
 
-methods=['walker_2', 'walker_1', 'barycentric', 'unconstrained', 'proj_train_test', 'proj_test']
-methods=['walker_2', 'walker_1']
-
+methods=['walker_2', 'walker_1', 'barycentric', 'unconstrained', 'proj_train_test', 'proj_test', 'dc3']
+methods=['walker_2', 'walker_1', 'barycentric', 'unconstrained', 'dc3']
 
 index_examples_to_run=list(range(9))
-# index_examples_to_run=[10]
 num_of_examples=len(index_examples_to_run)
 ###############
 rows=math.ceil(math.sqrt(num_of_examples))
