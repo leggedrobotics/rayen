@@ -17,6 +17,8 @@ from examples_sets import getExample
 import utils
 import tqdm
 
+import random
+
 from torch.utils.tensorboard import SummaryWriter
 
 class SplittedDatasetAndGenerator():
@@ -232,12 +234,12 @@ def main(params):
 	torch.set_default_dtype(torch.float64) ##Use float32 here??
 
 	## PROJECTION EXAMPLES
-	# cs=getExample(3)
-	# my_dataset=createProjectionDataset(200, cs, 4.0);
-	# my_dataset_out_dist=createProjectionDataset(200, cs, 7.0);
+	cs=getExample(4)
+	my_dataset=createProjectionDataset(200, cs, 4.0);
+	my_dataset_out_dist=createProjectionDataset(200, cs, 7.0);
 
 	## CORRIDOR EXAMPLES
-	my_dataset, my_dataset_out_dist, cs=getCorridorDatasetsAndConstraints()
+	# my_dataset, my_dataset_out_dist, cs=getCorridorDatasetsAndConstraints()
 
 	############### THIS AVOIDS CREATING the dataset all the time
 	# import pickle
@@ -260,11 +262,31 @@ def main(params):
 	######################### TRAINING
 	#Slide 4 of https://fleuret.org/dlc/materials/dlc-handout-4-6-writing-a-module.pdf
 	model = nn.Sequential(nn.Flatten(),
-						  nn.Linear(my_dataset.getNumelX(), 256), nn.ReLU(),
-						  nn.Linear(256, 256), nn.ReLU(),
-						  nn.Linear(256, 64),
+						  nn.Linear(my_dataset.getNumelX(), 64), 
+						  # nn.BatchNorm1d(64),
+						  nn.ReLU(),
+						  nn.Linear(64, 64),
+						  nn.ReLU(),
+						  # nn.Dropout(p=0.2), 
+						  # nn.Dropout(p=0.2),
+						  nn.Linear(64, 64),
 						  ConstraintLayer(cs, input_dim=64, method=params['method'], create_map=True) 
 						             ) 
+
+	#####################################
+	# def init_weights(m):
+	# 	# print(m)
+	# 	if type(m) == nn.Linear:
+	# 	# m.weight.data.fill_(1.0)
+	# 	# print(m.weight)
+	# 		nn.init.uniform_(m.weight.data, a=-1, b=1)
+	# 		nn.init.uniform_(m.bias.data, a=-1, b=1)
+	#    nn.init.kaiming_normal_(layer.weight)
+
+
+
+	# model.apply(init_weights)
+	#####################################
 
 	training_metrics = train_model(model, params, sdag, tensorboard_writer, cs)
 
@@ -307,16 +329,19 @@ def main(params):
 
 if __name__ == '__main__':
 
+	# random.seed(42)
+	# torch.manual_seed(0)
+
 	parser = argparse.ArgumentParser()
-	parser.add_argument('--method', type=str, default='walker_2') #walker_2, walker_1  or barycentric, unconstrained, proj_train_test, proj_test
+	parser.add_argument('--method', type=str, default='walker_1') #walker_2, walker_1  or barycentric, unconstrained, proj_train_test, proj_test
 	parser.add_argument('--use_supervised', type=bool, default=False)
 	parser.add_argument('--weight_soft_cost', type=float, default=0.0)
 	parser.add_argument('--result_dir', type=str, default='results')
 	parser.add_argument('--device', type=int, default=0)
-	parser.add_argument('--num_epochs', type=int, default=7000)
-	parser.add_argument('--batch_size', type=int, default=50)
+	parser.add_argument('--num_epochs', type=int, default=3000)
+	parser.add_argument('--batch_size', type=int, default=400)
 	parser.add_argument('--verbosity', type=int, default=1)
-	parser.add_argument('--learning_rate', type=float, default=1e-3)
+	parser.add_argument('--learning_rate', type=float, default=1e-4)
 	args = parser.parse_args()
 	params = vars(args)
 
