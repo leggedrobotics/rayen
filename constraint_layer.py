@@ -307,7 +307,7 @@ class ConstraintLayer(torch.nn.Module):
 			yp=y_new[:, self.partial_vars,:]
 			ypT=torch.transpose(yp,1,2);
 
-			grad = 2 * self.A1_effective.T @ torch.clamp(self.A1_effective@yp - self.b1_effective, 0)
+			grad = 2 * self.A1_effective.T @ torch.relu(self.A1_effective@yp - self.b1_effective)
 
 			for i in range(self.all_P_effective.shape[0]): #for each of the quadratic constraints
 				P_effective=self.all_P_effective[i,:,:]
@@ -315,7 +315,7 @@ class ConstraintLayer(torch.nn.Module):
 				r_effective=self.all_r_effective[i,:,:]
 
 				tmp1=(P_effective@yp + q_effective)
-				tmp2=torch.clamp(utils.quadExpression(yp, P_effective, q_effective, r_effective), 0)
+				tmp2=torch.relu(utils.quadExpression(yp, P_effective, q_effective, r_effective))
 
 				grad += 2*tmp1@tmp2 #The 2 is because of the squared norm
 
@@ -335,7 +335,7 @@ class ConstraintLayer(torch.nn.Module):
 			stacked=self.A1_dc3@y_new - self.b1_dc3
 			for i in range(self.all_P.shape[0]): #for each of the quadratic constraints
 				stacked=torch.cat((stacked,utils.quadExpression(y_new, self.all_P[i,:,:], self.all_q[i,:,:], self.all_r[i,:,:])), dim=1)
-			violation=torch.max(torch.clamp(stacked, 0))
+			violation=torch.max(torch.relu(stacked))
 			################################################
 			################################################
 
