@@ -55,7 +55,19 @@ for method in methods:
 			ax = fig.add_subplot(rows,cols,i+1) 
 
 		num_steps=4; #Only used in the ellipsoid_walker method
-		my_layer=ConstraintLayer(constraint, method=method, create_map=False)
+
+		if(method=='dc3'):
+			args_dc3={}
+			args_dc3['lr'] = 3e-4
+			args_dc3['eps_converge'] = 1e-4
+			args_dc3['momentum'] = 0.5
+			args_dc3['max_steps_training'] = 10
+			args_dc3['max_steps_testing'] = float("inf")
+		else:
+			args_dc3 = None
+
+
+		my_layer=ConstraintLayer(constraint, method=method, create_map=False, args_dc3=args_dc3)
 
 		numel_output_mapper=my_layer.getDimAfterMap()
 

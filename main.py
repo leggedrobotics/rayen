@@ -259,6 +259,16 @@ def main(params):
 	sdag=SplittedDatasetAndGenerator(my_dataset, percent_train=0.8, percent_val=0.1, batch_size=params['batch_size'])
 	sdag_out_dist=SplittedDatasetAndGenerator(my_dataset_out_dist, percent_train=0.0, percent_val=0.0, batch_size=params['batch_size'])
 
+	if(params['method']=='dc3'):
+		args_dc3={}
+		args_dc3['lr'] = 3e-4
+		args_dc3['eps_converge'] = 1e-4
+		args_dc3['momentum'] = 0.5
+		args_dc3['max_steps_training'] = 10
+		args_dc3['max_steps_testing'] = float("inf")
+	else:
+		args_dc3 = None
+
 	######################### TRAINING
 	#Slide 4 of https://fleuret.org/dlc/materials/dlc-handout-4-6-writing-a-module.pdf
 	model = nn.Sequential(nn.Flatten(),
@@ -270,8 +280,8 @@ def main(params):
 						  # nn.Dropout(p=0.2), 
 						  # nn.Dropout(p=0.2),
 						  nn.Linear(64, 64),
-						  ConstraintLayer(cs, input_dim=64, method=params['method'], create_map=True) 
-						             ) 
+						  ConstraintLayer(cs, input_dim=64, method=params['method'], create_map=True, args_dc3=args_dc3) 
+									 ) 
 
 	#####################################
 	# def init_weights(m):
@@ -333,9 +343,9 @@ if __name__ == '__main__':
 	# torch.manual_seed(0)
 
 	parser = argparse.ArgumentParser()
-	parser.add_argument('--method', type=str, default='walker_1') #walker_2, walker_1  or barycentric, unconstrained, proj_train_test, proj_test
+	parser.add_argument('--method', type=str, default='dc3') #walker_2, walker_1  or barycentric, unconstrained, proj_train_test, proj_test
 	parser.add_argument('--use_supervised', type=bool, default=False)
-	parser.add_argument('--weight_soft_cost', type=float, default=0.0)
+	parser.add_argument('--weight_soft_cost', type=float, default=10.0)
 	parser.add_argument('--result_dir', type=str, default='results')
 	parser.add_argument('--device', type=int, default=0)
 	parser.add_argument('--num_epochs', type=int, default=3000)
@@ -345,12 +355,18 @@ if __name__ == '__main__':
 	args = parser.parse_args()
 	params = vars(args)
 
-	has_unconstrained_training=(params['method']=='proj_test') or (params['method']=='unconstrained')
-
-	if(has_unconstrained_training and params['use_supervised']==False):
-		assert params['weight_soft_cost']>0
-
 	shouldnt_have_soft_cost=(params['method']=='walker_2' or params['method']=='walker_1' or params['method']=='barycentric')
+	
+
+	should_have_soft_cost=(
+							#Note that dc3 should have soft cost when training, see third paragraph of Section 3.2 of the DC3 paper
+							(params['method']=='dc3') or
+							(params['method']=='proj_test' and params['use_supervised']==False) or
+							(params['method']=='unconstrained' and params['use_supervised']==False)
+							)
+
+	if(should_have_soft_cost):
+		assert params['weight_soft_cost']>0
 
 	if(shouldnt_have_soft_cost):
 		assert params['weight_soft_cost']==0

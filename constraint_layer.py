@@ -96,7 +96,7 @@ class CostComputer(nn.Module): #Using nn.Module to be able to use register_buffe
 
 
 class ConstraintLayer(torch.nn.Module):
-	def __init__(self, cs, input_dim=None, method='walker_2', create_map=True):
+	def __init__(self, cs, input_dim=None, method='walker_2', create_map=True, args_dc3=None):
 		super().__init__()
 
 		assert cp.__version__=='1.2.3' #See this issue: https://github.com/cvxgrp/cvxpylayers/issues/143
@@ -105,6 +105,10 @@ class ConstraintLayer(torch.nn.Module):
 
 		if(self.method=='barycentric' and cs.has_quadratic_constraints):
 			raise Exception(f"Method {self.method} cannot be used with quadratic constraints")
+
+		if(self.method=='dc3'):
+			assert args_dc3 is not None
+			self.args_dc3=args_dc3
 
 		self.k=cs.k #Dimension of the ambient space
 		self.n=cs.n #Dimension of the embedded space
@@ -286,18 +290,15 @@ class ConstraintLayer(torch.nn.Module):
 		y[:, self.other_vars, :] = self.obtainyoFromypDC3(q)
 
 		#### Grad steps all
-		lr = 3e-4
-		eps_converge = 1e-4
-		momentum = 0.5
 
 		y_new = y
 		step_index = 0
 		old_y_step = 0
 
 		if(self.training):
-			max_steps=5000 #This is called corrTrainSteps in DC3 original code
+			max_steps=self.args_dc3['max_steps_training'] #This is called corrTrainSteps in DC3 original code
 		else:
-			max_steps=float("inf") #This is called corrTestMaxSteps in DC3 original code
+			max_steps=self.args_dc3['max_steps_testing'] #float("inf") #This is called corrTestMaxSteps in DC3 original code
 
 		while True:
 
@@ -325,7 +326,7 @@ class ConstraintLayer(torch.nn.Module):
 			################################################
 			################################################
 			
-			new_y_step = lr * y_step + momentum * old_y_step
+			new_y_step = self.args_dc3['lr'] * y_step + self.args_dc3['momentum'] * old_y_step
 			y_new = y_new - new_y_step
 			old_y_step = new_y_step
 			step_index += 1
@@ -339,9 +340,9 @@ class ConstraintLayer(torch.nn.Module):
 			################################################
 			################################################
 
-			print(f"step_index={step_index}, Violation={violation}")
+			# print(f"step_index={step_index}, Violation={violation}")
 
-			converged_ineq = (violation < eps_converge)
+			converged_ineq = (violation < self.args_dc3['eps_converge'])
 			max_iter_reached = (step_index >= max_steps)
 
 			if(max_iter_reached):
