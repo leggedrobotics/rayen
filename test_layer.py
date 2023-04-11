@@ -18,7 +18,7 @@ import scipy
 
 methods=['walker_2', 'walker_1', 'barycentric', 'unconstrained', 'proj_train_test', 'proj_test', 'dc3']
 methods=['walker_2', 'walker_1', 'barycentric', 'unconstrained', 'dc3']
-# methods=['walker_2','dc3']
+methods=['dc3']
 
 index_examples_to_run=list(range(9))
 # index_examples_to_run=[1]
