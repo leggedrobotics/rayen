@@ -6,6 +6,7 @@ import scipy
 import cvxpy as cp
 import math
 from cvxpylayers.torch import CvxpyLayer
+import random
 
 # class OptimizationLayer(torch.nn.Module):
 # 	def __init__(self, cs):
@@ -149,73 +150,100 @@ class ConstraintLayer(torch.nn.Module):
 
 		if(self.method=='dc3'):
 
-			A_E_b_E=np.concatenate((cs.A_E, cs.b_E), axis=1)
+			A2_dc3, b2_dc3=utils.removeRedundantEquationsFromEqualitySystem(cs.A_E, cs.b_E) 
 
-			##################################################
-			####### Remove the rows that are linearly dependent
+			self.register_buffer("A2_dc3", torch.tensor(A2_dc3))
+			self.register_buffer("b2_dc3", torch.tensor(b2_dc3))
+			self.register_buffer("A1_dc3", torch.tensor(cs.A_I))
+			self.register_buffer("b1_dc3", torch.tensor(cs.b_I))
 
-			##First detect the rows that are zero
-			rows_that_are_zero=[]
-			for i in range(A_E_b_E.shape[0]):
-				if(utils.isZero(A_E_b_E[i,:])):
-					rows_that_are_zero.append(i)
-
-			rows_to_remove=[]
-			for i in range(A_E_b_E.shape[0]):
-
-				row_i=A_E_b_E[i,:];
-
-				if(utils.isZero(row_i)):
-					rows_to_remove.append(i)
-					continue
-
-				for j in range(i+1, A_E_b_E.shape[0]):
-
-					row_j=A_E_b_E[j,:];
-
-					if(utils.isZero(row_j)):
-						continue
-
-					tmp=(row_i/row_j)
-					if(tmp.ptp() == 0.0): #All the elements of tmp are the same --> linearly dependent
-						rows_to_remove.append(i)
-
-			##################################################
-			##################################################
-
-			A2_dc3 = np.delete(cs.A_E, rows_to_remove, axis=0)
-			b2_dc3 = np.delete(cs.b_E, rows_to_remove, axis=0)
-
-			print(f"cs.A_E={cs.A_E}")
-			print(f"cs.b_E={cs.b_E}")
-
-			print(f"A2_dc3={A2_dc3}")
-			print(f"b2_dc3={b2_dc3}")
-
-			self.register_buffer("A2", torch.tensor(A2_dc3))
-			self.register_buffer("b2", torch.tensor(b2_dc3))
-			self.register_buffer("A1", torch.tensor(cs.A_I))
-			self.register_buffer("b1", torch.tensor(cs.b_I))
+			#Constraints are now 
+			# A2_dc3 y = b2_dc3
+			# A1_dc3 y <= b1_dc3
 
 			det = 0
 			i = 0
-			self._neq = self.A2.shape[0]
-			self._nineq = self.A1.shape[0]
+			self._neq = self.A2_dc3.shape[0]
+			self._nineq = self.A1_dc3.shape[0]
 			while abs(det) < 0.0001 and i < 100:
-				# print(f"A2 is {self.A2}")
-				# print(f"b2 is {self.b2}")
 				self.partial_vars = np.random.choice(self.k, self.k - self._neq, replace=False)
 				self.other_vars = np.setdiff1d( np.arange(self.k), self.partial_vars)
-				novale=self.A2[:, self.other_vars];
-				det = torch.det(self.A2[:, self.other_vars])
+				det = torch.det(self.A2_dc3[:, self.other_vars])
 				i += 1
 			if i == 100:
 				raise Exception
 			else:
-				self.A2_partial = self.A2[:, self.partial_vars]
-				self.A2_other_inv = torch.inverse(self.A2[:, self.other_vars])			
-			print(f"A2_partial is {self.A2_partial}")
-			print(f"A2_other_inv is {self.A2_other_inv}")
+				A2p = self.A2_dc3[:, self.partial_vars]
+				A2oi = torch.inverse(self.A2_dc3[:, self.other_vars])			
+
+
+			####################################################
+			####################################################
+
+			A1p=self.A1_dc3[:, self.partial_vars];
+			A1o=self.A1_dc3[:, self.other_vars];
+
+			A1_effective = A1p - A1o @ (A2oi @ A2p)
+			b1_effective = self.b1_dc3 - A1o @ A2oi @ self.b2_dc3;
+
+			all_P_effective=torch.Tensor(self.all_P.shape[0], len(self.partial_vars), len(self.partial_vars) )
+			all_q_effective=torch.Tensor(self.all_q.shape[0], len(self.partial_vars), 1 )
+			all_r_effective=torch.Tensor(self.all_q.shape[0], 1, 1 )
+
+			self.register_buffer("A2oi", A2oi)
+			self.register_buffer("A2p", A2p)
+			self.register_buffer("A1_effective", A1_effective)
+			self.register_buffer("b1_effective", b1_effective)
+
+			####################
+			for i in range(self.all_P.shape[0]): #for each of the quadratic constraints
+				P=self.all_P[i,:,:]
+				q=self.all_q[i,:,:]
+				r=self.all_r[i,:,:]
+
+				Po=P[np.ix_(self.other_vars,self.other_vars)].view(len(self.other_vars),len(self.other_vars))
+				Pp=P[np.ix_(self.partial_vars,self.partial_vars)].view(len(self.partial_vars),len(self.partial_vars))
+				Pop=P[np.ix_(self.other_vars,self.partial_vars)].view(len(self.other_vars),len(self.partial_vars))
+
+				qo=q[self.other_vars,0:1]
+				qp=q[self.partial_vars,0:1]
+
+				b2=self.b2_dc3
+
+				P_effective=2*(-A2p.T@A2oi.T@Pop + 0.5*A2p.T@A2oi.T@Po@A2oi@A2p + 0.5*Pp)
+				q_effective=(b2.T@A2oi.T@Pop + qp.T - qo.T@A2oi@A2p - b2.T@A2oi.T@Po@A2oi@A2p).T
+				r_effective=qo.T@A2oi@b2 + 0.5*b2.T@A2oi.T@Po@A2oi@b2 + r
+
+				###### QUICK CHECK
+				tmp=random.randint(1, 100) #number of elements in the batch
+				yp=torch.rand(tmp, len(self.partial_vars), 1) 
+
+				y = torch.zeros((tmp, self.k, 1))
+				y[:, self.partial_vars, :] = yp
+				y[:, self.other_vars, :] = self.obtainyoFromypDC3(yp)
+
+				using_effective=utils.quadExpression(yp, P_effective, q_effective, r_effective)
+				using_original=utils.quadExpression(y, P, q, r)
+
+				# print(f"using_effective[0,0,0]={using_effective[0,0,0]}")
+				# print(f"using_original[0,0,0]={using_original[0,0,0]}")
+				# exit()
+
+				assert torch.allclose(using_effective, using_original) 
+
+				###################
+
+				all_P_effective[i,:,:]=P_effective
+				all_q_effective[i,:,:]=q_effective
+				all_r_effective[i,:,:]=r_effective
+
+			self.register_buffer("all_P_effective", all_P_effective)
+			self.register_buffer("all_q_effective", all_q_effective)
+			self.register_buffer("all_r_effective", all_r_effective)
+
+			####################################################
+			####################################################
+
 
 		if(self.method=='walker_2'):
 			self.forwardForMethod=self.forwardForWalker2
@@ -247,99 +275,84 @@ class ConstraintLayer(torch.nn.Module):
 		else:
 			self.mapper=nn.Sequential(); #Mapper does nothing
 
-	# Solves for the full set of variables
-	# def complete_partial(self, Z):
-	#     Y = torch.zeros(X.shape[0], self.ydim, device=self.device)
-	#     Y[:, self.partial_vars] = Z
-	#     Y[:, self.other_vars] = (self.b_E - Z @ self.A_E_partial.T) @ self.A_E_other_inv.T
-	#     return Y
+	def obtainyoFromypDC3(self, yp):
+		return self.A2oi @ (self.b2_dc3 - self.A2p @ yp)
 
-	def eq_resid(self, y):
-		return self.b2 - self.A2@y
-
-	def ineq_resid(self, y):
-		return self.A1@y - self.b1
-
-	def ineq_dist(self, y):
-		resids = self.ineq_resid(y)
-		return torch.clamp(resids, 0)
-
-	def eq_grad(self, y):
-		return 2*(self.A2@y - self.b2) @ self.A2
-
-	def ineq_grad(self, y):
-		ineq_dist = self.ineq_dist(y)
-		return 2*ineq_dist@self.A1
-
-	def ineq_partial_grad(self, y):
-
-		A1p=self.A1[:, self.partial_vars];
-		A1o=self.A1[:, self.other_vars];
-		A2p=self.A2_partial;
-		A2oi=self.A2_other_inv;
-
-		A1_effective = A1p - A1o @ (A2oi @ A2p)
-		b1_effective = self.b1 - A1o @ A2oi @ self.b2;
-
-		#constraint is    A1_effective yp - b1_effective <= 0
-		#function is w(z)=||relu(A1_effective yp - b1_effective)||^2
-
-		grad = 2 * A1_effective.T @ torch.clamp(A1_effective@y[:, self.partial_vars,:] - b1_effective, 0)
-		y = torch.zeros_like(y)
-		y[:, self.partial_vars, :] = grad
-		y[:, self.other_vars, :] = - A2oi @ A2p @ grad
-		return y
 
 	def forwardForDc3(self, q):
 		
 		#### Complete partial
 		y = torch.zeros((q.shape[0], self.k, 1), device=q.device)
 		y[:, self.partial_vars, :] = q
-		y[:, self.other_vars, :] = self.A2_other_inv @ (self.b2 - self.A2_partial @ q)
+		y[:, self.other_vars, :] = self.obtainyoFromypDC3(q)
 
 		#### Grad steps all
-		lr = 1e-2
+		lr = 3e-4
 		eps_converge = 1e-4
-		max_steps = 1000
 		momentum = 0.5
 
 		y_new = y
-		i = 0
+		step_index = 0
 		old_y_step = 0
-		old_ineq_step = 0
-		old_eq_step = 0
 
 		if(self.training):
-			num_steps=10
+			max_steps=5000 #This is called corrTrainSteps in DC3 original code
 		else:
-			num_steps=10
-
-		print(f"BEFORE: {y}")
+			max_steps=float("inf") #This is called corrTestMaxSteps in DC3 original code
 
 		while True:
 
-			y_step = self.ineq_partial_grad(y_new)
+			################################################
+			################################################ COMPUTE y_step
+
+			yp=y_new[:, self.partial_vars,:]
+			ypT=torch.transpose(yp,1,2);
+
+			grad = 2 * self.A1_effective.T @ torch.clamp(self.A1_effective@yp - self.b1_effective, 0)
+
+			for i in range(self.all_P_effective.shape[0]): #for each of the quadratic constraints
+				P_effective=self.all_P_effective[i,:,:]
+				q_effective=self.all_q_effective[i,:,:]
+				r_effective=self.all_r_effective[i,:,:]
+
+				tmp1=(P_effective@yp + q_effective)
+				tmp2=torch.clamp(utils.quadExpression(yp, P_effective, q_effective, r_effective), 0)
+
+				grad += 2*tmp1@tmp2 #The 2 is because of the squared norm
+
+			y_step = torch.zeros_like(y)
+			y_step[:, self.partial_vars, :] = grad
+			y_step[:, self.other_vars, :] = - self.A2oi @ self.A2p @ grad
+			################################################
+			################################################
 			
 			new_y_step = lr * y_step + momentum * old_y_step
-
-			print(f"new_y_step={new_y_step}")
-
 			y_new = y_new - new_y_step
-
 			old_y_step = new_y_step
-			i += 1
+			step_index += 1
 
-			# converged_eq = (torch.max(torch.abs(self.eq_resid(y_new))) < eps_converge) #It's always converged when using completion
-			converged_ineq = (torch.max(self.ineq_dist(y_new)) < eps_converge)
-			max_iter_reached= (i >= max_steps)
+			################################################
+			################################################ COMPUTE current violation
+			stacked=self.A1_dc3@y_new - self.b1_dc3
+			for i in range(self.all_P.shape[0]): #for each of the quadratic constraints
+				stacked=torch.cat((stacked,utils.quadExpression(y_new, self.all_P[i,:,:], self.all_q[i,:,:], self.all_r[i,:,:])), dim=1)
+			violation=torch.max(torch.clamp(stacked, 0))
+			################################################
+			################################################
+
+			print(f"step_index={step_index}, Violation={violation}")
+
+			converged_ineq = (violation < eps_converge)
+			max_iter_reached = (step_index >= max_steps)
 
 			if(max_iter_reached):
+				utils.printInBoldRed("Max iter reached")
 				break
 
-			if(self.training==False and converged_ineq):
-				break
+			if(converged_ineq):
+				utils.printInBoldRed("Converged ineq reached")
 
-		print(f"AFTER: {y_new}")
+				break
 
 
 		return y_new

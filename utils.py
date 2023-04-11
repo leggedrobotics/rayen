@@ -107,6 +107,7 @@ def largestBallInPolytope(A,b, max_radius=None):
 
 	return B.value, x0.value
 
+
 def isZero(A):
 	return (not np.any(A))
 
@@ -129,6 +130,44 @@ def checkMatrixisPd(A):
 
 def isMatrixSingular(A):
 	return (np.linalg.matrix_rank(A) < self.E.shape[0])
+
+#This functions returns the rows that are linearly dependent
+#A row that is zero is also classifed as linearly dependent
+def getIndexesLinearlyDependentRows(C):
+	assert C.ndim==2
+
+	ld_rows=[]
+	for i in range(C.shape[0]):
+
+		row_i=C[i,:];
+
+		if(isZero(row_i)):
+			ld_rows.append(i)
+			continue
+
+		for j in range(i+1, C.shape[0]):
+
+			row_j=C[j,:];
+
+			if(isZero(row_j)):
+				continue
+
+			tmp=(row_i/row_j)
+			if(tmp.ptp() == 0.0): #All the elements of tmp are the same --> linearly dependent
+				ld_rows.append(i)
+
+	return ld_rows
+
+#Removes redundant equations from Ax=b
+def removeRedundantEquationsFromEqualitySystem(A, b):
+	A_b=np.concatenate((A, b), axis=1)
+
+	ld_rows=getIndexesLinearlyDependentRows(A_b)
+
+	A_result = np.delete(A, ld_rows, axis=0)
+	b_result = np.delete(b, ld_rows, axis=0)
+
+	return A_result, b_result
 
 #Everything in numpy
 #Ellipsoid is defined as {x | (x-c)'E(x-c)<=1}
