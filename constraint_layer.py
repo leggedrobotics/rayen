@@ -163,10 +163,9 @@ class ConstraintLayer(torch.nn.Module):
 
 			det = 0
 			i = 0
-			self._neq = self.A2_dc3.shape[0]
-			self._nineq = self.A1_dc3.shape[0]
+			self.neq_dc3 = self.A2_dc3.shape[0]
 			while abs(det) < 0.0001 and i < 100:
-				self.partial_vars = np.random.choice(self.k, self.k - self._neq, replace=False)
+				self.partial_vars = np.random.choice(self.k, self.k - self.neq_dc3, replace=False)
 				self.other_vars = np.setdiff1d( np.arange(self.k), self.partial_vars)
 				det = torch.det(self.A2_dc3[:, self.other_vars])
 				i += 1
@@ -265,7 +264,7 @@ class ConstraintLayer(torch.nn.Module):
 			self.dim_after_map=(self.n)
 		elif(self.method=='dc3'):
 			self.forwardForMethod=self.forwardForDc3
-			self.dim_after_map=(self.k - self._neq)
+			self.dim_after_map=(self.k - self.neq_dc3)
 		else:
 			raise NotImplementedError
 
