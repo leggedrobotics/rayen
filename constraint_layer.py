@@ -168,16 +168,26 @@ class ConstraintLayer(torch.nn.Module):
 			det = 0
 			i = 0
 			self.neq_dc3 = self.A2_dc3.shape[0]
-			while abs(det) < 0.0001 and i < 100:
+
+			#######################################################
+			#Note: This section follows the original implementation of DC3: https://github.com/locuslab/DC3/blob/35437af7f22390e4ed032d9eef90cc525764d26f/utils.py#L67
+			#There are probably more efficient ways to do this though (probably using the QR decomposition)
+			print("DC3: Obtaining partial_vars and other_vars")
+			while True:
 				self.partial_vars = np.random.choice(self.k, self.k - self.neq_dc3, replace=False)
 				self.other_vars = np.setdiff1d( np.arange(self.k), self.partial_vars)
 				det = torch.det(self.A2_dc3[:, self.other_vars])
+				if(abs(det) > 0.0001):
+					break
 				i += 1
-			if i == 100:
-				raise Exception
-			else:
-				A2p = self.A2_dc3[:, self.partial_vars]
-				A2oi = torch.inverse(self.A2_dc3[:, self.other_vars])			
+				if i > 1e8:
+					raise Exception
+			print("Done")
+			#######################################################
+
+
+			A2p = self.A2_dc3[:, self.partial_vars]
+			A2oi = torch.inverse(self.A2_dc3[:, self.other_vars])			
 
 
 			####################################################

@@ -131,41 +131,35 @@ def checkMatrixisPd(A):
 def isMatrixSingular(A):
 	return (np.linalg.matrix_rank(A) < self.E.shape[0])
 
-#This functions returns the rows that are linearly dependent
-#A row that is zero is also classifed as linearly dependent
-def getIndexesLinearlyDependentRows(C):
-	assert C.ndim==2
-
-	ld_rows=[]
-	for i in range(C.shape[0]):
-
-		row_i=C[i,:];
-
-		if(isZero(row_i)):
-			ld_rows.append(i)
-			continue
-
-		for j in range(i+1, C.shape[0]):
-
-			row_j=C[j,:];
-
-			if(isZero(row_j)):
-				continue
-
-			tmp=(row_i/row_j)
-			if(tmp.ptp() == 0.0): #All the elements of tmp are the same --> linearly dependent
-				ld_rows.append(i)
-
-	return ld_rows
-
-#Removes redundant equations from Ax=b
+# Removes redundant equations from Ax=b
+# Note that 
+#Ax=b                     is equivalent to
+#[A b][x;-1]=0            Performing now the QR decomposition we have:
+#QR[x;-1]=0               As Q^T=Q^-1, we have that:
+#R[x;-1]=0                Noting now that R=[Rnz;0], we have that:
+#[Rnz;0][x;-1]=0          Here, 0 is a matrix/vector of zeros. Getting rid of the zero part
+#[Rnz][x;-1]=0            Denoting now Rnz:=[Aresult bresult]
+# Aresult x = bresult     This is the equivalent system to Ax=b
 def removeRedundantEquationsFromEqualitySystem(A, b):
 	A_b=np.concatenate((A, b), axis=1)
 
-	ld_rows=getIndexesLinearlyDependentRows(A_b)
+	# (_, rref1) = scipy.linalg.qr(A_b) 
+	# rref2=sympy.Matrix(A_b).rref();
 
-	A_result = np.delete(A, ld_rows, axis=0)
-	b_result = np.delete(b, ld_rows, axis=0)
+	#See section titled "Alternatively" of https://stackoverflow.com/a/39621887
+	#See also http://www.ryanhmckenna.com/2021/03/removing-redundant-constraints-from.html
+	(_, R) = np.linalg.qr(A_b) 
+
+	rows_that_are_zero=[]
+	for i in range(R.shape[0]):
+		if(np.linalg.norm(R[i,:])<1e-7):
+			rows_that_are_zero.append(i)
+
+
+	Rnz = np.delete(R, rows_that_are_zero, axis=0)
+
+	A_result=Rnz[:,:-1].reshape((-1, A.shape[1]))
+	b_result=Rnz[:,-1].reshape((-1, 1))
 
 	return A_result, b_result
 
