@@ -23,21 +23,7 @@ python -m pip install gurobipy
 
 --> TODO: method "unconstrained" does not need Ap, bp,... (save all that offline computation?)
 
---> Constrained optimization on matrices: https://github.com/lezcano/geotorch
-
---> https://arxiv.org/pdf/1909.07374.pdf
-
---> https://arxiv.org/pdf/1706.02025.pdf
-
---> https://arxiv.org/pdf/2211.01340.pdf
-
---> https://arxiv.org/pdf/2002.01600v1.pdf (creo que solo vale para equality constraints)
-
---> hopfield linear constraints
-
 --> Use the kernel trick to extend it to nonlinearities?
-
---> Check the case when the only constraint is just a plane
 
 --> Examples:
 
