@@ -18,10 +18,9 @@ import scipy
 
 methods=['walker_2', 'walker_1', 'barycentric', 'unconstrained', 'proj_train_test', 'proj_test', 'dc3']
 methods=['walker_2', 'walker_1', 'barycentric', 'unconstrained', 'dc3']
-methods=['walker_2', 'walker_1']
 
-index_examples_to_run=list(range(9))
-# index_examples_to_run=[1]
+index_examples_to_run=list(range(12))
+# index_examples_to_run=[11]
 num_of_examples=len(index_examples_to_run)
 ###############
 rows=math.ceil(math.sqrt(num_of_examples))
@@ -40,8 +39,10 @@ for method in methods:
 
 		constraint=getExample(index_example)
 
-		if(method=='barycentric' and constraint.has_quadratic_constraints):
-			#b
+		if(method=='barycentric' and (constraint.has_quadratic_constraints or constraint.has_soc_constraints)):
+			continue
+
+		if(method=='dc3' and constraint.has_soc_constraints):
 			continue
 
 		# fig = plt.figure()
@@ -58,11 +59,11 @@ for method in methods:
 
 		if(method=='dc3'):
 			args_dc3={}
-			args_dc3['lr'] = 3e-4
+			args_dc3['lr'] = 1e-4
 			args_dc3['eps_converge'] = 1e-4
 			args_dc3['momentum'] = 0.5
 			args_dc3['max_steps_training'] = 10
-			args_dc3['max_steps_testing'] = float("inf")
+			args_dc3['max_steps_testing'] = 50000 #float("inf")
 		else:
 			args_dc3 = None
 
@@ -71,7 +72,7 @@ for method in methods:
 
 		numel_output_mapper=my_layer.getDimAfterMap()
 
-		x_batched=torch.Tensor(1000, numel_output_mapper, 1).uniform_(-5, 5)
+		x_batched=torch.Tensor(1000, numel_output_mapper, 1).uniform_(-8, 8)
 		# x_batched.requires_grad=True
 		# print(x_batched.requires_grad)
 		# exit()

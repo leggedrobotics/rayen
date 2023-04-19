@@ -201,6 +201,15 @@ def quadExpression(y, P, q, r):
 	assert result.shape==(y.shape[0],1,1)
 	return result
 
+#https://stackoverflow.com/a/3844832
+def all_equal(iterator):
+    iterator = iter(iterator)
+    try:
+        first = next(iterator)
+    except StopIteration:
+        return True
+    return all(first == x for x in iterator)
+
 ################### CONSTRAINTS
 class convexQuadraticConstraint():
 	# Constraint is (1/2)x'Px + q'x +r <=0
@@ -210,6 +219,10 @@ class convexQuadraticConstraint():
 		self.r=r;
 
 		checkMatrixisPsd(self.P);
+		checkMatrixisNotZero(self.P);
+
+	def dim(self):
+		return self.P.shape[1]
 
 class LinearConstraint():
 	#Constraint is A1<=b1, A2=b2
@@ -219,22 +232,40 @@ class LinearConstraint():
 		self.A2 = A2
 		self.b2 = b2
 
-	def dimAmbSpace(self):
-		return self.k
+		assert (A1 is not None and b1 is not None) or (A2 is not None and b2 is not None)
+
+	def dim(self):
+		if (self.A1 is not None and self.b1 is not None):
+			return self.A1.shape[1]
+		else:
+			return self.A2.shape[1]
 
 class SOCConstraint():
 	#Constraint is ||My+s||<=c'y+d
 	def __init__(self, M, s, c, d):
+		checkMatrixisNotZero(M);
+		checkMatrixisNotZero(c);
+
+		assert M.shape[1]==c.shape[0]
+		assert M.shape[0]==s.shape[0]
+		assert s.shape[1]==1
+		assert c.shape[1]==1
+		assert d.shape[0]==1
+		assert d.shape[1]==1
+
 		self.M = M
 		self.s = s
 		self.c = c
 		self.d = d
+
+	def dim(self):
+		return self.M.shape[1]
+
 ######################################
 
 class convexConstraints():
-	def __init__(self, lc=None, qcs=[]):
+	def __init__(self, lc=None, qcs=[], socs=[]):
 
-		#
 		if(lc is not None):
 			A1=lc.A1;
 			b1=lc.b1;
@@ -259,6 +290,16 @@ class convexConstraints():
 			all_q.append(qc.q)
 			all_r.append(qc.r)
 
+		all_M=[]
+		all_s=[]
+		all_c=[]
+		all_d=[]
+		for soc in socs:
+			all_M.append(soc.M)
+			all_s.append(soc.s)
+			all_c.append(soc.c)
+			all_d.append(soc.d)
+
 
 		################################# CHECKS for the linear constraints
 
@@ -267,47 +308,46 @@ class convexConstraints():
 			assert b1.ndim == 2, f"b1.shape={b1.shape}"
 			assert b1.shape[1] ==1
 			assert A1.shape[0] == b1.shape[0]
-			self.k=A1.shape[1]
 
 		if(self.has_linear_eq_constraints):
 			assert A2.ndim == 2, f"A2.shape={A2.shape}"
 			assert b2.ndim == 2, f"b2.shape={b2.shape}"
 			assert b2.shape[1] ==1
 			assert A2.shape[0] == b2.shape[0]
-			self.k=A2.shape[1]
 
 		if(self.has_linear_eq_constraints and self.has_linear_ineq_constraints):
 			assert A1.shape[1] == A2.shape[1]
 		#################################
 
-		############################CHECKS for the quadratic constraints
-		if( (len(all_P)==0) or (len(all_q)==0) or (len(all_r)==0)):
-			assert len(all_P)==0
-			assert len(all_q)==0
-			assert len(all_r)==0
-			self.has_quadratic_constraints=False;
-		else:
-			self.has_quadratic_constraints=True;
+		self.has_quadratic_constraints=(len(qcs)>0)
+		self.has_soc_constraints=(len(socs)>0)
+
+		assert (self.has_quadratic_constraints or self.has_linear_constraints or self.has_soc_constraints), "There are no constraints!"
+
+		# if(self.has_quadratic_constraints):
+		# 	for i in range(len(all_P)):
+		# 		assert all_P[i].shape[0]==tmp
+		# 		assert all_P[i].shape[1]==tmp
+		# 		assert all_q[i].shape[0]==tmp
+		# 		assert all_q[i].shape[1]==1
 
 
-		assert (self.has_quadratic_constraints or self.has_linear_constraints), "There are no constraints!"
+		# if(self.has_soc_constraints):
+		# 	tmp=all_M[0].shape[0]
+		# 	for i in range(len(all_P)):
+		# 		assert all_
 
-		if(self.has_quadratic_constraints):
-			assert len(all_P)==len(all_q)
-			assert len(all_P)==len(all_r)
-			tmp=all_P[0].shape[0]
-			for i in range(len(all_P)):
-				assert all_P[i].shape[0]==tmp
-				assert all_P[i].shape[1]==tmp
-				assert all_q[i].shape[0]==tmp
-				assert all_q[i].shape[1]==1
-				checkMatrixisNotZero(all_P[i]);
-				checkMatrixisPsd(all_P[i]);
+		all_dim=[]
+		if(self.has_linear_constraints):
+			all_dim.append(lc.dim())
+		for qc in qcs:
+			all_dim.append(qc.dim())
+		for soc in socs:
+			all_dim.append(soc.dim())
 
-			if(self.has_linear_constraints):
-				assert self.k==tmp
-			else:
-				self.k=tmp
+		assert all_equal(all_dim)
+
+		self.k=all_dim[0]
 
 
 		#################################
@@ -321,6 +361,12 @@ class convexConstraints():
 		self.all_P=all_P;
 		self.all_q=all_q;
 		self.all_r=all_r;
+
+		self.all_M=all_M;
+		self.all_s=all_s;
+		self.all_c=all_c;
+		self.all_d=all_d;
+
 
 		###########################################
 		# Ensure that the feasible set is not empty
@@ -484,9 +530,12 @@ class convexConstraints():
 
 		constraints+=[A_p@z0 - b_p <= -epsilon*np.ones((A_p.shape[0],1))]
 
-		x0=NA_E@z0 + y1
+		y0=NA_E@z0 + y1
 		for i in range(len(self.all_P)):
-			constraints.append( 0.5*cp.quad_form(x0, self.all_P[i]) + self.all_q[i].T@x0 + self.all_r[i] <= -epsilon) 
+			constraints.append( 0.5*cp.quad_form(y0, self.all_P[i]) + self.all_q[i].T@y0 + self.all_r[i] <= -epsilon) 
+
+		for i in range(len(self.all_M)):
+			constraints.append( cp.norm(self.all_M[i]@y0 + self.all_s[i]) - self.all_c[i].T@y0 - self.all_d[i] <= -epsilon) 
 
 		constraints.append(epsilon>=0)
 		constraints.append(epsilon<=5.0) #This constraint is needed for the case where the set is unbounded.
@@ -557,10 +606,16 @@ class convexConstraints():
 		assert variable.shape[0]==self.n		 
 		return self.getQuadraticConstraintsCvxpy(self.NA_E@variable + self.y1)
 
+	def getSOCConstraintsInSubspaceCvxpy(self, variable):
+		assert variable.shape[1]==1
+		assert variable.shape[0]==self.n		 
+		return self.getSOCConstraintsCvxpy(self.NA_E@variable + self.y1)
+
 	def getConstraintsInSubspaceCvxpy(self, variable):
 		linear_constraints = self.getLinearConstraintsInSubspaceCvxpy(variable)
 		quadratic_constraints = self.getQuadraticConstraintsInSubspaceCvxpy(variable)
-		return linear_constraints + quadratic_constraints
+		soc_constraints = self.getSOCConstraintsInSubspaceCvxpy(variable)
+		return linear_constraints + quadratic_constraints + soc_constraints
 	###########################################################################
 
 	def getLinearConstraintsCvxpy(self, variable):
@@ -577,13 +632,20 @@ class convexConstraints():
 		constraints=[]
 		for i in range(len(self.all_P)):
 			constraints.append( 0.5*cp.quad_form(variable, self.all_P[i]) + self.all_q[i].T@variable + self.all_r[i] <= 0) #https://www.cvxpy.org/api_reference/cvxpy.atoms.other_atoms.html#cvxpy.atoms.quad_form.quad_form
-		return constraints 	 #will be empty if there are no constraints
+		return constraints 	 
 
+	def getSOCConstraintsCvxpy(self,variable):
+		assert variable.shape[1]==1 
+		constraints=[]
+		for i in range(len(self.all_M)):
+			constraints.append( cp.norm(self.all_M[i]@variable + self.all_s[i]) - self.all_c[i].T@variable - self.all_d[i] <= 0) 
+		return constraints
 
 	def getConstraintsCvxpy(self, variable):
 		linear_constraints = self.getLinearConstraintsCvxpy(variable)
 		quadratic_constraints = self.getQuadraticConstraintsCvxpy(variable)
-		return linear_constraints + quadratic_constraints
+		soc_constraints = self.getSOCConstraintsCvxpy(variable)
+		return linear_constraints + quadratic_constraints + soc_constraints
 
 
 	#######################################3

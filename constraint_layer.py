@@ -106,6 +106,9 @@ class ConstraintLayer(torch.nn.Module):
 		if(self.method=='barycentric' and cs.has_quadratic_constraints):
 			raise Exception(f"Method {self.method} cannot be used with quadratic constraints")
 
+		if(self.method=='dc3' and cs.has_soc_constraints):
+			raise NotImplementedError
+
 		if(self.method=='dc3'):
 			assert args_dc3 is not None
 			self.args_dc3=args_dc3
@@ -121,6 +124,10 @@ class ConstraintLayer(torch.nn.Module):
 		self.register_buffer("all_P", torch.Tensor(np.array(cs.all_P)))
 		self.register_buffer("all_q", torch.Tensor(np.array(cs.all_q)))
 		self.register_buffer("all_r", torch.Tensor(np.array(cs.all_r)))
+		self.register_buffer("all_M", torch.Tensor(np.array(cs.all_M)))
+		self.register_buffer("all_s", torch.Tensor(np.array(cs.all_s)))
+		self.register_buffer("all_c", torch.Tensor(np.array(cs.all_c)))
+		self.register_buffer("all_d", torch.Tensor(np.array(cs.all_d)))
 		self.register_buffer("A_p", torch.tensor(cs.A_p))
 		self.register_buffer("b_p", torch.tensor(cs.b_p))
 		self.register_buffer("y1", torch.tensor(cs.y1))
@@ -237,10 +244,6 @@ class ConstraintLayer(torch.nn.Module):
 
 				using_effective=utils.quadExpression(yp, P_effective, q_effective, r_effective)
 				using_original=utils.quadExpression(y, P, q, r)
-
-				# print(f"using_effective[0,0,0]={using_effective[0,0,0]}")
-				# print(f"using_original[0,0,0]={using_original[0,0,0]}")
-				# exit()
 
 				assert torch.allclose(using_effective, using_original) 
 
@@ -368,41 +371,64 @@ class ConstraintLayer(torch.nn.Module):
 		return y_new
 
 
+	def solveSecondOrderEq(self, a, b, c, is_quad_constraint):
+		discriminant = torch.square(b) - 4*(a)*(c)
+		assert torch.all(discriminant >= 0) 
+		sol1=torch.div(  -(b)  - torch.sqrt(discriminant) , 2*a)  #note that for quad constraints the positive solution has the minus: (... - sqrt(...))/(...)
+		if(is_quad_constraint):
+			return sol1
+		else:
+			sol2=torch.div(  -(b)  +  torch.sqrt(discriminant) , 2*a) 
+			return torch.relu(torch.maximum(sol1, sol2))
+
 
 	def computeKappa(self,v_bar):
 
 		kappa=torch.relu( torch.max(self.D@v_bar, dim=1, keepdim=True).values  )
 
-		if(len(self.all_P)>0):
+		if(len(self.all_P)>0 or len(self.all_M)>0):
+			rho = self.NA_E@v_bar
+			w = self.NA_E@self.z0 + self.y1 #Do this in the constructor of this class. This is actually y0
+			rhoT=torch.transpose(rho,dim0=1, dim1=2)
 			nsib=v_bar.shape[0]; #number of samples in the batch
 			all_kappas_positives=torch.empty((nsib,0,1), device=v_bar.device)
+
+
 			for i in range(self.all_P.shape[0]): #for each of the quadratic constraints
 				P=self.all_P[i,:,:]
 				q=self.all_q[i,:,:]
 				r=self.all_r[i,:,:]
-
-				rho = self.NA_E@v_bar
-				w = self.NA_E@self.z0 + self.y1 #Do this in the constructor of this class. This is actually y0
-
-				rhoT=torch.transpose(rho,dim0=1, dim1=2)
+				
 
 				c_prime=0.5*rhoT@P@rho;
 				b_prime=(w.T@P@rho + q.T@rho);
 				a_prime=(0.5*w.T@P@w + q.T@w +r)
 
-				#  aprime kappa^2 + bprime kappa + cprime = 0
-
-				discriminant = torch.square(b_prime) - 4*(a_prime)*(c_prime)
-
-				assert torch.all(discriminant >= 0) 
-				kappa_positive_i=torch.div(  -(b_prime)  - torch.sqrt(discriminant) , 2*a_prime) #note that we the positive solution has the minus: (... - sqrt(...))/(...)
-
+				kappa_positive_i=self.solveSecondOrderEq(a_prime, b_prime, c_prime, True) 
 				assert torch.all(kappa_positive_i >= 0) #If not, then either the feasible set is infeasible (note that z0 is inside the feasible set)
-				
 				all_kappas_positives = torch.cat((all_kappas_positives, kappa_positive_i), dim=1)
 
-			kappa_quadratic=(torch.max(all_kappas_positives, dim=1, keepdim=True).values)
-			kappa = torch.maximum(kappa, kappa_quadratic)
+			for i in range(self.all_M.shape[0]): #for each of the SOC constraints
+				M=self.all_M[i,:,:]
+				s=self.all_s[i,:,:]
+				c=self.all_c[i,:,:]
+				d=self.all_d[i,:,:]
+
+				beta=M@w+s
+				tau=c.T@w+d
+
+				c_prime=rhoT@M.T@M@rho - torch.square(c.T@rho)
+				b_prime=2*rhoT@M.T@beta - 2*(c.T@rho)@tau
+				a_prime=beta.T@beta - torch.square(tau)
+
+				kappa_positive_i=self.solveSecondOrderEq(a_prime, b_prime, c_prime, False)
+
+				assert torch.all(kappa_positive_i >= 0) #If not, then either the feasible set is infeasible (note that z0 is inside the feasible set)
+				all_kappas_positives = torch.cat((all_kappas_positives, kappa_positive_i), dim=1)
+
+
+			kappa_nonlinear_constraints=(torch.max(all_kappas_positives, dim=1, keepdim=True).values)
+			kappa = torch.maximum(kappa, kappa_nonlinear_constraints)
 
 
 		assert torch.all(kappa >= 0)
@@ -479,6 +505,6 @@ class ConstraintLayer(torch.nn.Module):
 
 		y=self.forwardForMethod(q)
 
-		assert (torch.isnan(y).any())==False
+		assert (torch.isnan(y).any())==False, "If you are using DC3, try reducing args_dc3[lr]"
 
 		return y

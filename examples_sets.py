@@ -40,8 +40,15 @@ def getParaboloid3DConstraint():
 
 	return utils.convexQuadraticConstraint(P,q,r)
 
-# def convertEachItemToList():
+def getSOC3DConstraint():
+	M=np.array([[1.0, 0.0, 0.0],
+				[0.0, 1.0, 0.0],
+				[0.0, 0.0, 0.0]])
+	s=np.array([[0.0],[0.0],[0.0]])
+	c=np.array([[0.0],[0.0],[1.0]])
+	d=np.array([[0.0]])
 
+	return utils.SOCConstraint(M, s, c, d)
 
 def getNoneLinearConstraints():
 	return None, None, None, None
@@ -55,6 +62,7 @@ def getExample(example):
 	# all_P, all_q, all_r = getNoneQuadraticConstraints()
 	lc=None
 	qcs=[]
+	socs=[]
 
 	if example==0: #A 2D polygon embeded in 3D
 		A1, b1=getCube()
@@ -127,8 +135,11 @@ def getExample(example):
 		qcs.append(getParaboloid3DConstraint())
 		qcs.append(getSphereConstraint(2.0,np.zeros((3,1))))	
 
+	elif example==11: #A second-order cone 
+		socs.append(getSOC3DConstraint())
+
 	else:
 		raise Exception("Not implemented yet")
 
 
-	return utils.convexConstraints(lc=lc, qcs=qcs)
+	return utils.convexConstraints(lc=lc, qcs=qcs, socs=socs)
