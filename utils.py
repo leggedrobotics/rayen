@@ -201,19 +201,66 @@ def quadExpression(y, P, q, r):
 	assert result.shape==(y.shape[0],1,1)
 	return result
 
-class linearAndConvexQuadraticConstraints():
-	#Constraints are
-	# A1<=b
-	# A2=b2
-	# (1/2)x'P_ix + q_i'x +r_i <=0 for i=0,1,2,...
-	def __init__(self, A1, b1, A2, b2, all_P, all_q, all_r):
+################### CONSTRAINTS
+class convexQuadraticConstraint():
+	# Constraint is (1/2)x'Px + q'x +r <=0
+	def __init__(self, P, q, r):
+		self.P=P;
+		self.q=q;
+		self.r=r;
+
+		checkMatrixisPsd(self.P);
+
+class LinearConstraint():
+	#Constraint is A1<=b1, A2=b2
+	def __init__(self, A1, b1, A2, b2):
+		self.A1 = A1
+		self.b1 = b1
+		self.A2 = A2
+		self.b2 = b2
+
+	def dimAmbSpace(self):
+		return self.k
+
+class SOCConstraint():
+	#Constraint is ||My+s||<=c'y+d
+	def __init__(self, M, s, c, d):
+		self.M = M
+		self.s = s
+		self.c = c
+		self.d = d
+######################################
+
+class convexConstraints():
+	def __init__(self, lc=None, qcs=[]):
+
+		#
+		if(lc is not None):
+			A1=lc.A1;
+			b1=lc.b1;
+			A2=lc.A2;
+			b2=lc.b2;
+		else:
+			A1=None;
+			b1=None;
+			A2=None;
+			b2=None;
+
+		self.has_linear_eq_constraints=((A2 is not None) and (b2 is not None));
+		self.has_linear_ineq_constraints=((A1 is not None) and (b1 is not None));
+		self.has_linear_constraints=self.has_linear_eq_constraints or self.has_linear_ineq_constraints;
+
+
+		all_P=[]
+		all_q=[]
+		all_r=[]
+		for qc in qcs:
+			all_P.append(qc.P)
+			all_q.append(qc.q)
+			all_r.append(qc.r)
 
 
 		################################# CHECKS for the linear constraints
-		self.has_linear_eq_constraints=((A2 is not None) and (b2 is not None));
-		self.has_linear_ineq_constraints=((A1 is not None) and (b1 is not None));
-
-		self.has_linear_constraints=self.has_linear_eq_constraints or self.has_linear_ineq_constraints;
 
 		if(self.has_linear_ineq_constraints):
 			assert A1.ndim == 2, f"A1.shape={A1.shape}"
@@ -285,7 +332,6 @@ class linearAndConvexQuadraticConstraints():
 		if(prob.status != 'optimal'):
 			raise Exception("The feasible set is empty")
 		############################################
-
 
 		if(self.has_linear_constraints):
 

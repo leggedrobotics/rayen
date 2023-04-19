@@ -20,25 +20,25 @@ def getCube():
 
 #Ellipsoid is defined as {x | (x-c)'E(x-c)<=1}
 #Where E is a positive semidefinite matrix
-def getEllipsoid(E, c):
+def getEllipsoidConstraint(E, c):
 	#Convert to (1/2)x'P_ix + q_i'x +r_i <=0
 	P=2*E;
 	q=(-2*E@c)
 	r=c.T@E@c-1
-	return P, q, r
+	return utils.convexQuadraticConstraint(P, q, r)
 
 #Sphere of radius r centered around c
-def getSphere(r, c):
-	return getEllipsoid((1/(r*r))*np.eye(c.shape[0]),c)
+def getSphereConstraint(r, c):
+	return getEllipsoidConstraint((1/(r*r))*np.eye(c.shape[0]),c)
 
-def getParaboloid3D():
+def getParaboloid3DConstraint():
 	P=np.array([[1.0, 0.0, 0.0],
 				[0.0, 1.0, 0.0],
 				[0.0, 0.0, 0.0]])
 	q=np.array([[0.0],[0.0],[-1.0]])
 	r=np.array([[0.0]])
 
-	return P,q,r
+	return utils.convexQuadraticConstraint(P,q,r)
 
 # def convertEachItemToList():
 
@@ -51,43 +51,33 @@ def getNoneQuadraticConstraints():
 
 def getExample(example):
 
-	A1, b1, A2, b2 = getNoneLinearConstraints()
-	all_P, all_q, all_r = getNoneQuadraticConstraints()
-
+	# A1, b1, A2, b2 = getNoneLinearConstraints()
+	# all_P, all_q, all_r = getNoneQuadraticConstraints()
+	lc=None
+	qcs=[]
 
 	if example==0: #A 2D polygon embeded in 3D
 		A1, b1=getCube()
 		A2=np.array([[1.0, 1.0, 1.0]]);
 		b2=np.array([[1.0]]);
+		lc=utils.LinearConstraint(A1, b1, A2, b2)
 
 	elif example==1: #A polygon embeded in 3D with an sphere
 
 		A1, b1=getCube()
 		A2=np.array([[1.0, 1.0, 1.0]]);
 		b2=np.array([[1.0]]);
-
-		P,q,r=getSphere(0.8,np.zeros((3,1)))
-
-		all_P=[P]
-		all_q=[q]
-		all_r=[r]
+		lc=utils.LinearConstraint(A1, b1, A2, b2)
+		qcs.append(getSphereConstraint(0.8,np.zeros((3,1))))
 
 
 	elif example==2: #Just a sphere
 
-		P,q,r=getSphere(2.0,np.zeros((3,1)))
-
-		all_P=[P]
-		all_q=[q]
-		all_r=[r]
+		qcs.append(getSphereConstraint(2.0,np.zeros((3,1))))
 
 	elif example==3: #Just a paraboloid
 
-		P,q,r=getParaboloid3D()
-
-		all_P=[P]
-		all_q=[q]
-		all_r=[r]
+		qcs.append(getParaboloid3DConstraint())
 
 	#A 2d polyhedron 
 	elif (example==4  
@@ -103,49 +93,42 @@ def getExample(example):
 					[1],
 					[1.2127]])
 
+		lc=utils.LinearConstraint(A1, b1, None, None)
+
 		if(example==5):
-			P,q,r=getSphere(1.0,np.zeros((2,1)))
-			all_P=[P]
-			all_q=[q]
-			all_r=[r]
-
-
+			qcs.append(getSphereConstraint(1.0,np.zeros((2,1))))
 
 	elif example==6: #The intersection between a cube and two planes 
 		A1, b1=getCube()
 		A2=np.array([[1.0, 1.0, 1.0],
 					  [-1.0, 1.0, 1.0] ]);
 		b2=np.array([[1.0],[0.1]]);
+		lc=utils.LinearConstraint(A1, b1, A2, b2)
 
 	elif example==7: #Just a plane
 		A2=np.array([[1.0, 1.0, 1.0]]);
 		b2=np.array([[1.0]]);	
+		lc=utils.LinearConstraint(None, None, A2, b2)
 
 
 	elif example==8: #Unbounded 2d polyhedron. It has two vertices and two rays
 
 		A1=np.array([[0.0,-1.0], [2.0,-4.0], [-2.0,1.0]]);
 		b1=np.array([[-2.0], [8.0], [-5.0]]);
+		lc=utils.LinearConstraint(A1, b1, None, None)
 
 	elif example==9: #A paraboloid and a plane
-		P,q,r=getParaboloid3D()
-
-		all_P=[P]
-		all_q=[q]
-		all_r=[r]	
+		qcs.append(getParaboloid3DConstraint())
 
 		A2=np.array([[1.0, 1.0, 1.0]]);
 		b2=np.array([[1.0]]);		
 
 	elif example==10: #A paraboloid and a shpere
-		P1,q1,r1=getParaboloid3D()
-		P2,q2,r2=getSphere(2.0,np.zeros((3,1)))
-
-		all_P=[P1, P2]
-		all_q=[q1, q2]
-		all_r=[r1, r2]		
+		qcs.append(getParaboloid3DConstraint())
+		qcs.append(getSphereConstraint(2.0,np.zeros((3,1))))	
 
 	else:
 		raise Exception("Not implemented yet")
 
-	return utils.linearAndConvexQuadraticConstraints(A1, b1, A2, b2, all_P, all_q, all_r)
+
+	return utils.convexConstraints(lc=lc, qcs=qcs)
