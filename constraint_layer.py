@@ -356,11 +356,11 @@ class ConstraintLayer(torch.nn.Module):
 			max_iter_reached = (step_index >= max_steps)
 
 			if(max_iter_reached):
-				utils.printInBoldRed("Max iter reached")
+				# utils.printInBoldRed("Max iter reached")
 				break
 
 			if(converged_ineq):
-				utils.printInBoldRed("Converged ineq reached")
+				# utils.printInBoldRed("Converged ineq reached")
 
 				break
 
@@ -375,7 +375,7 @@ class ConstraintLayer(torch.nn.Module):
 
 		if(len(self.all_P)>0):
 			nsib=v_bar.shape[0]; #number of samples in the batch
-			lambda_quadratic=torch.empty((nsib,0,1), device=v_bar.device)
+			all_kappas_positives=torch.empty((nsib,0,1), device=v_bar.device)
 			for i in range(self.all_P.shape[0]): #for each of the quadratic constraints
 				P=self.all_P[i,:,:]
 				q=self.all_q[i,:,:]
@@ -386,22 +386,23 @@ class ConstraintLayer(torch.nn.Module):
 
 				rhoT=torch.transpose(rho,dim0=1, dim1=2)
 
-				a=0.5*rhoT@P@rho;
-				b=(w.T@P@rho + q.T@rho);
-				c=(0.5*w.T@P@w + q.T@w +r)
+				c_prime=0.5*rhoT@P@rho;
+				b_prime=(w.T@P@rho + q.T@rho);
+				a_prime=(0.5*w.T@P@w + q.T@w +r)
 
-				discriminant = torch.square(b) - 4*(a)*(c)
+				#  aprime kappa^2 + bprime kappa + cprime = 0
+
+				discriminant = torch.square(b_prime) - 4*(a_prime)*(c_prime)
 
 				assert torch.all(discriminant >= 0) 
-				lamb_positive_i=torch.div(  -(b)  + torch.sqrt(discriminant) , 2*a)
-				assert torch.all(lamb_positive_i >= 0) #If not, then either the feasible set is infeasible (note that z0 is inside the feasible set)
+				kappa_positive_i=torch.div(  -(b_prime)  - torch.sqrt(discriminant) , 2*a_prime) #note that we the positive solution has the minus: (... - sqrt(...))/(...)
+
+				assert torch.all(kappa_positive_i >= 0) #If not, then either the feasible set is infeasible (note that z0 is inside the feasible set)
 				
-				lambda_quadratic = torch.cat((lambda_quadratic, lamb_positive_i), dim=1)
+				all_kappas_positives = torch.cat((all_kappas_positives, kappa_positive_i), dim=1)
 
-				tmp=(torch.min(lambda_quadratic, dim=1, keepdim=True).values)
-				assert torch.all(lambda_quadratic >= 0)
-
-				kappa = torch.maximum(kappa, 1.0/tmp)
+			kappa_quadratic=(torch.max(all_kappas_positives, dim=1, keepdim=True).values)
+			kappa = torch.maximum(kappa, kappa_quadratic)
 
 
 		assert torch.all(kappa >= 0)
