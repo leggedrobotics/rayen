@@ -19,8 +19,8 @@ import scipy
 methods=['walker_2', 'walker_1', 'barycentric', 'unconstrained', 'proj_train_test', 'proj_test', 'dc3']
 methods=['walker_2', 'walker_1', 'barycentric', 'unconstrained', 'dc3']
 
-# index_examples_to_run=list(range(12))
-index_examples_to_run=[12]
+index_examples_to_run=list(range(13))
+# index_examples_to_run=[12]
 methods=['walker_1']
 num_of_examples=len(index_examples_to_run)
 ###############
@@ -40,10 +40,10 @@ for method in methods:
 
 		constraint=getExample(index_example)
 
-		if(method=='barycentric' and (constraint.has_quadratic_constraints or constraint.has_soc_constraints)):
+		if(method=='barycentric' and (constraint.has_quadratic_constraints or constraint.has_soc_constraints or constraint.has_sdp_constraints)):
 			continue
 
-		if(method=='dc3' and constraint.has_soc_constraints):
+		if(method=='dc3' and (constraint.has_soc_constraints or constraint.has_sdp_constraints)):
 			continue
 
 		# fig = plt.figure()
