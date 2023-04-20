@@ -9,7 +9,6 @@ import scipy.io
 import utils
 import time
 
-
 # create custom dataset class
 class CustomDataset(Dataset):
 	def __init__(self, all_x, all_y, all_Pobj, all_qobj, all_robj, all_times_s, all_costs):
@@ -144,44 +143,9 @@ def getCorridorDatasetsAndConstraints():
 	my_dataset = CustomDataset(all_x, all_y, all_Pobj, all_qobj, all_robj, all_times_s, all_costs)
 	my_dataset_out_dist = CustomDataset(all_x_out_dist, all_y_out_dist, all_Pobj_out_dist, all_qobj_out_dist, all_robj_out_dist, all_times_s_out_dist, all_costs_out_dist)
 
-	# print(all_x[0].shape)
-	# print(all_x_out_dist[0].shape)
-
-	# print(all_y_out_dist[0].shape)
-	# print(all_y[0].shape)
-	# exit()
 
 	return my_dataset, my_dataset_out_dist, cs
 
-	# print(polyhedron['Aineq'][0,0])
-
-	# print(f"len(all_x)={len(all_x)}")
-	# print(f"len(all_y)={len(all_y)}")
-	# print(all_x[0].shape)
-	# print(all_x[0])
-	# print(all_y[0].shape)
-	# print(all_y[0])
 
 
-# print('\nFirst iteration of data set: ', next(iter(my_dataset)), '\n')
-# print('Length of data set: ', len(my_dataset), '\n')
-# print('Entire data set: ', list(DataLoader(my_dataset)), '\n')
-
-# # create DataLoader object of DataSet object
-# my_data_loader = DataLoader(my_dataset, batch_size=2, shuffle=True)
-
-# # loop through each batch in the DataLoader object
-# for (idx, batch) in enumerate(my_data_loader):
-# 	print(f"Batch {idx} is {batch}")
-
-# train_size = int(0.7 * len(my_dataset))
-# validation_size = int(0.1 * len(my_dataset))
-# test_size = len(my_dataset) - train_size - validation_size
-# train_dataset, validation_dataset, test_dataset = torch.utils.data.random_split(my_dataset, [train_size, validation_size, test_size])
-
-# print(train_dataset.all_x)
-
-# print(f"Length of train dataset={len(train_dataset)}")
-# print(f"Length of test dataset={len(test_dataset)}")
-# print(f"Length of validation dataset={len(validation_dataset)}")
 
