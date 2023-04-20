@@ -19,8 +19,9 @@ import scipy
 methods=['walker_2', 'walker_1', 'barycentric', 'unconstrained', 'proj_train_test', 'proj_test', 'dc3']
 methods=['walker_2', 'walker_1', 'barycentric', 'unconstrained', 'dc3']
 
-index_examples_to_run=list(range(12))
-# index_examples_to_run=[11]
+# index_examples_to_run=list(range(12))
+index_examples_to_run=[12]
+methods=['walker_1']
 num_of_examples=len(index_examples_to_run)
 ###############
 rows=math.ceil(math.sqrt(num_of_examples))
@@ -49,7 +50,7 @@ for method in methods:
 		if(constraint.k==3):
 			ax = fig.add_subplot(rows,cols,i+1, projection="3d")
 			if(constraint.has_linear_ineq_constraints):
-				utils.plot3DPolytopeHRepresentation(constraint.A1,constraint.b1,[-1, 2, -1, 2, -1, 2], ax)
+				utils.plot3DPolytopeHRepresentation(constraint.lc.A1,constraint.lc.b1,[-1, 2, -1, 2, -1, 2], ax)
 
 
 		else:
@@ -107,7 +108,7 @@ for method in methods:
 
 		if(constraint.k==2):
 			ax.scatter(result[:,0,0], result[:,1,0])
-			utils.plot2DPolyhedron(constraint.A1,constraint.b1,ax)
+			utils.plot2DPolyhedron(constraint.lc.A1,constraint.lc.b1,ax)
 			
 			ax.scatter(y0[0,0], y0[1,0])
 			# utils.plot2DEllipsoidB(my_layer.B.numpy(),my_layer.z0.numpy(),ax)
@@ -116,30 +117,30 @@ for method in methods:
 
 		###################### SAVE TO MAT FILE
 
-		A2=constraint.A2;
-		b2=constraint.b2;
-		A1=constraint.A1;
-		b1=constraint.b1;
-		all_P=constraint.all_P;
-		all_q=constraint.all_q;
-		all_r=constraint.all_r;
+		# A2=constraint.A2;
+		# b2=constraint.b2;
+		# A1=constraint.A1;
+		# b1=constraint.b1;
+		# all_P=constraint.all_P;
+		# all_q=constraint.all_q;
+		# all_r=constraint.all_r;
 
-		if(A2 is None):
-			A2=np.array([[]])
-		if(b2 is None):
-			b2=np.array([[]])
-		if(A1 is None):
-			A1=np.array([[]])
-		if(b1 is None):
-			b1=np.array([[]])
-		if(all_P is None):
-			all_P=np.array([[]])
-		if(all_q is None):
-			all_q=np.array([[]])
-		if(all_r is None):
-			all_r=np.array([[]])
+		# if(A2 is None):
+		# 	A2=np.array([[]])
+		# if(b2 is None):
+		# 	b2=np.array([[]])
+		# if(A1 is None):
+		# 	A1=np.array([[]])
+		# if(b1 is None):
+		# 	b1=np.array([[]])
+		# if(all_P is None):
+		# 	all_P=np.array([[]])
+		# if(all_q is None):
+		# 	all_q=np.array([[]])
+		# if(all_r is None):
+		# 	all_r=np.array([[]])
 
-		scipy.io.savemat('example_'+str(index_example)+'.mat', dict(A2=A2, b2=b2, A1=A1, b1=b1, all_P=all_P, all_q=all_q, all_r=all_r, result=result))
+		# scipy.io.savemat('example_'+str(index_example)+'.mat', dict(A2=A2, b2=b2, A1=A1, b1=b1, all_P=all_P, all_q=all_q, all_r=all_r, result=result))
 
 		################################################3
 

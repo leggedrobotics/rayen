@@ -50,6 +50,22 @@ def getSOC3DConstraint():
 
 	return utils.SOCConstraint(M, s, c, d)
 
+def getPSDCone3DConstraint():
+	#[x y;y z] >> 0
+	F0=np.array([[1.0, 0.0],
+				 [0.0, 0.0]])
+
+	F1=np.array([[0.0, 1.0],
+				 [1.0, 0.0]])
+
+	F2=np.array([[0.0, 0.0],
+				 [0.0, 1.0]])
+
+	F3=np.array([[0.0, 0.0],
+				 [0.0, 0.0]])
+
+	return utils.SDPConstraint([F0, F1, F2, F3])
+
 def getNoneLinearConstraints():
 	return None, None, None, None
 
@@ -63,6 +79,7 @@ def getExample(example):
 	lc=None
 	qcs=[]
 	socs=[]
+	sdpc=None
 
 	if example==0: #A 2D polygon embeded in 3D
 		A1, b1=getCube()
@@ -138,8 +155,11 @@ def getExample(example):
 	elif example==11: #A second-order cone 
 		socs.append(getSOC3DConstraint())
 
+	elif example==12: #The PSD cone in 3D
+		sdpc = getPSDCone3DConstraint()
+
 	else:
 		raise Exception("Not implemented yet")
 
 
-	return utils.convexConstraints(lc=lc, qcs=qcs, socs=socs)
+	return utils.convexConstraints(lc=lc, qcs=qcs, socs=socs, sdpc=sdpc)

@@ -34,10 +34,12 @@ class CostComputer(nn.Module): #Using nn.Module to be able to use register_buffe
 	def __init__(self, cs):
 		super().__init__()
 
+		all_P, all_q, all_r = utils.getAllPqrFromQcs(cs.qcs)
+
 		if(cs.has_quadratic_constraints):
-			self.register_buffer("all_P", torch.Tensor(np.array(cs.all_P)))
-			self.register_buffer("all_q", torch.Tensor(np.array(cs.all_q)))
-			self.register_buffer("all_r", torch.Tensor(np.array(cs.all_r)))
+			self.register_buffer("all_P", torch.Tensor(np.array(all_P)))
+			self.register_buffer("all_q", torch.Tensor(np.array(all_q)))
+			self.register_buffer("all_r", torch.Tensor(np.array(all_r)))
 	
 		#See https://discuss.pytorch.org/t/model-cuda-does-not-convert-all-variables-to-cuda/114733/9
 		# and https://discuss.pytorch.org/t/keeping-constant-value-in-module-on-correct-device/10129
@@ -118,16 +120,24 @@ class ConstraintLayer(torch.nn.Module):
 
 		D=cs.A_p/((cs.b_p-cs.A_p@cs.z0)@np.ones((1,cs.n)))
 			
+		all_P, all_q, all_r = utils.getAllPqrFromQcs(cs.qcs)
+		all_M, all_s, all_c, all_d= utils.getAllMscdFromQcs(cs.socs)
+		if(cs.has_sdp_constraints):
+			all_F=cs.sdpc.all_F
+		else:
+			all_F=[]
+
 		#See https://discuss.pytorch.org/t/model-cuda-does-not-convert-all-variables-to-cuda/114733/9
 		# and https://discuss.pytorch.org/t/keeping-constant-value-in-module-on-correct-device/10129
 		self.register_buffer("D", torch.tensor(D))
-		self.register_buffer("all_P", torch.Tensor(np.array(cs.all_P)))
-		self.register_buffer("all_q", torch.Tensor(np.array(cs.all_q)))
-		self.register_buffer("all_r", torch.Tensor(np.array(cs.all_r)))
-		self.register_buffer("all_M", torch.Tensor(np.array(cs.all_M)))
-		self.register_buffer("all_s", torch.Tensor(np.array(cs.all_s)))
-		self.register_buffer("all_c", torch.Tensor(np.array(cs.all_c)))
-		self.register_buffer("all_d", torch.Tensor(np.array(cs.all_d)))
+		self.register_buffer("all_P", torch.Tensor(np.array(all_P)))
+		self.register_buffer("all_q", torch.Tensor(np.array(all_q)))
+		self.register_buffer("all_r", torch.Tensor(np.array(all_r)))
+		self.register_buffer("all_M", torch.Tensor(np.array(all_M)))
+		self.register_buffer("all_s", torch.Tensor(np.array(all_s)))
+		self.register_buffer("all_c", torch.Tensor(np.array(all_c)))
+		self.register_buffer("all_d", torch.Tensor(np.array(all_d)))
+		self.register_buffer("all_F", torch.Tensor(np.array(all_F)))
 		self.register_buffer("A_p", torch.tensor(cs.A_p))
 		self.register_buffer("b_p", torch.tensor(cs.b_p))
 		self.register_buffer("y1", torch.tensor(cs.y1))
@@ -367,7 +377,6 @@ class ConstraintLayer(torch.nn.Module):
 
 				break
 
-
 		return y_new
 
 
@@ -386,7 +395,7 @@ class ConstraintLayer(torch.nn.Module):
 
 		kappa=torch.relu( torch.max(self.D@v_bar, dim=1, keepdim=True).values  )
 
-		if(len(self.all_P)>0 or len(self.all_M)>0):
+		if(len(self.all_P)>0 or len(self.all_M)>0 or len(self.all_F)>0):
 			rho = self.NA_E@v_bar
 			w = self.NA_E@self.z0 + self.y1 #Do this in the constructor of this class. This is actually y0
 			rhoT=torch.transpose(rho,dim0=1, dim1=2)
@@ -425,6 +434,26 @@ class ConstraintLayer(torch.nn.Module):
 
 				assert torch.all(kappa_positive_i >= 0) #If not, then either the feasible set is infeasible (note that z0 is inside the feasible set)
 				all_kappas_positives = torch.cat((all_kappas_positives, kappa_positive_i), dim=1)
+
+			if(len(self.all_F)>0): #If there are SDP constraints:
+				H=self.all_F[-1,:,:]
+				for i in range(len(self.all_F)-1):
+					H += w[i,0]*self.all_F[i,:,:]
+
+				M=self.all_F[0,:,:]*rho[:,0:(0+1),0:1]
+				for i in range(1,len(self.all_F)-1):
+					M += self.all_F[i,:,:]*rho[:,i:(i+1),0:1] #See https://discuss.pytorch.org/t/scalar-matrix-multiplication-for-a-tensor-and-an-array-of-scalars/100174/2
+
+				Hinv=torch.linalg.inv(H);
+
+				eigenvalues = torch.unsqueeze(torch.linalg.eigvals(-Hinv@M),2) #Note that Hinv@M is not symmetric but always have real eigenvalues
+
+				assert (torch.all(torch.isreal(eigenvalues)))
+
+				kappa_positive_i = torch.relu( torch.max(eigenvalues.real, dim=1, keepdim=True).values  )
+				all_kappas_positives = torch.cat((all_kappas_positives, kappa_positive_i), dim=1)
+
+
 
 
 			kappa_nonlinear_constraints=(torch.max(all_kappas_positives, dim=1, keepdim=True).values)

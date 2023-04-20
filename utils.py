@@ -211,6 +211,54 @@ def all_equal(iterator):
     return all(first == x for x in iterator)
 
 ################### CONSTRAINTS
+#everything is numpy
+
+class LinearConstraint():
+	#Constraint is A1<=b1, A2=b2
+	def __init__(self, A1, b1, A2, b2):
+		self.A1 = A1
+		self.b1 = b1
+		self.A2 = A2
+		self.b2 = b2
+
+		assert self.hasEqConstraints() or self.hasIneqConstraints()
+
+		if (self.hasIneqConstraints()):
+			assert A1.ndim == 2, f"A1.shape={A1.shape}"
+			assert b1.ndim == 2, f"b1.shape={b1.shape}"
+			assert b1.shape[1] ==1
+			assert A1.shape[0] == b1.shape[0]
+
+		if (self.hasEqConstraints()):
+			assert A2.ndim == 2, f"A2.shape={A2.shape}"
+			assert b2.ndim == 2, f"b2.shape={b2.shape}"
+			assert b2.shape[1] ==1
+			assert A2.shape[0] == b2.shape[0]
+
+		if (self.hasIneqConstraints() and self.hasEqConstraints()):
+			assert A1.shape[1] == A2.shape[1]
+
+	def hasEqConstraints(self):
+		return (self.A2 is not None and self.b2 is not None)
+
+	def hasIneqConstraints(self): 
+		return (self.A1 is not None and self.b1 is not None)
+
+	def dim(self):
+		if (self.A1 is not None and self.b1 is not None):
+			return self.A1.shape[1]
+		else:
+			return self.A2.shape[1]
+
+	def asCvxpy(self, y, epsilon=0.0):
+		constraints=[];
+		if self.hasIneqConstraints():
+			constraints.append(self.A1@y<=self.b1)
+		if self.hasEqConstraints():
+			constraints.append(self.A2@y==self.b2)
+
+		return constraints
+
 class convexQuadraticConstraint():
 	# Constraint is (1/2)x'Px + q'x +r <=0
 	def __init__(self, P, q, r):
@@ -224,21 +272,8 @@ class convexQuadraticConstraint():
 	def dim(self):
 		return self.P.shape[1]
 
-class LinearConstraint():
-	#Constraint is A1<=b1, A2=b2
-	def __init__(self, A1, b1, A2, b2):
-		self.A1 = A1
-		self.b1 = b1
-		self.A2 = A2
-		self.b2 = b2
-
-		assert (A1 is not None and b1 is not None) or (A2 is not None and b2 is not None)
-
-	def dim(self):
-		if (self.A1 is not None and self.b1 is not None):
-			return self.A1.shape[1]
-		else:
-			return self.A2.shape[1]
+	def asCvxpy(self, y, epsilon=0.0):
+		return [0.5*cp.quad_form(y, self.P) + self.q.T@y + self.r <= -epsilon]
 
 class SOCConstraint():
 	#Constraint is ||My+s||<=c'y+d
@@ -261,35 +296,43 @@ class SOCConstraint():
 	def dim(self):
 		return self.M.shape[1]
 
+	def asCvxpy(self, y, epsilon=0.0):
+		return [cp.norm(self.M@y + self.s) - self.c.T@y - self.d <= -epsilon]
+
+
+class SDPConstraint():
+	#Constraint is y0 F0 + y1 F1 + ... + ykm1 Fkm1 + Fk >=0
+	def __init__(self, all_F):
+		for F in all_F:
+			checkMatrixisSymmetric(F);
+		self.all_F=all_F
+
+	def dim(self):
+		return (len(self.all_F)-1)
+
+	def asCvxpy(self, y, epsilon=0.0):
+		sdp_left_hand_side=0;
+		k=self.dim()
+		tmp=self.all_F[0].shape[0]
+		for i in range(k):
+			sdp_left_hand_side += y[i,0]*self.all_F[i]
+		sdp_left_hand_side += self.all_F[k]
+
+		return [sdp_left_hand_side  >>  epsilon*np.eye(tmp)]
+
 ######################################
 
-class convexConstraints():
-	def __init__(self, lc=None, qcs=[], socs=[]):
-
-		if(lc is not None):
-			A1=lc.A1;
-			b1=lc.b1;
-			A2=lc.A2;
-			b2=lc.b2;
-		else:
-			A1=None;
-			b1=None;
-			A2=None;
-			b2=None;
-
-		self.has_linear_eq_constraints=((A2 is not None) and (b2 is not None));
-		self.has_linear_ineq_constraints=((A1 is not None) and (b1 is not None));
-		self.has_linear_constraints=self.has_linear_eq_constraints or self.has_linear_ineq_constraints;
-
-
+def getAllPqrFromQcs(qcs):
 		all_P=[]
 		all_q=[]
 		all_r=[]
 		for qc in qcs:
 			all_P.append(qc.P)
 			all_q.append(qc.q)
-			all_r.append(qc.r)
+			all_r.append(qc.r)	
+		return all_P, all_q, all_r
 
+def getAllMscdFromQcs(socs):
 		all_M=[]
 		all_s=[]
 		all_c=[]
@@ -300,43 +343,35 @@ class convexConstraints():
 			all_c.append(soc.c)
 			all_d.append(soc.d)
 
+		return all_M, all_s, all_c, all_d
 
-		################################# CHECKS for the linear constraints
+class convexConstraints():
+	def __init__(self, lc=None, qcs=[], socs=[], sdpc=None):
 
-		if(self.has_linear_ineq_constraints):
-			assert A1.ndim == 2, f"A1.shape={A1.shape}"
-			assert b1.ndim == 2, f"b1.shape={b1.shape}"
-			assert b1.shape[1] ==1
-			assert A1.shape[0] == b1.shape[0]
+		if(lc is not None):
+			self.has_linear_eq_constraints=lc.hasEqConstraints();
+			self.has_linear_ineq_constraints=lc.hasIneqConstraints();
+			self.has_linear_constraints=self.has_linear_eq_constraints or self.has_linear_ineq_constraints;
+		else:
+			self.has_linear_eq_constraints=False
+			self.has_linear_ineq_constraints=False
+			self.has_linear_constraints=False
 
-		if(self.has_linear_eq_constraints):
-			assert A2.ndim == 2, f"A2.shape={A2.shape}"
-			assert b2.ndim == 2, f"b2.shape={b2.shape}"
-			assert b2.shape[1] ==1
-			assert A2.shape[0] == b2.shape[0]
-
-		if(self.has_linear_eq_constraints and self.has_linear_ineq_constraints):
-			assert A1.shape[1] == A2.shape[1]
-		#################################
 
 		self.has_quadratic_constraints=(len(qcs)>0)
 		self.has_soc_constraints=(len(socs)>0)
+		self.has_sdp_constraints=(sdpc is not None)
 
-		assert (self.has_quadratic_constraints or self.has_linear_constraints or self.has_soc_constraints), "There are no constraints!"
-
-		# if(self.has_quadratic_constraints):
-		# 	for i in range(len(all_P)):
-		# 		assert all_P[i].shape[0]==tmp
-		# 		assert all_P[i].shape[1]==tmp
-		# 		assert all_q[i].shape[0]==tmp
-		# 		assert all_q[i].shape[1]==1
+		self.lc=lc
+		self.qcs=qcs
+		self.socs=socs
+		self.sdpc=sdpc
 
 
-		# if(self.has_soc_constraints):
-		# 	tmp=all_M[0].shape[0]
-		# 	for i in range(len(all_P)):
-		# 		assert all_
+		assert (self.has_quadratic_constraints or self.has_linear_constraints or self.has_soc_constraints or self.has_sdp_constraints), "There are no constraints!"
 
+
+		#Check that the dimensions of all the constraints are the same
 		all_dim=[]
 		if(self.has_linear_constraints):
 			all_dim.append(lc.dim())
@@ -344,28 +379,13 @@ class convexConstraints():
 			all_dim.append(qc.dim())
 		for soc in socs:
 			all_dim.append(soc.dim())
+		if(self.has_sdp_constraints):
+			all_dim.append(sdpc.dim())
 
 		assert all_equal(all_dim)
+		#####################################3
 
 		self.k=all_dim[0]
-
-
-		#################################
-
-		####################STORE DATA IN THE CLASS
-		self.A1=A1;
-		self.b1=b1;
-		self.A2=A2;
-		self.b2=b2;
-
-		self.all_P=all_P;
-		self.all_q=all_q;
-		self.all_r=all_r;
-
-		self.all_M=all_M;
-		self.all_s=all_s;
-		self.all_c=all_c;
-		self.all_d=all_d;
 
 
 		###########################################
@@ -383,16 +403,16 @@ class convexConstraints():
 
 			######################################## Stack the matrices so that the linear constraints look like Ax<=b 
 			if(self.has_linear_ineq_constraints):
-				A=self.A1;
-				b=self.b1;
+				A=self.lc.A1;
+				b=self.lc.b1;
 				if(self.has_linear_eq_constraints): 
 					#Add the equality constraints as inequality constraints
-					A=np.concatenate((A,self.A2,-self.A2), axis=0);
-					b=np.concatenate((b,self.b2,-self.b2), axis=0);				
+					A=np.concatenate((A,self.lc.A2,-self.lc.A2), axis=0);
+					b=np.concatenate((b,self.lc.b2,-self.lc.b2), axis=0);				
 			else:
 				#Add the equality constraints as inequality constraints
-				A=np.concatenate((self.A2,-self.A2), axis=0);
-				b=np.concatenate((self.b2,-self.b2), axis=0);
+				A=np.concatenate((self.lc.A2,-self.lc.A2), axis=0);
+				b=np.concatenate((self.lc.b2,-self.lc.b2), axis=0);
 			printInBoldGreen(f"A is {A.shape} and b is {b.shape}")
 			########################################
 
@@ -520,22 +540,18 @@ class convexConstraints():
 		self.A_I=A_I
 		self.b_I=b_I
 
+		self.A_p=A_p	
+		self.b_p=b_p	
+		self.y1=y1	
+		self.NA_E=NA_E	
+
 		#############Obtain a strictly feasible point z0
 		###################################################
 
 		epsilon=cp.Variable()
 		z0 = cp.Variable((self.n,1))
 
-		constraints=[]
-
-		constraints+=[A_p@z0 - b_p <= -epsilon*np.ones((A_p.shape[0],1))]
-
-		y0=NA_E@z0 + y1
-		for i in range(len(self.all_P)):
-			constraints.append( 0.5*cp.quad_form(y0, self.all_P[i]) + self.all_q[i].T@y0 + self.all_r[i] <= -epsilon) 
-
-		for i in range(len(self.all_M)):
-			constraints.append( cp.norm(self.all_M[i]@y0 + self.all_s[i]) - self.all_c[i].T@y0 - self.all_d[i] <= -epsilon) 
+		constraints=self.getConstraintsInSubspaceCvxpy(z0, epsilon)
 
 		constraints.append(epsilon>=0)
 		constraints.append(epsilon<=5.0) #This constraint is needed for the case where the set is unbounded.
@@ -550,31 +566,17 @@ class convexConstraints():
 		assert epsilon.value>1e-8 #If not, there are no strictly feasible points in the subspace
 								  #TODO: change hand-coded tolerance
 
-		z0= z0.value
-
-
-		####Store data in the class
-		self.A_p=A_p	
-		self.b_p=b_p	
-		self.y1=y1	
-		self.NA_E=NA_E	
-		self.z0=z0	
-
-		# self.A_p_pytorch=torch.tensor(A_p)
-		# self.b_p_pytorch=torch.tensor(b_p)
-		# self.y1_pytorch=torch.tensor(y1)
-		# self.NA_E_pytorch=torch.tensor(NA_E)
-		# self.z0_pytorch=torch.tensor(z0)
+		self.z0=z0.value	
 
 		assert np.allclose(NA_E.T@NA_E, np.eye(NA_E.shape[1])) #By definition, N'*N=I
 
 		###################### SET UP PROBLEM FOR PROJECTION
 		###################################################
 		#Section 8.1.1 of https://web.stanford.edu/~boyd/cvxbook/bv_cvxbook.pdf
-		self.x_projected = cp.Variable((self.k,1))         #projected point
-		self.x_to_be_projected = cp.Parameter((self.k,1))  #original point
-		constraints=self.getConstraintsCvxpy(self.x_projected)
-		objective = cp.Minimize(cp.sum_squares(self.x_projected - self.x_to_be_projected))
+		self.y_projected = cp.Variable((self.k,1))         #projected point
+		self.y_to_be_projected = cp.Parameter((self.k,1))  #original point
+		constraints=self.getConstraintsCvxpy(self.y_projected)
+		objective = cp.Minimize(cp.sum_squares(self.y_projected - self.y_to_be_projected))
 		self.prob_projection = cp.Problem(objective, constraints)
 		###################################################
 
@@ -595,79 +597,67 @@ class convexConstraints():
 			raise Exception(f"Which solver do you have installed?")
 		###################################################
 
+
+
 	######################### CONSTRAINTS IN THE SUBSPACE
-	def getLinearConstraintsInSubspaceCvxpy(self, variable):
-		assert variable.shape[1]==1
-		assert variable.shape[0]==self.n		 
-		return [self.A_p@variable<=self.b_p] 
+	def getConstraintsInSubspaceCvxpy(self, z, epsilon=0.0):
 
-	def getQuadraticConstraintsInSubspaceCvxpy(self, variable):
-		assert variable.shape[1]==1
-		assert variable.shape[0]==self.n		 
-		return self.getQuadraticConstraintsCvxpy(self.NA_E@variable + self.y1)
+		constraints = [self.A_p@z - self.b_p <= -epsilon*np.ones((self.A_p.shape[0],1))]
 
-	def getSOCConstraintsInSubspaceCvxpy(self, variable):
-		assert variable.shape[1]==1
-		assert variable.shape[0]==self.n		 
-		return self.getSOCConstraintsCvxpy(self.NA_E@variable + self.y1)
+		y=self.NA_E@z + self.y1
 
-	def getConstraintsInSubspaceCvxpy(self, variable):
-		linear_constraints = self.getLinearConstraintsInSubspaceCvxpy(variable)
-		quadratic_constraints = self.getQuadraticConstraintsInSubspaceCvxpy(variable)
-		soc_constraints = self.getSOCConstraintsInSubspaceCvxpy(variable)
-		return linear_constraints + quadratic_constraints + soc_constraints
+		constraints+=self.getNonLinearConstraintsCvxpy(y, epsilon)
+
+		return constraints
 	###########################################################################
 
-	def getLinearConstraintsCvxpy(self, variable):
-		constraints=[]
-		assert variable.shape[1]==1 
-		if(self.has_linear_ineq_constraints):
-			constraints.append(self.A1@variable<=self.b1)
-		if(self.has_linear_eq_constraints):
-			constraints.append(self.A2@variable==self.b2)   
-		return constraints 	 #will be empty if there are no constraints
+	def getNonLinearConstraintsCvxpy(self, y, epsilon=0.0):
 
-	def getQuadraticConstraintsCvxpy(self, variable):
-		assert variable.shape[1]==1 
 		constraints=[]
-		for i in range(len(self.all_P)):
-			constraints.append( 0.5*cp.quad_form(variable, self.all_P[i]) + self.all_q[i].T@variable + self.all_r[i] <= 0) #https://www.cvxpy.org/api_reference/cvxpy.atoms.other_atoms.html#cvxpy.atoms.quad_form.quad_form
-		return constraints 	 
 
-	def getSOCConstraintsCvxpy(self,variable):
-		assert variable.shape[1]==1 
+		for qc in self.qcs:   
+			constraints += qc.asCvxpy(y, epsilon) 
+
+		for soc in self.socs:   
+			constraints += soc.asCvxpy(y, epsilon) 
+
+		if(self.has_sdp_constraints):
+			constraints += self.sdpc.asCvxpy(y, epsilon) 	
+
+		return constraints	
+
+	def getConstraintsCvxpy(self, y, epsilon=0.0):
+
 		constraints=[]
-		for i in range(len(self.all_M)):
-			constraints.append( cp.norm(self.all_M[i]@variable + self.all_s[i]) - self.all_c[i].T@variable - self.all_d[i] <= 0) 
+
+		if(self.has_linear_constraints):
+			constraints += self.lc.asCvxpy(y, epsilon) 
+
+		constraints+=self.getNonLinearConstraintsCvxpy(y, epsilon)
+
 		return constraints
-
-	def getConstraintsCvxpy(self, variable):
-		linear_constraints = self.getLinearConstraintsCvxpy(variable)
-		quadratic_constraints = self.getQuadraticConstraintsCvxpy(variable)
-		soc_constraints = self.getSOCConstraintsCvxpy(variable)
-		return linear_constraints + quadratic_constraints + soc_constraints
 
 
 	#######################################3
 
-	def project(self, x_to_be_projected):
-		assert x_to_be_projected.shape==self.x_to_be_projected.shape
+	def project(self, y_to_be_projected):
+		assert y_to_be_projected.shape==self.y_to_be_projected.shape
 
-		self.x_to_be_projected.value=x_to_be_projected;
+		self.y_to_be_projected.value=y_to_be_projected;
 		obj_value = self.prob_projection.solve(verbose=False, solver=self.solver);
 
 		if(self.prob_projection.status != 'optimal' and self.prob_projection.status != 'optimal_inaccurate'):
 			raise Exception(f"Value is not optimal, prob_status={self.prob_projection.status}")
 
-		return self.x_projected.value, obj_value	
+		return self.y_projected.value, obj_value	
 
-	def getViolation(self, x_to_be_projected):
+	def getViolation(self, y_to_be_projected):
 
-		if(x_to_be_projected.ndim==1):
+		if(y_to_be_projected.ndim==1):
 			#convert to a column vector
-			x_to_be_projected=np.expand_dims(x_to_be_projected, axis=1)
+			y_to_be_projected=np.expand_dims(y_to_be_projected, axis=1)
 
-		_, violation = self.project(x_to_be_projected)
+		_, violation = self.project(y_to_be_projected)
 
 		assert violation>=0  #violation is nonnegative by definition
 
