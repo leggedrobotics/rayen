@@ -144,6 +144,9 @@ class ConstraintLayer(torch.nn.Module):
 		self.register_buffer("NA_E", torch.tensor(cs.NA_E))
 		self.register_buffer("z0", torch.tensor(cs.z0))
 
+		self.w = self.NA_E@self.z0 + self.y1 #Do this in the constructor of this class. This is actually y0
+
+
 
 		if(self.method=='proj_train_test' or self.method=='proj_test'):
 			#Section 8.1.1 of https://web.stanford.edu/~boyd/cvxbook/bv_cvxbook.pdf
@@ -397,21 +400,17 @@ class ConstraintLayer(torch.nn.Module):
 
 		if(len(self.all_P)>0 or len(self.all_M)>0 or len(self.all_F)>0):
 			rho = self.NA_E@v_bar
-			w = self.NA_E@self.z0 + self.y1 #Do this in the constructor of this class. This is actually y0
 			rhoT=torch.transpose(rho,dim0=1, dim1=2)
-			nsib=v_bar.shape[0]; #number of samples in the batch
-			all_kappas_positives=torch.empty((nsib,0,1), device=v_bar.device)
-
+			all_kappas_positives=torch.empty((v_bar.shape[0],0,1), device=v_bar.device)
 
 			for i in range(self.all_P.shape[0]): #for each of the quadratic constraints
 				P=self.all_P[i,:,:]
 				q=self.all_q[i,:,:]
 				r=self.all_r[i,:,:]
 				
-
 				c_prime=0.5*rhoT@P@rho;
-				b_prime=(w.T@P@rho + q.T@rho);
-				a_prime=(0.5*w.T@P@w + q.T@w +r)
+				b_prime=(self.w.T@P@rho + q.T@rho);
+				a_prime=(0.5*self.w.T@P@self.w + q.T@self.w +r) #This could be computed offline
 
 				kappa_positive_i=self.solveSecondOrderEq(a_prime, b_prime, c_prime, True) 
 				assert torch.all(kappa_positive_i >= 0) #If not, then either the feasible set is infeasible (note that z0 is inside the feasible set)
@@ -423,8 +422,8 @@ class ConstraintLayer(torch.nn.Module):
 				c=self.all_c[i,:,:]
 				d=self.all_d[i,:,:]
 
-				beta=M@w+s
-				tau=c.T@w+d
+				beta=M@self.w+s
+				tau=c.T@self.w+d
 
 				c_prime=rhoT@M.T@M@rho - torch.square(c.T@rho)
 				b_prime=2*rhoT@M.T@beta - 2*(c.T@rho)@tau
@@ -438,7 +437,7 @@ class ConstraintLayer(torch.nn.Module):
 			if(len(self.all_F)>0): #If there are SDP constraints:
 				H=self.all_F[-1,:,:]
 				for i in range(len(self.all_F)-1):
-					H += w[i,0]*self.all_F[i,:,:]
+					H += self.w[i,0]*self.all_F[i,:,:]
 
 				M=self.all_F[0,:,:]*rho[:,0:(0+1),0:1]
 				for i in range(1,len(self.all_F)-1):
@@ -452,8 +451,6 @@ class ConstraintLayer(torch.nn.Module):
 
 				kappa_positive_i = torch.relu( torch.max(eigenvalues.real, dim=1, keepdim=True).values  )
 				all_kappas_positives = torch.cat((all_kappas_positives, kappa_positive_i), dim=1)
-
-
 
 
 			kappa_nonlinear_constraints=(torch.max(all_kappas_positives, dim=1, keepdim=True).values)
@@ -527,6 +524,7 @@ class ConstraintLayer(torch.nn.Module):
 	def forward(self, x):
 
 		##################  MAPPER LAYER ####################
+		#nsib denotes the number of samples in the batch
 		# x has dimensions [nsib, numel_input_mapper, 1]. nsib is the number of samples in the batch (i.e., x.shape[0]=x.shape[0])
 		q = self.mapper(x.view(x.size(0), -1)) #After this, q has dimensions [nsib, numel_output_mapper]
 		q = torch.unsqueeze(q,dim=2)  #After this, q has dimensions [nsib, numel_output_mapper, 1]
