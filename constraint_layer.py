@@ -124,6 +124,11 @@ class ConstraintLayer(torch.nn.Module):
 		all_M, all_s, all_c, all_d= utils.getAllMscdFromQcs(cs.socs)
 		if(cs.has_sdp_constraints):
 			all_F=cs.sdpc.all_F
+			H=all_F[-1]
+			for i in range(cs.sdpc.dim()):
+				H += cs.y0[i,0]*cs.sdpc.all_F[i]
+			Hinv=np.linalg.inv(H);
+			self.register_buffer("Hinv", torch.Tensor(Hinv))
 		else:
 			all_F=[]
 
@@ -143,10 +148,7 @@ class ConstraintLayer(torch.nn.Module):
 		self.register_buffer("y1", torch.tensor(cs.y1))
 		self.register_buffer("NA_E", torch.tensor(cs.NA_E))
 		self.register_buffer("z0", torch.tensor(cs.z0))
-
-		self.w = self.NA_E@self.z0 + self.y1 #Do this in the constructor of this class. This is actually y0
-
-
+		self.register_buffer("y0", torch.tensor(cs.y0))
 
 		if(self.method=='proj_train_test' or self.method=='proj_test'):
 			#Section 8.1.1 of https://web.stanford.edu/~boyd/cvxbook/bv_cvxbook.pdf
@@ -409,8 +411,8 @@ class ConstraintLayer(torch.nn.Module):
 				r=self.all_r[i,:,:]
 				
 				c_prime=0.5*rhoT@P@rho;
-				b_prime=(self.w.T@P@rho + q.T@rho);
-				a_prime=(0.5*self.w.T@P@self.w + q.T@self.w +r) #This could be computed offline
+				b_prime=(self.y0.T@P@rho + q.T@rho);
+				a_prime=(0.5*self.y0.T@P@self.y0 + q.T@self.y0 +r) #This could be computed offline
 
 				kappa_positive_i=self.solveSecondOrderEq(a_prime, b_prime, c_prime, True) 
 				assert torch.all(kappa_positive_i >= 0) #If not, then either the feasible set is infeasible (note that z0 is inside the feasible set)
@@ -422,8 +424,8 @@ class ConstraintLayer(torch.nn.Module):
 				c=self.all_c[i,:,:]
 				d=self.all_d[i,:,:]
 
-				beta=M@self.w+s
-				tau=c.T@self.w+d
+				beta=M@self.y0+s
+				tau=c.T@self.y0+d
 
 				c_prime=rhoT@M.T@M@rho - torch.square(c.T@rho)
 				b_prime=2*rhoT@M.T@beta - 2*(c.T@rho)@tau
@@ -435,17 +437,12 @@ class ConstraintLayer(torch.nn.Module):
 				all_kappas_positives = torch.cat((all_kappas_positives, kappa_positive_i), dim=1)
 
 			if(len(self.all_F)>0): #If there are SDP constraints:
-				H=self.all_F[-1,:,:]
-				for i in range(len(self.all_F)-1):
-					H += self.w[i,0]*self.all_F[i,:,:]
 
 				M=self.all_F[0,:,:]*rho[:,0:(0+1),0:1]
 				for i in range(1,len(self.all_F)-1):
-					M += self.all_F[i,:,:]*rho[:,i:(i+1),0:1] #See https://discuss.pytorch.org/t/scalar-matrix-multiplication-for-a-tensor-and-an-array-of-scalars/100174/2
+					M += self.all_F[i,:,:]*rho[:,i:(i+1),0:1] #See https://discuss.pytorch.org/t/scalar-matrix-multiplication-for-a-tensor-and-an-array-of-scalars/100174/2			
 
-				Hinv=torch.linalg.inv(H);
-
-				eigenvalues = torch.unsqueeze(torch.linalg.eigvals(-Hinv@M),2) #Note that Hinv@M is not symmetric but always have real eigenvalues
+				eigenvalues = torch.unsqueeze(torch.linalg.eigvals(-self.Hinv@M),2) #Note that Hinv@M is not symmetric but always have real eigenvalues
 
 				assert (torch.all(torch.isreal(eigenvalues)))
 

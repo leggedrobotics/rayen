@@ -566,7 +566,9 @@ class convexConstraints():
 		assert epsilon.value>1e-8 #If not, there are no strictly feasible points in the subspace
 								  #TODO: change hand-coded tolerance
 
-		self.z0=z0.value	
+		self.z0 = z0.value
+
+		self.y0 = self.NA_E@self.z0 + self.y1	
 
 		assert np.allclose(NA_E.T@NA_E, np.eye(NA_E.shape[1])) #By definition, N'*N=I
 
