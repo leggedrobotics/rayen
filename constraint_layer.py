@@ -8,39 +8,24 @@ import math
 from cvxpylayers.torch import CvxpyLayer
 import random
 
-# class OptimizationLayer(torch.nn.Module):
-# 	def __init__(self, cs):
-
-# 		variable = cp.Parameter((cs.k,1))  
-# 		Pobj = cp.Parameter((cs.k,cs.k))  
-# 		qobj = cp.Parameter((cs.k,1))  
-# 		robj = cp.Parameter((1,1))  
-
-# 		#Problem is https://github.com/cvxgrp/cvxpylayers/issues/136#issuecomment-1410563781
-# 		objective=cp.Minimize(0.5*cp.quad_form(variable, Pobj) + qobj.T@variable + robj)
-# 		constraints=cs.getConstraintsCvxpy(variable);
-
-# 		self.prob_projection = cp.Problem(objective, constraints)
-
-# 		self.problem = CvxpyLayer(self.prob_projection, parameters=[Pobj, qobj, robj], variables=[variable])
-
-# 	def forward(self, Pobj, qobj, robj):
-# 		solution, = self.problem(Pobj, qobj, robj)
-# 		return solution
-
-
 
 class CostComputer(nn.Module): #Using nn.Module to be able to use register_buffer (and hence to be able to have the to() method)
 	def __init__(self, cs):
 		super().__init__()
 
-		all_P, all_q, all_r = utils.getAllPqrFromQcs(cs.qcs)
-
 		if(cs.has_quadratic_constraints):
+			all_P, all_q, all_r = utils.getAllPqrFromQcs(cs.qcs)
 			self.register_buffer("all_P", torch.Tensor(np.array(all_P)))
 			self.register_buffer("all_q", torch.Tensor(np.array(all_q)))
 			self.register_buffer("all_r", torch.Tensor(np.array(all_r)))
-	
+
+		if(cs.has_soc_constraints):
+			all_M, all_s, all_c, all_d = utils.getAllMscdFromQcs(cs.socs)
+			self.register_buffer("all_M", torch.Tensor(np.array(all_M)))
+			self.register_buffer("all_s", torch.Tensor(np.array(all_s)))
+			self.register_buffer("all_c", torch.Tensor(np.array(all_c)))
+			self.register_buffer("all_d", torch.Tensor(np.array(all_d)))
+
 		#See https://discuss.pytorch.org/t/model-cuda-does-not-convert-all-variables-to-cuda/114733/9
 		# and https://discuss.pytorch.org/t/keeping-constant-value-in-module-on-correct-device/10129
 		self.register_buffer("A_p", torch.tensor(cs.A_p))
@@ -50,6 +35,9 @@ class CostComputer(nn.Module): #Using nn.Module to be able to use register_buffe
 		self.register_buffer("z0", torch.tensor(cs.z0))
 
 		self.has_quadratic_constraints=cs.has_quadratic_constraints
+		self.has_soc_constraints=cs.has_soc_constraints
+		self.has_sdp_constraints=cs.has_sdp_constraints
+
 
 	def getyFromz(self, z):
 		y=self.NA_E@z + self.y1
@@ -75,6 +63,21 @@ class CostComputer(nn.Module): #Using nn.Module to be able to use register_buffe
 				q=self.all_q[i,:,:]
 				r=self.all_r[i,:,:]
 				all_inequalities=torch.cat((all_inequalities, utils.quadExpression(y=y,P=P,q=q,r=r)), dim=1)
+
+		if(self.has_soc_constraints):
+			for i in range(self.all_M.shape[0]):
+				M=self.all_M[i,:,:]
+				s=self.all_s[i,:,:]
+				c=self.all_c[i,:,:]
+				d=self.all_d[i,:,:]
+
+				lhs=torch.linalg.vector_norm(M@y + s, dim=1, keepdim=True) - c.T@y - d
+
+				all_inequalities=torch.cat((all_inequalities, lhs), dim=1)
+
+		if(self.has_sdp_constraints):
+			raise NotImplementedError 
+
 		########################################################################
 
 		return torch.sum(torch.square(torch.nn.functional.relu(all_inequalities)))
@@ -90,9 +93,20 @@ class CostComputer(nn.Module): #Using nn.Module to be able to use register_buffe
 		return torch.sum(torch.square(y-y_predicted))
 
 	def getSumLossAllSamples(self, params, y, y_predicted, Pobj, qobj, robj, isTesting=False):
-		loss=params['use_supervised']*self.getSumSupervisedCostAllSamples(y, y_predicted) + \
-			 (1-isTesting)*params['weight_soft_cost']*self.getSumSoftCostAllSamples(y_predicted) + \
-			 (1-params['use_supervised'])*self.getSumObjCostAllSamples(y_predicted, Pobj, qobj, robj)
+
+		loss=0.0;
+
+		if(params['use_supervised']):
+			loss += self.getSumSupervisedCostAllSamples(y, y_predicted)
+		else:
+			loss += self.getSumObjCostAllSamples(y_predicted, Pobj, qobj, robj)
+
+		if (isTesting==False and params['weight_soft_cost']>0): #I need the term params['weight_soft_cost']>0 because the soft cost is not implemented for sdp constraints yet
+			loss += params['weight_soft_cost']*self.getSumSoftCostAllSamples(y_predicted)
+
+		# loss=params['use_supervised']*self.getSumSupervisedCostAllSamples(y, y_predicted) + \
+		# 	 (1-isTesting)*params['weight_soft_cost']*self.getSumSoftCostAllSamples(y_predicted) + \
+		# 	 (1-params['use_supervised'])*self.getSumObjCostAllSamples(y_predicted, Pobj, qobj, robj)
 
 		return loss
 
@@ -108,7 +122,7 @@ class ConstraintLayer(torch.nn.Module):
 		if(self.method=='barycentric' and cs.has_quadratic_constraints):
 			raise Exception(f"Method {self.method} cannot be used with quadratic constraints")
 
-		if(self.method=='dc3' and cs.has_soc_constraints):
+		if(self.method=='dc3' and (cs.has_soc_constraints or cs.has_sdp_constraints)):
 			raise NotImplementedError
 
 		if(self.method=='dc3'):
@@ -122,6 +136,7 @@ class ConstraintLayer(torch.nn.Module):
 			
 		all_P, all_q, all_r = utils.getAllPqrFromQcs(cs.qcs)
 		all_M, all_s, all_c, all_d= utils.getAllMscdFromQcs(cs.socs)
+
 		if(cs.has_sdp_constraints):
 			all_F=cs.sdpc.all_F
 			H=all_F[-1]
