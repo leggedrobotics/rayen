@@ -203,12 +203,12 @@ def quadExpression(y, P, q, r):
 
 #https://stackoverflow.com/a/3844832
 def all_equal(iterator):
-    iterator = iter(iterator)
-    try:
-        first = next(iterator)
-    except StopIteration:
-        return True
-    return all(first == x for x in iterator)
+	iterator = iter(iterator)
+	try:
+		first = next(iterator)
+	except StopIteration:
+		return True
+	return all(first == x for x in iterator)
 
 ################### CONSTRAINTS
 #everything is numpy
@@ -416,35 +416,36 @@ class convexConstraints():
 			printInBoldGreen(f"A is {A.shape} and b is {b.shape}")
 			########################################
 
-			#Remove redundant constraints
-			################################################
-			#Eq 1.5 of https://www.research-collection.ethz.ch/bitstream/handle/20.500.11850/167108/1/thesisFinal_MaySzedlak.pdf
-			#See also https://mathoverflow.net/a/69667
-			printInBoldBlue("Removing redundant constraints...")
 			TOL=1e-7;
 			z = cp.Variable((self.k,1))
-			indexes_const_removed=[]
-			reversed_indexes=list(reversed(range(A.shape[0])));
-			for i in tqdm(reversed_indexes):
-				# print(i)
-				all_rows_but_i=[x for x in range(A.shape[0]) if x != i]
-				objective = cp.Maximize(A[i,:]@z)
-				constraints=[A[all_rows_but_i,:]@z<=b[all_rows_but_i,:],   A[i,:]@z<=(b[i,0]+1)]
-				prob = cp.Problem(objective, constraints)
-				result = prob.solve(verbose=False);
-				if(prob.status != 'optimal' and prob.status!='optimal_inaccurate'):
-					raise Exception("Value is not optimal")
+			if(A.shape[0]>1): #If there is more than one constraint
+				#Remove redundant constraints
+				################################################
+				#Eq 1.5 of https://www.research-collection.ethz.ch/bitstream/handle/20.500.11850/167108/1/thesisFinal_MaySzedlak.pdf
+				#See also https://mathoverflow.net/a/69667
+				printInBoldBlue("Removing redundant constraints...")
+				indexes_const_removed=[]
+				reversed_indexes=list(reversed(range(A.shape[0])));
+				for i in tqdm(reversed_indexes):
+					# print(i)
+					all_rows_but_i=[x for x in range(A.shape[0]) if x != i]
+					objective = cp.Maximize(A[i,:]@z)
+					constraints=[A[all_rows_but_i,:]@z<=b[all_rows_but_i,:],   A[i,:]@z<=(b[i,0]+1)]
+					prob = cp.Problem(objective, constraints)
+					result = prob.solve(verbose=False);
+					if(prob.status != 'optimal' and prob.status!='optimal_inaccurate'):
+						raise Exception("Value is not optimal")
 
-				if ((objective.value-b[i,0])<=TOL):
-					# print(f"Deleting constraint {i}")
-					indexes_const_removed.append(i)
-					A = np.delete(A, (i), axis=0)
-					b = np.delete(b, (i), axis=0)
+					if ((objective.value-b[i,0])<=TOL):
+						# print(f"Deleting constraint {i}")
+						indexes_const_removed.append(i)
+						A = np.delete(A, (i), axis=0)
+						b = np.delete(b, (i), axis=0)
 
-			# printInBoldBlue(f"Removed constraints {indexes_const_removed}")
-			printInBoldBlue(f"Removed {len(indexes_const_removed)} constraints ")
-			printInBoldGreen(f"A is {A.shape} and b is {b.shape}")
-			################################################
+				# printInBoldBlue(f"Removed constraints {indexes_const_removed}")
+				printInBoldBlue(f"Removed {len(indexes_const_removed)} constraints ")
+				printInBoldGreen(f"A is {A.shape} and b is {b.shape}")
+				################################################
 
 
 
@@ -598,6 +599,51 @@ class convexConstraints():
 			#TODO: There are more solvers, see https://www.cvxpy.org/tutorial/advanced/index.html#choosing-a-solver
 			raise Exception(f"Which solver do you have installed?")
 		###################################################
+
+	def getDataAsDict(self):
+
+		if self.has_linear_eq_constraints:
+			A2=self.lc.A2;
+			b2=self.lc.b2;
+		else:
+			A2=np.zeros((1, self.k))
+			b2=np.array([[0]])			 #0==0 (i.e., no constraint)
+
+		if self.has_linear_ineq_constraints:
+			A1=self.lc.A1;
+			b1=self.lc.b1;
+		else:
+			A1=np.zeros((1, self.k))
+			b1=np.array([[1]])	          #0<=0 (i.e., no constraint)
+
+		if self.has_quadratic_constraints:
+			all_P, all_q, all_r = getAllPqrFromQcs(self.qcs)	
+		else:
+			all_P=[np.zeros((self.k, self.k))]
+			all_q=[np.zeros((self.k, 1))]
+			all_r=[-np.ones((1, 1))]                    # -1<=0 (i.e., no constraint)
+
+		if self.has_soc_constraints:
+			all_M, all_s, all_c, all_d = getAllMscdFromQcs(self.socs)
+		else:
+			all_M=[np.zeros((self.k, self.k))]
+			all_s=[np.zeros((self.k, 1))]
+			all_c=[np.zeros((self.k, 1))]                 
+			all_d=[np.ones((1, 1))]                    # 0<=1 (i.e., no constraint)
+
+		if(self.has_sdp_constraints):
+			all_F=self.sdpc.all_F
+		else:
+			all_F=[]
+			for i in range(self.k):
+				all_F.append(np.zeros((self.k, self.k)))
+			all_F.append(np.eye((self.k)))            # I<=0 (i.e., no constraint)
+
+
+		return dict(A2=A2, b2=b2, A1=A1, b1=b1, 
+					all_P=all_P, all_q=all_q, all_r=all_r, 
+					all_M=all_M, all_s=all_s, all_c=all_c, all_d=all_d,
+					all_F=all_F)
 
 
 
@@ -769,12 +815,10 @@ def H_to_V(A, b):
 		else:
 			raise ValueError('Generator data structure is not valid.')
 
-	printInBoldRed(f"Found {len(V_list)} vertices and {len(R_list)} rays")
-
 	V = np.asarray(V_list)
 	R = np.asarray(R_list)
 
-	# by convention of cddlib, those rays assciated with R_lin_idx
+	# by convention of cddlib, those rays associated with R_lin_idx
 	# are not constrained to non-negative coefficients
 	if len(R) > 0:
 		R = np.concatenate([R, -R[R_lin_idx, :]], axis=0)
@@ -782,12 +826,13 @@ def H_to_V(A, b):
 	V=V.T; 
 	R=R.T;
 
-
 	if(R.size==0):
 		R=np.array([[]])#Simply add a dimension, so that both V and R are 2D matrices
 
 	if(V.size==0):
 		V=np.array([[]])#Simply add a dimension, so that both V and R are 2D matrices
+
+	printInBoldRed(f"Found {V.shape[1]} vertices and {R.shape[1]} rays")
 
 	#Each column of V is a vertex
 	#Each column of R is a ray
@@ -796,17 +841,19 @@ def H_to_V(A, b):
 
 
 def plot3DPolytopeHRepresentation(A,b, limits, ax):
-	print("here")
 	points, R=H_to_V(A,b)
-	plot3DPolytopeVRepresentation(points, limits, ax)
+	if(R.shape[1]>0):
+		printInBoldRed("Plotting 3D unbounded polyhedron not implemented yet")
+		return
+	plotConvexHullOf3DPoints(points, limits, ax)
 
-def plot3DPolytopeVRepresentation(V, limits, ax):
+def plotConvexHullOf3DPoints(V, limits, ax):
 	points=V.T
 
 	## https://stackoverflow.com/a/71544694/6057617
 
 	# to get the convex hull with cdd, one has to prepend a column of ones
-	vertices = np.hstack((np.ones((8,1)), points))
+	vertices = np.hstack((np.ones((points.shape[0],1)), points))
 
 	# do the polyhedron
 	mat = cdd.Matrix(vertices, linear=False, number_type="fraction") 

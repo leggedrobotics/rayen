@@ -14,12 +14,13 @@ import matplotlib.colors as colors
 import numpy as np
 
 import scipy
+import os
 
 
 methods=['walker_2', 'walker_1', 'barycentric', 'unconstrained', 'proj_train_test', 'proj_test', 'dc3']
 methods=['walker_2', 'walker_1', 'barycentric', 'unconstrained', 'dc3']
 
-index_examples_to_run=list(range(13))
+index_examples_to_run=list(range(14))
 # index_examples_to_run=[12]
 methods=['walker_1']
 num_of_examples=len(index_examples_to_run)
@@ -28,6 +29,10 @@ rows=math.ceil(math.sqrt(num_of_examples))
 cols=rows
 
 torch.set_default_dtype(torch.float64) ##Use float32 here??
+
+# if method=='walker_1':
+# 	os.system("rm -rf ./examples_mat");
+# 	os.system("mkdir ./examples_mat");
 
 for method in methods:
 	utils.printInBoldRed(f"==================== METHOD: {method} ==========================")
@@ -115,34 +120,10 @@ for method in methods:
 			ax.set_aspect('equal')
 
 
-		###################### SAVE TO MAT FILE
-
-		# A2=constraint.A2;
-		# b2=constraint.b2;
-		# A1=constraint.A1;
-		# b1=constraint.b1;
-		# all_P=constraint.all_P;
-		# all_q=constraint.all_q;
-		# all_r=constraint.all_r;
-
-		# if(A2 is None):
-		# 	A2=np.array([[]])
-		# if(b2 is None):
-		# 	b2=np.array([[]])
-		# if(A1 is None):
-		# 	A1=np.array([[]])
-		# if(b1 is None):
-		# 	b1=np.array([[]])
-		# if(all_P is None):
-		# 	all_P=np.array([[]])
-		# if(all_q is None):
-		# 	all_q=np.array([[]])
-		# if(all_r is None):
-		# 	all_r=np.array([[]])
-
-		# scipy.io.savemat('example_'+str(index_example)+'.mat', dict(A2=A2, b2=b2, A1=A1, b1=b1, all_P=all_P, all_q=all_q, all_r=all_r, result=result))
-
-		################################################3
+		if method=='walker_1':
+			my_dict=constraint.getDataAsDict();
+			my_dict["result"]=result
+			scipy.io.savemat('./examples_mat/example_'+str(index_example)+'.mat', my_dict)
 
 
 plt.show()
