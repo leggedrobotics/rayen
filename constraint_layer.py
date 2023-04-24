@@ -7,6 +7,7 @@ import cvxpy as cp
 import math
 from cvxpylayers.torch import CvxpyLayer
 import random
+import copy
 
 
 class CostComputer(nn.Module): #Using nn.Module to be able to use register_buffer (and hence to be able to have the to() method)
@@ -138,7 +139,7 @@ class ConstraintLayer(torch.nn.Module):
 		all_M, all_s, all_c, all_d= utils.getAllMscdFromQcs(cs.socs)
 
 		if(cs.has_sdp_constraints):
-			all_F=cs.sdpc.all_F
+			all_F=copy.deepcopy(cs.sdpc.all_F)
 			H=all_F[-1]
 			for i in range(cs.sdpc.dim()):
 				H += cs.y0[i,0]*cs.sdpc.all_F[i]
