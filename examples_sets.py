@@ -158,6 +158,17 @@ def getExample(example):
 	elif example==12: #The PSD cone in 3D
 		sdpc = getPSDCone3DConstraint()
 
+	elif example==13: #Many of them
+		A1=np.array([[-1.0,-1.0,-1.0]])
+		b1=np.array([[-1.0]])
+		lc=utils.LinearConstraint(A1, b1, None, None)
+		E_ellipsoid=np.array([[0.1,0,0],
+							  [0.0,1.0,0.0],
+							  [0.0,0.0,1.0]])
+		qcs.append(getEllipsoidConstraint(E_ellipsoid, np.zeros((3,1))))
+		socs.append(getSOC3DConstraint())
+		sdpc = getPSDCone3DConstraint()
+
 	else:
 		raise Exception("Not implemented yet")
 
