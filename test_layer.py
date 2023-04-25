@@ -15,13 +15,14 @@ import numpy as np
 
 import scipy
 import os
+import time
 
 
 methods=['walker_2', 'walker_1', 'barycentric', 'unconstrained', 'proj_train_test', 'proj_test', 'dc3']
 methods=['walker_2', 'walker_1', 'barycentric', 'unconstrained', 'dc3']
 
-index_examples_to_run=list(range(14))
-# index_examples_to_run=[12]
+index_examples_to_run=list(range(15))
+# index_examples_to_run=[14]
 methods=['walker_1']
 num_of_examples=len(index_examples_to_run)
 ###############
@@ -78,7 +79,9 @@ for method in methods:
 
 		numel_output_mapper=my_layer.getDimAfterMap()
 
-		x_batched=torch.Tensor(1000, numel_output_mapper, 1).uniform_(-8, 8)
+		# x_batched=torch.Tensor(1000, numel_output_mapper, 1).uniform_(-8, 8)
+		num_samples=12000
+		x_batched=torch.Tensor(12000, numel_output_mapper, 1).uniform_(-2.5, 2.5)
 		# x_batched.requires_grad=True
 		# print(x_batched.requires_grad)
 		# exit()
@@ -88,7 +91,10 @@ for method in methods:
 		# my_layer.setMapper(mapper)
 
 		my_layer.eval() #This changes the self.training variable of the module
+
+		time_start=time.time()
 		result=my_layer(x_batched)
+		total_time_per_sample= (time.time()-time_start)/num_samples
 
 		result=result.detach().numpy();
 
@@ -119,11 +125,17 @@ for method in methods:
 			# utils.plot2DEllipsoidB(my_layer.B.numpy(),my_layer.z0.numpy(),ax)
 			ax.set_aspect('equal')
 
+			ax.set_xlim(-0.5,8)
+			ax.set_ylim(-0.5,8)
+
 
 		if method=='walker_1':
 			my_dict=constraint.getDataAsDict();
 			my_dict["result"]=result
+			my_dict["total_time_per_sample"]=total_time_per_sample
 			scipy.io.savemat('./examples_mat/example_'+str(index_example)+'.mat', my_dict)
+
+		utils.printInBoldBlue(f"Example {i}, total_time_per_sample={total_time_per_sample}")
 
 
 plt.show()
