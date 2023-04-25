@@ -555,7 +555,7 @@ class convexConstraints():
 		constraints=self.getConstraintsInSubspaceCvxpy(z0, epsilon)
 
 		constraints.append(epsilon>=0)
-		constraints.append(epsilon<=5.0) #This constraint is needed for the case where the set is unbounded.
+		constraints.append(epsilon<=0.5) #This constraint is needed for the case where the set is unbounded. Any positive value is valid
 		
 		objective = cp.Minimize(-epsilon)
 		prob = cp.Problem(objective, constraints)
