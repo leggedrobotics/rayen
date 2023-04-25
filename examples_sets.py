@@ -111,7 +111,7 @@ def getExample(example):
 		A1=np.array([[-1,0],
 					 [0, -1.0],
 					 [0, 1.0],
-					 [0.2425,    0.9701]]);
+					 [0.6,    0.9701]]);
 
 		b1=np.array([[0],
 					[0],
@@ -121,7 +121,7 @@ def getExample(example):
 		lc=utils.LinearConstraint(A1, b1, None, None)
 
 		if(example==5):
-			qcs.append(getSphereConstraint(1.0,np.zeros((2,1))))
+			qcs.append(getSphereConstraint(1.25,np.zeros((2,1))))
 
 	elif example==6: #The intersection between a cube and two planes 
 		A1, b1=getCube()
@@ -139,14 +139,15 @@ def getExample(example):
 	elif example==8: #Unbounded 2d polyhedron. It has two vertices and two rays
 
 		A1=np.array([[0.0,-1.0], [2.0,-4.0], [-2.0,1.0]]);
-		b1=np.array([[-2.0], [8.0], [-5.0]]);
+		b1=np.array([[-2.0], [1.0], [-5.0]]);
 		lc=utils.LinearConstraint(A1, b1, None, None)
 
 	elif example==9: #A paraboloid and a plane
 		qcs.append(getParaboloid3DConstraint())
 
-		A2=np.array([[1.0, 1.0, 1.0]]);
-		b2=np.array([[1.0]]);		
+		A2=np.array([[1.0, 1.0, 3.0]]);
+		b2=np.array([[1.0]]);	
+		lc=utils.LinearConstraint(None, None, A2, b2)	
 
 	elif example==10: #A paraboloid and a shpere
 		qcs.append(getParaboloid3DConstraint())
@@ -168,6 +169,19 @@ def getExample(example):
 		qcs.append(getEllipsoidConstraint(E_ellipsoid, np.zeros((3,1))))
 		socs.append(getSOC3DConstraint())
 		sdpc = getPSDCone3DConstraint()
+
+	elif example==14: #Many of them
+		A1=np.array([[-1.0,-1.0,-1.0],
+			         [-1.0,2.0,2.0]])
+		b1=np.array([[-1.0],[1.0]])
+		lc=utils.LinearConstraint(A1, b1, None, None)
+		E_ellipsoid=np.array([[0.6,0,0],
+							  [0.0,1.0,0.0],
+							  [0.0,0.0,1.0]])
+		qcs.append(getEllipsoidConstraint(E_ellipsoid, np.zeros((3,1))))
+		# qcs.append(getParaboloid3DConstraint())
+		# socs.append(getSOC3DConstraint())
+		# sdpc = getPSDCone3DConstraint()
 
 	else:
 		raise Exception("Not implemented yet")
