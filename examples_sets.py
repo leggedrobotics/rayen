@@ -1,5 +1,6 @@
 import numpy as np
-import utils
+import constraints
+
 
 def getCube():
 	A1=np.array([ [1.0, 0, 0],
@@ -25,7 +26,7 @@ def getEllipsoidConstraint(E, c):
 	P=2*E;
 	q=(-2*E@c)
 	r=c.T@E@c-1
-	return utils.convexQuadraticConstraint(P, q, r)
+	return constraints.convexQuadraticConstraint(P, q, r)
 
 #Sphere of radius r centered around c
 def getSphereConstraint(r, c):
@@ -38,7 +39,7 @@ def getParaboloid3DConstraint():
 	q=np.array([[0.0],[0.0],[-1.0]])
 	r=np.array([[0.0]])
 
-	return utils.convexQuadraticConstraint(P,q,r)
+	return constraints.convexQuadraticConstraint(P,q,r)
 
 def getSOC3DConstraint():
 	M=np.array([[1.0, 0.0, 0.0],
@@ -48,7 +49,7 @@ def getSOC3DConstraint():
 	c=np.array([[0.0],[0.0],[1.0]])
 	d=np.array([[0.0]])
 
-	return utils.SOCConstraint(M, s, c, d)
+	return constraints.SOCConstraint(M, s, c, d)
 
 def getPSDCone3DConstraint():
 	#[x y;y z] >> 0
@@ -64,7 +65,7 @@ def getPSDCone3DConstraint():
 	F3=np.array([[0.0, 0.0],
 				 [0.0, 0.0]])
 
-	return utils.SDPConstraint([F0, F1, F2, F3])
+	return constraints.SDPConstraint([F0, F1, F2, F3])
 
 def getNoneLinearConstraints():
 	return None, None, None, None
@@ -85,14 +86,14 @@ def getExample(example):
 		A1, b1=getCube()
 		A2=np.array([[1.0, 1.0, 1.0]]);
 		b2=np.array([[1.0]]);
-		lc=utils.LinearConstraint(A1, b1, A2, b2)
+		lc=constraints.LinearConstraint(A1, b1, A2, b2)
 
 	elif example==1: #A polygon embeded in 3D with an sphere
 
 		A1, b1=getCube()
 		A2=np.array([[1.0, 1.0, 1.0]]);
 		b2=np.array([[1.0]]);
-		lc=utils.LinearConstraint(A1, b1, A2, b2)
+		lc=constraints.LinearConstraint(A1, b1, A2, b2)
 		qcs.append(getSphereConstraint(0.8,np.zeros((3,1))))
 
 
@@ -118,7 +119,7 @@ def getExample(example):
 					[1],
 					[1.2127]])
 
-		lc=utils.LinearConstraint(A1, b1, None, None)
+		lc=constraints.LinearConstraint(A1, b1, None, None)
 
 		if(example==5):
 			qcs.append(getSphereConstraint(1.25,np.zeros((2,1))))
@@ -128,26 +129,26 @@ def getExample(example):
 		A2=np.array([[1.0, 1.0, 1.0],
 					  [-1.0, 1.0, 1.0] ]);
 		b2=np.array([[1.0],[0.1]]);
-		lc=utils.LinearConstraint(A1, b1, A2, b2)
+		lc=constraints.LinearConstraint(A1, b1, A2, b2)
 
 	elif example==7: #Just a plane
 		A2=np.array([[1.0, 1.0, 1.0]]);
 		b2=np.array([[1.0]]);	
-		lc=utils.LinearConstraint(None, None, A2, b2)
+		lc=constraints.LinearConstraint(None, None, A2, b2)
 
 
 	elif example==8: #Unbounded 2d polyhedron. It has two vertices and two rays
 
 		A1=np.array([[0.0,-1.0], [2.0,-4.0], [-2.0,1.0]]);
 		b1=np.array([[-2.0], [1.0], [-5.0]]);
-		lc=utils.LinearConstraint(A1, b1, None, None)
+		lc=constraints.LinearConstraint(A1, b1, None, None)
 
 	elif example==9: #A paraboloid and a plane
 		qcs.append(getParaboloid3DConstraint())
 
 		A2=np.array([[1.0, 1.0, 3.0]]);
 		b2=np.array([[1.0]]);	
-		lc=utils.LinearConstraint(None, None, A2, b2)	
+		lc=constraints.LinearConstraint(None, None, A2, b2)	
 
 	elif example==10: #A paraboloid and a shpere
 		qcs.append(getParaboloid3DConstraint())
@@ -162,7 +163,7 @@ def getExample(example):
 	elif example==13: #Many of them
 		A1=np.array([[-1.0,-1.0,-1.0]])
 		b1=np.array([[-1.0]])
-		lc=utils.LinearConstraint(A1, b1, None, None)
+		lc=constraints.LinearConstraint(A1, b1, None, None)
 		E_ellipsoid=np.array([[0.1,0,0],
 							  [0.0,1.0,0.0],
 							  [0.0,0.0,1.0]])
@@ -174,7 +175,7 @@ def getExample(example):
 		A1=np.array([[-1.0,-1.0,-1.0],
 			         [-1.0,2.0,2.0]])
 		b1=np.array([[-1.0],[1.0]])
-		lc=utils.LinearConstraint(A1, b1, None, None)
+		lc=constraints.LinearConstraint(A1, b1, None, None)
 		E_ellipsoid=np.array([[0.6,0,0],
 							  [0.0,1.0,0.0],
 							  [0.0,0.0,1.0]])
@@ -187,4 +188,4 @@ def getExample(example):
 		raise Exception("Not implemented yet")
 
 
-	return utils.convexConstraints(lc=lc, qcs=qcs, socs=socs, sdpc=sdpc)
+	return constraints.convexConstraints(lc=lc, qcs=qcs, socs=socs, sdpc=sdpc)

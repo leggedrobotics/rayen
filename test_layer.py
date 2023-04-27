@@ -18,8 +18,9 @@ import os
 import time
 
 
-methods=['walker_2', 'walker_1', 'barycentric', 'unconstrained', 'proj_train_test', 'proj_test', 'dc3']
-methods=['walker_2', 'walker_1', 'barycentric', 'unconstrained', 'dc3']
+
+methods=['walker_2', 'walker_1', 'Bar', 'UU', 'PP', 'UP', 'DC3']
+methods=['walker_2', 'walker_1', 'Bar', 'UU', 'DC3']
 
 index_examples_to_run=list(range(15))
 # index_examples_to_run=[14]
@@ -46,10 +47,10 @@ for method in methods:
 
 		constraint=getExample(index_example)
 
-		if(method=='barycentric' and (constraint.has_quadratic_constraints or constraint.has_soc_constraints or constraint.has_sdp_constraints)):
+		if(method=='Bar' and (constraint.has_quadratic_constraints or constraint.has_soc_constraints or constraint.has_sdp_constraints)):
 			continue
 
-		if(method=='dc3' and (constraint.has_soc_constraints or constraint.has_sdp_constraints)):
+		if(method=='DC3' and (constraint.has_soc_constraints or constraint.has_sdp_constraints)):
 			continue
 
 		# fig = plt.figure()
@@ -64,18 +65,18 @@ for method in methods:
 
 		num_steps=4; #Only used in the ellipsoid_walker method
 
-		if(method=='dc3'):
-			args_dc3={}
-			args_dc3['lr'] = 1e-4
-			args_dc3['eps_converge'] = 1e-4
-			args_dc3['momentum'] = 0.5
-			args_dc3['max_steps_training'] = 10
-			args_dc3['max_steps_testing'] = 50000 #float("inf")
+		if(method=='DC3'):
+			args_DC3={}
+			args_DC3['lr'] = 1e-4
+			args_DC3['eps_converge'] = 1e-4
+			args_DC3['momentum'] = 0.5
+			args_DC3['max_steps_training'] = 10
+			args_DC3['max_steps_testing'] = 50000 #float("inf")
 		else:
-			args_dc3 = None
+			args_DC3 = None
 
 
-		my_layer=ConstraintLayer(constraint, method=method, create_map=False, args_dc3=args_dc3)
+		my_layer=ConstraintLayer(constraint, method=method, create_map=False, args_DC3=args_DC3)
 
 		numel_output_mapper=my_layer.getDimAfterMap()
 
@@ -182,7 +183,7 @@ plt.show()
 # 			# print(f"direction_and_scalar={direction_and_scalar}")
 # 			x_batched=torch.cat((x_batched, tmp), axis=0)
 
-# if(method=='barycentric' or method=='proj_train_test' or method=='proj_test'):
+# if(method=='Bar' or method=='PP' or method=='UP'):
 # 	x_batched=torch.empty(0, numel_output_mapper, 1)
 
 # 	for i in range(1000):

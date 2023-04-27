@@ -9,144 +9,23 @@ from cvxpylayers.torch import CvxpyLayer
 import random
 import copy
 
-
-class CostComputer(nn.Module): #Using nn.Module to be able to use register_buffer (and hence to be able to have the to() method)
-	def __init__(self, cs):
-		super().__init__()
-
-		if(cs.has_quadratic_constraints):
-			all_P, all_q, all_r = utils.getAllPqrFromQcs(cs.qcs)
-			self.register_buffer("all_P", torch.Tensor(np.array(all_P)))
-			self.register_buffer("all_q", torch.Tensor(np.array(all_q)))
-			self.register_buffer("all_r", torch.Tensor(np.array(all_r)))
-
-		if(cs.has_soc_constraints):
-			all_M, all_s, all_c, all_d = utils.getAllMscdFromQcs(cs.socs)
-			self.register_buffer("all_M", torch.Tensor(np.array(all_M)))
-			self.register_buffer("all_s", torch.Tensor(np.array(all_s)))
-			self.register_buffer("all_c", torch.Tensor(np.array(all_c)))
-			self.register_buffer("all_d", torch.Tensor(np.array(all_d)))
-
-		#See https://discuss.pytorch.org/t/model-cuda-does-not-convert-all-variables-to-cuda/114733/9
-		# and https://discuss.pytorch.org/t/keeping-constant-value-in-module-on-correct-device/10129
-		self.register_buffer("A_p", torch.tensor(cs.A_p))
-		self.register_buffer("b_p", torch.tensor(cs.b_p))
-		self.register_buffer("y1", torch.tensor(cs.y1))
-		self.register_buffer("NA_E", torch.tensor(cs.NA_E))
-		self.register_buffer("z0", torch.tensor(cs.z0))
-
-		self.has_linear_ineq_constraints=cs.has_linear_ineq_constraints
-		self.has_linear_eq_constraints=cs.has_linear_eq_constraints
-		self.has_quadratic_constraints=cs.has_quadratic_constraints
-		self.has_soc_constraints=cs.has_soc_constraints
-		self.has_sdp_constraints=cs.has_sdp_constraints
-
-		if self.has_linear_ineq_constraints:
-			self.register_buffer("A1", torch.Tensor(cs.lc.A1))
-			self.register_buffer("b1", torch.Tensor(cs.lc.b1))
-
-		if self.has_linear_eq_constraints:
-			self.register_buffer("A2", torch.Tensor(cs.lc.A2))
-			self.register_buffer("b2", torch.Tensor(cs.lc.b2))
-
-	def getyFromz(self, z):
-		y=self.NA_E@z + self.y1
-		return y
-
-	#This function below assumes that y is in the plane spanned by the columns of NA_E!!
-	# def getzFromy(self, y):
-	# 	z=self.NA_E.T@(y - self.y1)
-	# 	return z
-
-	def getSumSoftCostAllSamples(self, y):
-		################## STACK THE VALUES OF ALL THE INEQUALITIES
-		all_inequalities=torch.empty((y.shape[0],0,1), device=y.device)
-		##### Ap*z<=bp
-		# z=self.getzFromy(y); #I cannot use this function, since this function assumes that y lies in \mathcal{Y}_L
-							   #I could use it for DC3, but not for the "unconstrained method"
-		# all_inequalities=torch.cat((all_inequalities, self.A_p@z-self.b_p), dim=1);
-		##### A1*y<=b1
-		if self.has_linear_ineq_constraints:
-			all_inequalities=torch.cat((all_inequalities, self.A1@y-self.b1), dim=1);
-
-		##### g(y)<=0
-		if(self.has_quadratic_constraints):
-			for i in range(self.all_P.shape[0]):
-				P=self.all_P[i,:,:]
-				q=self.all_q[i,:,:]
-				r=self.all_r[i,:,:]
-				all_inequalities=torch.cat((all_inequalities, utils.quadExpression(y=y,P=P,q=q,r=r)), dim=1)
-
-		if(self.has_soc_constraints):
-			for i in range(self.all_M.shape[0]):
-				M=self.all_M[i,:,:]
-				s=self.all_s[i,:,:]
-				c=self.all_c[i,:,:]
-				d=self.all_d[i,:,:]
-
-				lhs=torch.linalg.vector_norm(M@y + s, dim=1, keepdim=True) - c.T@y - d
-
-				all_inequalities=torch.cat((all_inequalities, lhs), dim=1)
-
-		if(self.has_sdp_constraints):
-			raise NotImplementedError 
-
-		soft_cost = torch.sum(torch.square(torch.nn.functional.relu(all_inequalities)))
-
-		if self.has_linear_eq_constraints:
-			soft_cost_equalities = torch.sum(torch.square(self.A2@y-self.b2)); #This is zero for the DC3 method, and nonzero for the unconstrained method
-			soft_cost += soft_cost_equalities
-
-		########################################################################
-
-		return soft_cost
-
-
-	def getSumObjCostAllSamples(self, y, Pobj, qobj, robj):
-		tmp=utils.quadExpression(y=y,P=Pobj,q=qobj,r=robj)
-		assert tmp.shape==(y.shape[0], 1, 1)
-
-		return torch.sum(tmp)
-
-	def getSumSupervisedCostAllSamples(self, y, y_predicted):
-		return torch.sum(torch.square(y-y_predicted))
-
-	def getSumLossAllSamples(self, params, y, y_predicted, Pobj, qobj, robj, isTesting=False):
-
-		loss=0.0;
-
-		if(params['use_supervised']):
-			loss += self.getSumSupervisedCostAllSamples(y, y_predicted)
-		else:
-			loss += self.getSumObjCostAllSamples(y_predicted, Pobj, qobj, robj)
-
-		if (isTesting==False and params['weight_soft_cost']>0): #I need the term params['weight_soft_cost']>0 because the soft cost is not implemented for sdp constraints yet
-			loss += params['weight_soft_cost']*self.getSumSoftCostAllSamples(y_predicted)
-
-		# loss=params['use_supervised']*self.getSumSupervisedCostAllSamples(y, y_predicted) + \
-		# 	 (1-isTesting)*params['weight_soft_cost']*self.getSumSoftCostAllSamples(y_predicted) + \
-		# 	 (1-params['use_supervised'])*self.getSumObjCostAllSamples(y_predicted, Pobj, qobj, robj)
-
-		return loss
-
-
 class ConstraintLayer(torch.nn.Module):
-	def __init__(self, cs, input_dim=None, method='walker_2', create_map=True, args_dc3=None):
+	def __init__(self, cs, input_dim=None, method='walker_2', create_map=True, args_DC3=None):
 		super().__init__()
 
 		assert cp.__version__=='1.2.3' #See this issue: https://github.com/cvxgrp/cvxpylayers/issues/143
 
 		self.method=method
 
-		if(self.method=='barycentric' and cs.has_quadratic_constraints):
+		if(self.method=='Bar' and cs.has_quadratic_constraints):
 			raise Exception(f"Method {self.method} cannot be used with quadratic constraints")
 
-		if(self.method=='dc3' and (cs.has_soc_constraints or cs.has_sdp_constraints)):
+		if(self.method=='DC3' and (cs.has_soc_constraints or cs.has_sdp_constraints)):
 			raise NotImplementedError
 
-		if(self.method=='dc3'):
-			assert args_dc3 is not None
-			self.args_dc3=args_dc3
+		if(self.method=='DC3'):
+			assert args_DC3 is not None
+			self.args_DC3=args_DC3
 
 		self.k=cs.k #Dimension of the ambient space
 		self.n=cs.n #Dimension of the embedded space
@@ -184,7 +63,7 @@ class ConstraintLayer(torch.nn.Module):
 		self.register_buffer("z0", torch.tensor(cs.z0))
 		self.register_buffer("y0", torch.tensor(cs.y0))
 
-		if(self.method=='proj_train_test' or self.method=='proj_test'):
+		if(self.method=='PP' or self.method=='UP'):
 			#Section 8.1.1 of https://web.stanford.edu/~boyd/cvxbook/bv_cvxbook.pdf
 			self.z_projected = cp.Variable((cs.n,1))         #projected point
 			self.z_to_be_projected = cp.Parameter((cs.n,1))  #original point
@@ -208,31 +87,31 @@ class ConstraintLayer(torch.nn.Module):
 			print(f"vertices={self.V}")
 			print(f"rays={self.R}")
 
-		if(self.method=='dc3'):
+		if(self.method=='DC3'):
 
-			A2_dc3, b2_dc3=utils.removeRedundantEquationsFromEqualitySystem(cs.A_E, cs.b_E) 
+			A2_DC3, b2_DC3=utils.removeRedundantEquationsFromEqualitySystem(cs.A_E, cs.b_E) 
 
-			self.register_buffer("A2_dc3", torch.tensor(A2_dc3))
-			self.register_buffer("b2_dc3", torch.tensor(b2_dc3))
-			self.register_buffer("A1_dc3", torch.tensor(cs.A_I))
-			self.register_buffer("b1_dc3", torch.tensor(cs.b_I))
+			self.register_buffer("A2_DC3", torch.tensor(A2_DC3))
+			self.register_buffer("b2_DC3", torch.tensor(b2_DC3))
+			self.register_buffer("A1_DC3", torch.tensor(cs.A_I))
+			self.register_buffer("b1_DC3", torch.tensor(cs.b_I))
 
 			#Constraints are now 
-			# A2_dc3 y = b2_dc3
-			# A1_dc3 y <= b1_dc3
+			# A2_DC3 y = b2_DC3
+			# A1_DC3 y <= b1_DC3
 
 			det = 0
 			i = 0
-			self.neq_dc3 = self.A2_dc3.shape[0]
+			self.neq_DC3 = self.A2_DC3.shape[0]
 
 			#######################################################
 			#Note: This section follows the original implementation of DC3: https://github.com/locuslab/DC3/blob/35437af7f22390e4ed032d9eef90cc525764d26f/utils.py#L67
 			#There are probably more efficient ways to do this though (probably using the QR decomposition)
 			print("DC3: Obtaining partial_vars and other_vars")
 			while True:
-				self.partial_vars = np.random.choice(self.k, self.k - self.neq_dc3, replace=False)
+				self.partial_vars = np.random.choice(self.k, self.k - self.neq_DC3, replace=False)
 				self.other_vars = np.setdiff1d( np.arange(self.k), self.partial_vars)
-				det = torch.det(self.A2_dc3[:, self.other_vars])
+				det = torch.det(self.A2_DC3[:, self.other_vars])
 				if(abs(det) > 0.0001):
 					break
 				i += 1
@@ -242,18 +121,18 @@ class ConstraintLayer(torch.nn.Module):
 			#######################################################
 
 
-			A2p = self.A2_dc3[:, self.partial_vars]
-			A2oi = torch.inverse(self.A2_dc3[:, self.other_vars])			
+			A2p = self.A2_DC3[:, self.partial_vars]
+			A2oi = torch.inverse(self.A2_DC3[:, self.other_vars])			
 
 
 			####################################################
 			####################################################
 
-			A1p=self.A1_dc3[:, self.partial_vars];
-			A1o=self.A1_dc3[:, self.other_vars];
+			A1p=self.A1_DC3[:, self.partial_vars];
+			A1o=self.A1_DC3[:, self.other_vars];
 
 			A1_effective = A1p - A1o @ (A2oi @ A2p)
-			b1_effective = self.b1_dc3 - A1o @ A2oi @ self.b2_dc3;
+			b1_effective = self.b1_DC3 - A1o @ A2oi @ self.b2_DC3;
 
 			all_P_effective=torch.Tensor(self.all_P.shape[0], len(self.partial_vars), len(self.partial_vars) )
 			all_q_effective=torch.Tensor(self.all_q.shape[0], len(self.partial_vars), 1 )
@@ -277,7 +156,7 @@ class ConstraintLayer(torch.nn.Module):
 				qo=q[self.other_vars,0:1]
 				qp=q[self.partial_vars,0:1]
 
-				b2=self.b2_dc3
+				b2=self.b2_DC3
 
 				P_effective=2*(-A2p.T@A2oi.T@Pop + 0.5*A2p.T@A2oi.T@Po@A2oi@A2p + 0.5*Pp)
 				q_effective=(b2.T@A2oi.T@Pop + qp.T - qo.T@A2oi@A2p - b2.T@A2oi.T@Po@A2oi@A2p).T
@@ -316,21 +195,21 @@ class ConstraintLayer(torch.nn.Module):
 		elif(self.method=='walker_1'):
 			self.forwardForMethod=self.forwardForWalker1
 			self.dim_after_map=self.n
-		elif(self.method=='unconstrained'):
-			self.forwardForMethod=self.forwardForUnconstrained
+		elif(self.method=='UU'):
+			self.forwardForMethod=self.forwardForUU
 			self.dim_after_map=self.k
 		elif(self.method=='barycentric'):
 			self.forwardForMethod=self.forwardForBarycentric
 			self.dim_after_map=(self.num_vertices + self.num_rays)
-		elif(self.method=='proj_train_test'):
+		elif(self.method=='PP'):
 			self.forwardForMethod=self.forwardForProjTrainTest
 			self.dim_after_map=(self.n)
-		elif(self.method=='proj_test'):
+		elif(self.method=='UP'):
 			self.forwardForMethod=self.forwardForProjTest
 			self.dim_after_map=(self.n)
-		elif(self.method=='dc3'):
-			self.forwardForMethod=self.forwardForDc3
-			self.dim_after_map=(self.k - self.neq_dc3)
+		elif(self.method=='DC3'):
+			self.forwardForMethod=self.forwardForDC3
+			self.dim_after_map=(self.k - self.neq_DC3)
 		else:
 			raise NotImplementedError
 
@@ -341,10 +220,10 @@ class ConstraintLayer(torch.nn.Module):
 			self.mapper=nn.Sequential(); #Mapper does nothing
 
 	def obtainyoFromypDC3(self, yp):
-		return self.A2oi @ (self.b2_dc3 - self.A2p @ yp)
+		return self.A2oi @ (self.b2_DC3 - self.A2p @ yp)
 
 
-	def forwardForDc3(self, q):
+	def forwardForDC3(self, q):
 		
 		#### Complete partial
 		y = torch.zeros((q.shape[0], self.k, 1), device=q.device)
@@ -358,9 +237,9 @@ class ConstraintLayer(torch.nn.Module):
 		old_y_step = 0
 
 		if(self.training):
-			max_steps=self.args_dc3['max_steps_training'] #This is called corrTrainSteps in DC3 original code
+			max_steps=self.args_DC3['max_steps_training'] #This is called corrTrainSteps in DC3 original code
 		else:
-			max_steps=self.args_dc3['max_steps_testing'] #float("inf") #This is called corrTestMaxSteps in DC3 original code
+			max_steps=self.args_DC3['max_steps_testing'] #float("inf") #This is called corrTestMaxSteps in DC3 original code
 
 		while True:
 
@@ -388,14 +267,14 @@ class ConstraintLayer(torch.nn.Module):
 			################################################
 			################################################
 			
-			new_y_step = self.args_dc3['lr'] * y_step + self.args_dc3['momentum'] * old_y_step
+			new_y_step = self.args_DC3['lr'] * y_step + self.args_DC3['momentum'] * old_y_step
 			y_new = y_new - new_y_step
 			old_y_step = new_y_step
 			step_index += 1
 
 			################################################
 			################################################ COMPUTE current violation
-			stacked=self.A1_dc3@y_new - self.b1_dc3
+			stacked=self.A1_DC3@y_new - self.b1_DC3
 			for i in range(self.all_P.shape[0]): #for each of the quadratic constraints
 				stacked=torch.cat((stacked,utils.quadExpression(y_new, self.all_P[i,:,:], self.all_q[i,:,:], self.all_r[i,:,:])), dim=1)
 			violation=torch.max(torch.relu(stacked))
@@ -404,7 +283,7 @@ class ConstraintLayer(torch.nn.Module):
 
 			# print(f"step_index={step_index}, Violation={violation}")
 
-			converged_ineq = (violation < self.args_dc3['eps_converge'])
+			converged_ineq = (violation < self.args_DC3['eps_converge'])
 			max_iter_reached = (step_index >= max_steps)
 
 			if(max_iter_reached):
@@ -508,7 +387,7 @@ class ConstraintLayer(torch.nn.Module):
 		alpha=torch.minimum( 1/kappa , norm_v )
 		return self.getyFromz(self.z0 + alpha*v_bar)
 
-	def forwardForUnconstrained(self, q):
+	def forwardForUU(self, q):
 		return q
 
 	def forwardForBarycentric(self, q):
@@ -563,6 +442,6 @@ class ConstraintLayer(torch.nn.Module):
 
 		y=self.forwardForMethod(q)
 
-		assert (torch.isnan(y).any())==False, "If you are using DC3, try reducing args_dc3[lr]"
+		assert (torch.isnan(y).any())==False, "If you are using DC3, try reducing args_DC3[lr]"
 
 		return y

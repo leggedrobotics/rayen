@@ -10,7 +10,8 @@ import pandas as pd
 from torch.utils.data import DataLoader
 from early_stopping import EarlyStopping
 
-from constraint_layer import ConstraintLayer, CostComputer
+from constraint_layer import ConstraintLayer
+from cost_computer import CostComputer
 from create_dataset import createProjectionDataset, getCorridorDatasetsAndConstraints
 from examples_sets import getExample
 
@@ -258,19 +259,19 @@ def main(params):
 	sdag=SplittedDatasetAndGenerator(my_dataset, percent_train=0.8, percent_val=0.1, batch_size=params['batch_size'])
 	sdag_out_dist=SplittedDatasetAndGenerator(my_dataset_out_dist, percent_train=0.0, percent_val=0.0, batch_size=params['batch_size'])
 
-	if(params['method']=='dc3'):
-		args_dc3={}
-		args_dc3['lr'] = 3e-4
-		args_dc3['eps_converge'] = 1e-4
-		args_dc3['momentum'] = 0.5
-		args_dc3['max_steps_training'] = 10
-		args_dc3['max_steps_testing'] = 10  #float("inf")
+	if(params['method']=='DC3'):
+		args_DC3={}
+		args_DC3['lr'] = 3e-4
+		args_DC3['eps_converge'] = 1e-4
+		args_DC3['momentum'] = 0.5
+		args_DC3['max_steps_training'] = 10
+		args_DC3['max_steps_testing'] = 10  #float("inf")
 	else:
-		args_dc3 = None
+		args_DC3 = None
 
 	######################### TRAINING
 	#Slide 4 of https://fleuret.org/dlc/materials/dlc-handout-4-6-writing-a-module.pdf
-	constraint_layer=ConstraintLayer(cs, input_dim=64, method=params['method'], create_map=True, args_dc3=args_dc3) 
+	constraint_layer=ConstraintLayer(cs, input_dim=64, method=params['method'], create_map=True, args_DC3=args_DC3) 
 	model = nn.Sequential(nn.Flatten(),
 						  nn.Linear(my_dataset.getNumelX(), 64), 
 						  # nn.BatchNorm1d(64),
@@ -290,7 +291,7 @@ def main(params):
 	torch.save(model.state_dict(), name+".pt")
 	# model.load_state_dict(torch.load('checkpoint.pt'))
 
-	# model.load_state_dict(torch.load('./results/unconstrained.pt'))
+	# model.load_state_dict(torch.load('./results/UU.pt'))
 
 	print("Testing model...")
 	testing_metrics = onePassOverDataset(model, params, sdag, 'test', cs)
@@ -340,10 +341,9 @@ def main(params):
 if __name__ == '__main__':
 
 	parser = argparse.ArgumentParser()
-	parser.add_argument('--method', type=str, default='unconstrained') #walker_2, walker_1  or barycentric, unconstrained, proj_train_test, proj_test
+	parser.add_argument('--method', type=str, default='walker_1') #walker_2, walker_1, Bar, UU, PP, UP, DC3
 	parser.add_argument('--use_supervised', type=bool, default=False)
-	parser.add_argument('--weight_soft_cost', type=float, default=10000.0)
-	parser.add_argument('--result_dir', type=str, default='results')
+	parser.add_argument('--weight_soft_cost', type=float, default=0.0)
 	parser.add_argument('--device', type=int, default=0)
 	parser.add_argument('--num_epochs', type=int, default=1000)
 	parser.add_argument('--batch_size', type=int, default=400)
@@ -352,18 +352,18 @@ if __name__ == '__main__':
 	args = parser.parse_args()
 	params = vars(args)
 
-	shouldnt_have_soft_cost=(params['method']=='walker_2' or params['method']=='walker_1' or params['method']=='barycentric')
+	shouldnt_have_soft_cost=(params['method']=='walker_2' or params['method']=='walker_1' or params['method']=='Bar' or params['method']=='PP')
 	
 
-	should_have_soft_cost=(
-							#Note that dc3 should have soft cost when training, see third paragraph of Section 3.2 of the DC3 paper
-							(params['method']=='dc3') or
-							(params['method']=='proj_test' and params['use_supervised']==False) or
-							(params['method']=='unconstrained' and params['use_supervised']==False)
-							)
+	# should_have_soft_cost=(
+	# 						#Note that DC3 should have soft cost when training, see third paragraph of Section 3.2 of the DC3 paper
+	# 						(params['method']=='DC3') or
+	# 						(params['method']=='UP' and params['use_supervised']==False) or
+	# 						(params['method']=='UU' and params['use_supervised']==False)
+	# 						)
 
-	if(should_have_soft_cost):
-		assert params['weight_soft_cost']>0
+	# if(should_have_soft_cost):
+	# 	assert params['weight_soft_cost']>0
 
 	if(shouldnt_have_soft_cost):
 		assert params['weight_soft_cost']==0

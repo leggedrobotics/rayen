@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import scipy.io
 import utils
 import time
+import constraints
 
 # create custom dataset class
 class CustomDataset(Dataset):
@@ -137,9 +138,9 @@ def getCorridorDatasetsAndConstraints():
 	assert all_x_out_dist[0].shape[1]==1
 	assert all_y_out_dist[0].shape[1]==1
 
-	lc=utils.LinearConstraint(A1=A1, b1=b1, A2=None, b2=None);
+	lc=constraints.LinearConstraint(A1=A1, b1=b1, A2=None, b2=None);
 
-	cs=utils.convexConstraints(lc=lc, qcs=[], socs=[], sdpc=None)
+	cs=constraints.convexConstraints(lc=lc, qcs=[], socs=[], sdpc=None)
 	my_dataset = CustomDataset(all_x, all_y, all_Pobj, all_qobj, all_robj, all_times_s, all_costs)
 	my_dataset_out_dist = CustomDataset(all_x_out_dist, all_y_out_dist, all_Pobj_out_dist, all_qobj_out_dist, all_robj_out_dist, all_times_s_out_dist, all_costs_out_dist)
 
