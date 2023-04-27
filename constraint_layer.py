@@ -35,28 +35,40 @@ class CostComputer(nn.Module): #Using nn.Module to be able to use register_buffe
 		self.register_buffer("NA_E", torch.tensor(cs.NA_E))
 		self.register_buffer("z0", torch.tensor(cs.z0))
 
+		self.has_linear_ineq_constraints=cs.has_linear_ineq_constraints
+		self.has_linear_eq_constraints=cs.has_linear_eq_constraints
 		self.has_quadratic_constraints=cs.has_quadratic_constraints
 		self.has_soc_constraints=cs.has_soc_constraints
 		self.has_sdp_constraints=cs.has_sdp_constraints
 
+		if self.has_linear_ineq_constraints:
+			self.register_buffer("A1", torch.Tensor(cs.lc.A1))
+			self.register_buffer("b1", torch.Tensor(cs.lc.b1))
+
+		if self.has_linear_eq_constraints:
+			self.register_buffer("A2", torch.Tensor(cs.lc.A2))
+			self.register_buffer("b2", torch.Tensor(cs.lc.b2))
 
 	def getyFromz(self, z):
 		y=self.NA_E@z + self.y1
 		return y
 
-	def getzFromy(self, y):
-		z=self.NA_E.T@(y - self.y1)
-		return z
+	#This function below assumes that y is in the plane spanned by the columns of NA_E!!
+	# def getzFromy(self, y):
+	# 	z=self.NA_E.T@(y - self.y1)
+	# 	return z
 
 	def getSumSoftCostAllSamples(self, y):
-		z=self.getzFromy(y);
-
-		#Note that in the projected subspace we don't have equalities
-
-		################## STACK THE VALUES OF ALL THE INEQUALITIES (Ap*z-bp<=0 and g(y)<=0)
+		################## STACK THE VALUES OF ALL THE INEQUALITIES
 		all_inequalities=torch.empty((y.shape[0],0,1), device=y.device)
 		##### Ap*z<=bp
-		all_inequalities=torch.cat((all_inequalities, self.A_p@z-self.b_p), dim=1);
+		# z=self.getzFromy(y); #I cannot use this function, since this function assumes that y lies in \mathcal{Y}_L
+							   #I could use it for DC3, but not for the "unconstrained method"
+		# all_inequalities=torch.cat((all_inequalities, self.A_p@z-self.b_p), dim=1);
+		##### A1*y<=b1
+		if self.has_linear_ineq_constraints:
+			all_inequalities=torch.cat((all_inequalities, self.A1@y-self.b1), dim=1);
+
 		##### g(y)<=0
 		if(self.has_quadratic_constraints):
 			for i in range(self.all_P.shape[0]):
@@ -79,9 +91,15 @@ class CostComputer(nn.Module): #Using nn.Module to be able to use register_buffe
 		if(self.has_sdp_constraints):
 			raise NotImplementedError 
 
+		soft_cost = torch.sum(torch.square(torch.nn.functional.relu(all_inequalities)))
+
+		if self.has_linear_eq_constraints:
+			soft_cost_equalities = torch.sum(torch.square(self.A2@y-self.b2)); #This is zero for the DC3 method, and nonzero for the unconstrained method
+			soft_cost += soft_cost_equalities
+
 		########################################################################
 
-		return torch.sum(torch.square(torch.nn.functional.relu(all_inequalities)))
+		return soft_cost
 
 
 	def getSumObjCostAllSamples(self, y, Pobj, qobj, robj):
