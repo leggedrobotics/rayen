@@ -18,7 +18,8 @@ def printInBoldRed(data_string):
 	print(Style.BRIGHT+Fore.RED+data_string+Style.RESET_ALL)
 def printInBoldGreen(data_string):
 	print(Style.BRIGHT+Fore.GREEN+data_string+Style.RESET_ALL)
-
+def printInBoldWhite(data_string):
+	print(Style.BRIGHT+Fore.WHITE+data_string+Style.RESET_ALL)
 
 #Ellisoid is represented by {x | x'*E*x <=1}
 def plotEllipsoid(E, x0, ax):
