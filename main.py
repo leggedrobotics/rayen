@@ -21,6 +21,8 @@ import random
 
 from torch.utils.tensorboard import SummaryWriter
 
+import uuid
+
 class SplittedDatasetAndGenerator():
 	def __init__(self, dataset, percent_train, percent_val, batch_size):
 		assert percent_train<=1
@@ -148,7 +150,6 @@ def onePassOverDataset(model, params, sdag, my_type, cs):
 	metrics={};
 	metrics['loss']=sum_all_losses/num_samples_dataset
 
-
 	if(my_type=='test'):
 		metrics['violation']=                    sum_all_violations/num_samples_dataset
 		metrics['time_s']=                       sum_time_s/num_samples_dataset
@@ -209,9 +210,7 @@ def train_model(model, params, sdag, tensorboard_writer, cs):
 			break
 
 	my_early_stopping.load_best_model(model)
-
 	tensorboard_writer.flush()
-
 
 	return metrics_all_epochs
 
@@ -234,12 +233,12 @@ def main(params):
 	torch.set_default_dtype(torch.float64) ##Use float32 here??
 
 	## PROJECTION EXAMPLES
-	cs=getExample(4)
-	my_dataset=createProjectionDataset(200, cs, 4.0);
-	my_dataset_out_dist=createProjectionDataset(200, cs, 7.0);
+	# cs=getExample(4)
+	# my_dataset=createProjectionDataset(200, cs, 4.0);
+	# my_dataset_out_dist=createProjectionDataset(200, cs, 7.0);
 
 	## CORRIDOR EXAMPLES
-	# my_dataset, my_dataset_out_dist, cs=getCorridorDatasetsAndConstraints()
+	my_dataset, my_dataset_out_dist, cs=getCorridorDatasetsAndConstraints()
 
 	############### THIS AVOIDS CREATING the dataset all the time
 	# import pickle
@@ -265,12 +264,13 @@ def main(params):
 		args_dc3['eps_converge'] = 1e-4
 		args_dc3['momentum'] = 0.5
 		args_dc3['max_steps_training'] = 10
-		args_dc3['max_steps_testing'] = float("inf")
+		args_dc3['max_steps_testing'] = 10  #float("inf")
 	else:
 		args_dc3 = None
 
 	######################### TRAINING
 	#Slide 4 of https://fleuret.org/dlc/materials/dlc-handout-4-6-writing-a-module.pdf
+	constraint_layer=ConstraintLayer(cs, input_dim=64, method=params['method'], create_map=True, args_dc3=args_dc3) 
 	model = nn.Sequential(nn.Flatten(),
 						  nn.Linear(my_dataset.getNumelX(), 64), 
 						  # nn.BatchNorm1d(64),
@@ -280,27 +280,17 @@ def main(params):
 						  # nn.Dropout(p=0.2), 
 						  # nn.Dropout(p=0.2),
 						  nn.Linear(64, 64),
-						  ConstraintLayer(cs, input_dim=64, method=params['method'], create_map=True, args_dc3=args_dc3) 
+						  constraint_layer
 									 ) 
-
-	#####################################
-	# def init_weights(m):
-	# 	# print(m)
-	# 	if type(m) == nn.Linear:
-	# 	# m.weight.data.fill_(1.0)
-	# 	# print(m.weight)
-	# 		nn.init.uniform_(m.weight.data, a=-1, b=1)
-	# 		nn.init.uniform_(m.bias.data, a=-1, b=1)
-	#    nn.init.kaiming_normal_(layer.weight)
-
-
-
-	# model.apply(init_weights)
-	#####################################
-
+	### TRAIN THE MODEL 
 	training_metrics = train_model(model, params, sdag, tensorboard_writer, cs)
 
+	#Save the best model found
+	name="./results/"+params['method']+"_"+uuid.uuid4().hex #https://stackoverflow.com/a/62277811
+	torch.save(model.state_dict(), name+".pt")
 	# model.load_state_dict(torch.load('checkpoint.pt'))
+
+	# model.load_state_dict(torch.load('./results/unconstrained.pt'))
 
 	print("Testing model...")
 	testing_metrics = onePassOverDataset(model, params, sdag, 'test', cs)
@@ -309,46 +299,53 @@ def main(params):
 
 	#####PRINT STUFF
 	print("\n\n-----------------------------------------------------")
-	# print(f"Method={params['method']}")
 	method=params['method']
-	print(f"Num of trainable params={sum(	p.numel() for p in model.parameters() if p.requires_grad)}")
-	utils.printInBoldBlue(f"Training: \n"\
-						  f"  [{method}] loss: {training_metrics['train_loss'][-1]:.3} \n"\
-						  f"  [{method}] val loss: {training_metrics['val_loss'][-1]:.3}")
+
+	training_summary=f"k = {cs.k}, n = {cs.n}, dim_after_map={constraint_layer.dim_after_map}\n"\
+					 f"Num of trainable params = {sum(	p.numel() for p in model.parameters() if p.requires_grad)}\n\n"\
+						f"Training: \n"\
+						  f"  [{method}] loss: {training_metrics['train_loss'][-1]:.6} \n"\
+						  f"  [{method}] val loss: {training_metrics['val_loss'][-1]:.6}"
+
+	testing_summary=f"Testing: \n"\
+						 f"  [{method}] loss: {testing_metrics['loss']:.6} \n"\
+						 f"  [{method}] violation: {testing_metrics['violation']:.6} \n"\
+						 f"  [{method}] time_ms: {1000.0*testing_metrics['time_s']:.6} \n"\
+						 f"  [Opt] loss: {testing_metrics['optimization_loss']:.6} \n"\
+						 f"  [Opt] violation: {testing_metrics['optimization_violation']:.6} \n"\
+						 f"  [Opt] time_ms: {1000.0*testing_metrics['optimization_time_s']:.6} \n";
 
 
-	######################### TESTING #:.2e
-	utils.printInBoldRed(f"Testing: \n"\
-						 f"  [{method}] loss: {testing_metrics['loss']:.3} \n"\
-						 f"  [{method}] violation: {testing_metrics['violation']:.3} \n"\
-						 f"  [{method}] time_ms: {1000.0*testing_metrics['time_s']:.3} \n"\
-						 f"  [Opt] loss: {testing_metrics['optimization_loss']:.3} \n"\
-						 f"  [Opt] violation: {testing_metrics['optimization_violation']:.3} \n"\
-						 f"  [Opt] time_ms: {1000.0*testing_metrics['optimization_time_s']:.3} \n")
+	testing_out_dist_summary=f"Testing outside distrib: \n"\
+						 f"  [{method}] loss: {testing_metrics_out_dist['loss']:.6} \n"\
+						 f"  [{method}] violation: {testing_metrics_out_dist['violation']:.6} \n"\
+						 f"  [{method}] time_ms: {1000.0*testing_metrics_out_dist['time_s']:.6} \n"\
+						 f"  [Opt] loss: {testing_metrics_out_dist['optimization_loss']:.6} \n"\
+						 f"  [Opt] violation: {testing_metrics_out_dist['optimization_violation']:.6} \n"\
+						 f"  [Opt] time_ms: {1000.0*testing_metrics_out_dist['optimization_time_s']:.6} \n";
 
-	utils.printInBoldRed(f"Testing outside distrib: \n"\
-						 f"  [{method}] loss: {testing_metrics_out_dist['loss']:.3} \n"\
-						 f"  [{method}] violation: {testing_metrics_out_dist['violation']:.3} \n"\
-						 f"  [{method}] time_ms: {1000.0*testing_metrics_out_dist['time_s']:.3} \n"\
-						 f"  [Opt] loss: {testing_metrics_out_dist['optimization_loss']:.3} \n"\
-						 f"  [Opt] violation: {testing_metrics_out_dist['optimization_violation']:.3} \n"\
-						 f"  [Opt] time_ms: {1000.0*testing_metrics_out_dist['optimization_time_s']:.3} \n")
+
+	utils.printInBoldBlue(training_summary)
+	utils.printInBoldRed(testing_summary)
+	utils.printInBoldGreen(testing_out_dist_summary)
+
+	f = open(name+".txt", "w")
+	f.write(str(params)+"\n\n"+training_summary +"\n\n"+testing_summary+"\n\n"+testing_out_dist_summary)
+	f.close()
+
 
 	tensorboard_writer.close()
 
 
 if __name__ == '__main__':
 
-	# random.seed(42)
-	# torch.manual_seed(0)
-
 	parser = argparse.ArgumentParser()
-	parser.add_argument('--method', type=str, default='dc3') #walker_2, walker_1  or barycentric, unconstrained, proj_train_test, proj_test
+	parser.add_argument('--method', type=str, default='unconstrained') #walker_2, walker_1  or barycentric, unconstrained, proj_train_test, proj_test
 	parser.add_argument('--use_supervised', type=bool, default=False)
-	parser.add_argument('--weight_soft_cost', type=float, default=10.0)
+	parser.add_argument('--weight_soft_cost', type=float, default=10000.0)
 	parser.add_argument('--result_dir', type=str, default='results')
 	parser.add_argument('--device', type=int, default=0)
-	parser.add_argument('--num_epochs', type=int, default=3000)
+	parser.add_argument('--num_epochs', type=int, default=1000)
 	parser.add_argument('--batch_size', type=int, default=400)
 	parser.add_argument('--verbosity', type=int, default=1)
 	parser.add_argument('--learning_rate', type=float, default=1e-4)
