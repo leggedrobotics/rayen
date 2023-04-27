@@ -18,7 +18,7 @@ from examples_sets import getExample
 import utils
 import tqdm
 
-import random
+# import random
 
 from torch.utils.tensorboard import SummaryWriter
 
@@ -234,12 +234,12 @@ def main(params):
 	torch.set_default_dtype(torch.float64) ##Use float32 here??
 
 	## PROJECTION EXAMPLES
-	# cs=getExample(4)
-	# my_dataset=createProjectionDataset(200, cs, 4.0);
-	# my_dataset_out_dist=createProjectionDataset(200, cs, 7.0);
+	cs=getExample(4)
+	my_dataset=createProjectionDataset(200, cs, 4.0);
+	my_dataset_out_dist=createProjectionDataset(200, cs, 7.0);
 
 	## CORRIDOR EXAMPLES
-	my_dataset, my_dataset_out_dist, cs=getCorridorDatasetsAndConstraints()
+	# my_dataset, my_dataset_out_dist, cs=getCorridorDatasetsAndConstraints()
 
 	############### THIS AVOIDS CREATING the dataset all the time
 	# import pickle
@@ -261,11 +261,11 @@ def main(params):
 
 	if(params['method']=='DC3'):
 		args_DC3={}
-		args_DC3['lr'] = 3e-4
-		args_DC3['eps_converge'] = 1e-4
-		args_DC3['momentum'] = 0.5
-		args_DC3['max_steps_training'] = 10
-		args_DC3['max_steps_testing'] = 10  #float("inf")
+		args_DC3['lr'] = params['DC3_lr']
+		args_DC3['eps_converge'] = params['DC3_eps_converge']
+		args_DC3['momentum'] = params['DC3_momentum']
+		args_DC3['max_steps_training'] = params['DC3_max_steps_training']
+		args_DC3['max_steps_testing'] = params['DC3_max_steps_testing']
 	else:
 		args_DC3 = None
 
@@ -287,8 +287,10 @@ def main(params):
 	training_metrics = train_model(model, params, sdag, tensorboard_writer, cs)
 
 	#Save the best model found
-	name="./results/"+params['method']+"_"+uuid.uuid4().hex #https://stackoverflow.com/a/62277811
-	torch.save(model.state_dict(), name+".pt")
+	folder="./scripts/results/"
+	name_file=params['method']+"_weight_soft_cost_"+str(params["weight_soft_cost"])    #+uuid.uuid4().hex #https://stackoverflow.com/a/62277811
+
+	torch.save(model.state_dict(), folder+name_file+".pt")
 	# model.load_state_dict(torch.load('checkpoint.pt'))
 
 	# model.load_state_dict(torch.load('./results/UU.pt'))
@@ -302,37 +304,67 @@ def main(params):
 	print("\n\n-----------------------------------------------------")
 	method=params['method']
 
+	num_trainable_params=sum(	p.numel() for p in model.parameters() if p.requires_grad)
+
 	training_summary=f"k = {cs.k}, n = {cs.n}, dim_after_map={constraint_layer.dim_after_map}\n"\
-					 f"Num of trainable params = {sum(	p.numel() for p in model.parameters() if p.requires_grad)}\n\n"\
+					 f"Num of trainable params = {num_trainable_params}\n\n"\
 						f"Training: \n"\
 						  f"  [{method}] loss: {training_metrics['train_loss'][-1]:.6} \n"\
 						  f"  [{method}] val loss: {training_metrics['val_loss'][-1]:.6}"
 
-	testing_summary=f"Testing: \n"\
-						 f"  [{method}] loss: {testing_metrics['loss']:.6} \n"\
-						 f"  [{method}] violation: {testing_metrics['violation']:.6} \n"\
-						 f"  [{method}] time_ms: {1000.0*testing_metrics['time_s']:.6} \n"\
-						 f"  [Opt] loss: {testing_metrics['optimization_loss']:.6} \n"\
-						 f"  [Opt] violation: {testing_metrics['optimization_violation']:.6} \n"\
-						 f"  [Opt] time_ms: {1000.0*testing_metrics['optimization_time_s']:.6} \n";
+	# testing_summary=f"Testing: \n"\
+	# 					 f"  [{method}] loss: {testing_metrics['loss']:.6} \n"\
+	# 					 f"  [{method}] violation: {testing_metrics['violation']:.6} \n"\
+	# 					 f"  [{method}] time_ms: {1000.0*testing_metrics['time_s']:.6} \n"\
+	# 					 f"  [Opt] loss: {testing_metrics['optimization_loss']:.6} \n"\
+	# 					 f"  [Opt] violation: {testing_metrics['optimization_violation']:.6} \n"\
+	# 					 f"  [Opt] time_us: {1e6*testing_metrics['optimization_time_s']:.6} \n";
 
 
-	testing_out_dist_summary=f"Testing outside distrib: \n"\
-						 f"  [{method}] loss: {testing_metrics_out_dist['loss']:.6} \n"\
-						 f"  [{method}] violation: {testing_metrics_out_dist['violation']:.6} \n"\
-						 f"  [{method}] time_ms: {1000.0*testing_metrics_out_dist['time_s']:.6} \n"\
-						 f"  [Opt] loss: {testing_metrics_out_dist['optimization_loss']:.6} \n"\
-						 f"  [Opt] violation: {testing_metrics_out_dist['optimization_violation']:.6} \n"\
-						 f"  [Opt] time_ms: {1000.0*testing_metrics_out_dist['optimization_time_s']:.6} \n";
+	# testing_out_dist_summary=f"Testing outside distrib: \n"\
+	# 					 f"  [{method}] loss: {testing_metrics_out_dist['loss']:.6} \n"\
+	# 					 f"  [{method}] violation: {testing_metrics_out_dist['violation']:.6} \n"\
+	# 					 f"  [{method}] time_ms: {1000.0*testing_metrics_out_dist['time_s']:.6} \n"\
+	# 					 f"  [Opt] loss: {testing_metrics_out_dist['optimization_loss']:.6} \n"\
+	# 					 f"  [Opt] violation: {testing_metrics_out_dist['optimization_violation']:.6} \n"\
+	# 					 f"  [Opt] time_us: {1e6*testing_metrics_out_dist['optimization_time_s']:.6} \n";
 
 
 	utils.printInBoldBlue(training_summary)
-	utils.printInBoldRed(testing_summary)
-	utils.printInBoldGreen(testing_out_dist_summary)
+	# utils.printInBoldRed(testing_summary)
+	# utils.printInBoldGreen(testing_out_dist_summary)
 
-	f = open(name+".txt", "w")
-	f.write(str(params)+"\n\n"+training_summary +"\n\n"+testing_summary+"\n\n"+testing_out_dist_summary)
-	f.close()
+	# index=                       [method+" In dist", method+"Out of dist", "Opt In dist", "Opt Out dist"]
+	# d = {'num_trainable_params': [num_trainable_params,         	 num_trainable_params,                     0, 												 0], 
+	#     'loss':                  [testing_metrics['loss'],      	 testing_metrics_out_dist['loss'],         testing_metrics['optimization_loss'],            testing_metrics_out_dist['optimization_loss']     ], 
+	#     'violation':             [testing_metrics['violation'], 	 testing_metrics_out_dist['violation'],    testing_metrics['optimization_violation'],       testing_metrics_out_dist['optimization_violation'] ],
+	#     'time_us':               [1e6*testing_metrics['time_s'],     1e6*testing_metrics_out_dist['time_s'],   1e6*testing_metrics['optimization_time_s'],      1e6*testing_metrics_out_dist['optimization_time_s']             ]   }
+
+
+	index=                       [name_file, "Optimization"]
+	d = {'num_trainable_params': [num_trainable_params,         	  0], 
+	    '[In dist] loss':        [testing_metrics['loss'],      	  testing_metrics['optimization_loss']      ], 
+	    '[In dist] violation':   [testing_metrics['violation'], 	  testing_metrics['optimization_violation'] ],
+	    '[In dist] time_us':     [1e6*testing_metrics['time_s'],     1e6*testing_metrics['optimization_time_s'] ],
+	    #
+	    '[Out dist] loss':        [testing_metrics_out_dist['loss'],      	  testing_metrics_out_dist['optimization_loss']      ], 
+	    '[Out dist] violation':   [testing_metrics_out_dist['violation'], 	  testing_metrics_out_dist['optimization_violation'] ],
+	    '[Out dist] time_us':     [1e6*testing_metrics_out_dist['time_s'],     1e6*testing_metrics_out_dist['optimization_time_s'] ]}
+
+
+	df = pd.DataFrame(data=d, index=index)
+	print(df)
+
+
+
+	# f = open(name+".txt", "w")
+	# f.write(df.to_string())
+	# f.write("\n\n\n"+training_summary)
+	# f.close()
+
+	# df.to_csv(name+".csv")
+
+	df.to_pickle(folder+name_file+".pkl")  
 
 
 	tensorboard_writer.close()
@@ -345,10 +377,18 @@ if __name__ == '__main__':
 	parser.add_argument('--use_supervised', type=bool, default=False)
 	parser.add_argument('--weight_soft_cost', type=float, default=0.0)
 	parser.add_argument('--device', type=int, default=0)
-	parser.add_argument('--num_epochs', type=int, default=1000)
+	parser.add_argument('--num_epochs', type=int, default=100)
 	parser.add_argument('--batch_size', type=int, default=400)
 	parser.add_argument('--verbosity', type=int, default=1)
 	parser.add_argument('--learning_rate', type=float, default=1e-4)
+	#Parameters specific to DC3
+	parser.add_argument('--DC3_lr', type=float, default=3e-4)
+	parser.add_argument('--DC3_eps_converge', type=float, default=1e-5)
+	parser.add_argument('--DC3_momentum', type=float, default=0.5)
+	parser.add_argument('--DC3_max_steps_training', type=int, default=10)
+	parser.add_argument('--DC3_max_steps_testing', type=int, default=10) #float("inf")
+
+
 	args = parser.parse_args()
 	params = vars(args)
 

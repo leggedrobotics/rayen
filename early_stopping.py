@@ -3,10 +3,12 @@
 
 import numpy as np
 import torch
+import uuid
+import os
 
 class EarlyStopping:
     """Early stops the training if validation loss doesn't improve after a given patience."""
-    def __init__(self, patience=20, verbose=False, delta=0, path='checkpoint.pt', trace_func=print):
+    def __init__(self, patience=20, verbose=False, delta=0, trace_func=print):
         """
         Args:
             patience (int): How long to wait after last time validation loss improved.
@@ -27,7 +29,7 @@ class EarlyStopping:
         self.early_stop = False
         self.val_loss_min = np.Inf
         self.delta = delta
-        self.path = path
+        self.path = 'checkpoint_'+uuid.uuid4().hex #https://stackoverflow.com/a/62277811
         self.trace_func = trace_func
     def __call__(self, val_loss, model):
 
@@ -58,3 +60,8 @@ class EarlyStopping:
     #Added by jtorde
     def load_best_model(self, model):
         model.load_state_dict(torch.load(self.path))
+
+    def __del__(self):
+        os.system("rm "+self.path)
+      # body of destructor
+

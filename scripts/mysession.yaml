@@ -1,0 +1,28 @@
+session_name: mysession
+windows:
+  - window_name: dev window
+    layout: tiled
+    shell_command_before:
+       - cd .. # run as a first command in all panes
+    panes:
+      # - shell_command: # pane no. 1
+      #     - cd /var/log # run multiple commands in this pane
+      #     - ls -al | grep \.log
+      - python main.py --method walker_1   --weight_soft_cost 0     && if [[ $(tmux list-panes | wc -l) -eq 1 ]]; then tmux kill-session; else exit; fi
+
+      - python main.py --method Bar        --weight_soft_cost 0     && if [[ $(tmux list-panes | wc -l) -eq 1 ]]; then tmux kill-session; else exit; fi
+
+      - python main.py --method UU         --weight_soft_cost 0     && if [[ $(tmux list-panes | wc -l) -eq 1 ]]; then tmux kill-session; else exit; fi
+      - python main.py --method UU         --weight_soft_cost 10    && if [[ $(tmux list-panes | wc -l) -eq 1 ]]; then tmux kill-session; else exit; fi
+      - python main.py --method UU         --weight_soft_cost 100   && if [[ $(tmux list-panes | wc -l) -eq 1 ]]; then tmux kill-session; else exit; fi
+      - python main.py --method UU         --weight_soft_cost 1000  && if [[ $(tmux list-panes | wc -l) -eq 1 ]]; then tmux kill-session; else exit; fi
+
+      - python main.py --method UP         --weight_soft_cost 0     && if [[ $(tmux list-panes | wc -l) -eq 1 ]]; then tmux kill-session; else exit; fi
+      - python main.py --method UP         --weight_soft_cost 10    && if [[ $(tmux list-panes | wc -l) -eq 1 ]]; then tmux kill-session; else exit; fi
+      - python main.py --method UP         --weight_soft_cost 100   && if [[ $(tmux list-panes | wc -l) -eq 1 ]]; then tmux kill-session; else exit; fi
+      - python main.py --method UP         --weight_soft_cost 1000  && if [[ $(tmux list-panes | wc -l) -eq 1 ]]; then tmux kill-session; else exit; fi
+
+      - python main.py --method DC3        --weight_soft_cost 0     && if [[ $(tmux list-panes | wc -l) -eq 1 ]]; then tmux kill-session; else exit; fi
+      - python main.py --method DC3        --weight_soft_cost 10    && if [[ $(tmux list-panes | wc -l) -eq 1 ]]; then tmux kill-session; else exit; fi
+      - python main.py --method DC3        --weight_soft_cost 100   && if [[ $(tmux list-panes | wc -l) -eq 1 ]]; then tmux kill-session; else exit; fi
+      - python main.py --method DC3        --weight_soft_cost 1000  && if [[ $(tmux list-panes | wc -l) -eq 1 ]]; then tmux kill-session; else exit; fi

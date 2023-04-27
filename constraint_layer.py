@@ -74,7 +74,7 @@ class ConstraintLayer(torch.nn.Module):
 			assert self.prob_projection.is_dpp()
 			self.proj_layer = CvxpyLayer(self.prob_projection, parameters=[self.z_to_be_projected], variables=[self.z_projected])
 
-		if(self.method=='barycentric'):
+		if(self.method=='Bar'):
 			print(f"A_p={cs.A_p}")
 			print(f"b_p={cs.b_p}")
 			print("Computing vertices and rays...")
@@ -198,14 +198,14 @@ class ConstraintLayer(torch.nn.Module):
 		elif(self.method=='UU'):
 			self.forwardForMethod=self.forwardForUU
 			self.dim_after_map=self.k
-		elif(self.method=='barycentric'):
-			self.forwardForMethod=self.forwardForBarycentric
+		elif(self.method=='Bar'):
+			self.forwardForMethod=self.forwardForBar
 			self.dim_after_map=(self.num_vertices + self.num_rays)
 		elif(self.method=='PP'):
-			self.forwardForMethod=self.forwardForProjTrainTest
+			self.forwardForMethod=self.forwardForPP
 			self.dim_after_map=(self.n)
 		elif(self.method=='UP'):
-			self.forwardForMethod=self.forwardForProjTest
+			self.forwardForMethod=self.forwardForUP
 			self.dim_after_map=(self.n)
 		elif(self.method=='DC3'):
 			self.forwardForMethod=self.forwardForDC3
@@ -390,7 +390,7 @@ class ConstraintLayer(torch.nn.Module):
 	def forwardForUU(self, q):
 		return q
 
-	def forwardForBarycentric(self, q):
+	def forwardForBar(self, q):
 		tmp1 = q[:,  0:self.num_vertices,0:1] #0:1 to keep the dimension. 
 		tmp2 = q[:,  self.num_vertices:(self.num_vertices+self.num_rays),0:1] #0:1 to keep the dimension. 
 		
@@ -404,12 +404,12 @@ class ConstraintLayer(torch.nn.Module):
 		z, = self.proj_layer(q, solver_args={'solve_method':'ECOS'}) #Supported: ECOS (fast, accurate), SCS (slower, less accurate).   NOT supported: GUROBI
 		return z
 
-	def forwardForProjTrainTest(self, q):
+	def forwardForPP(self, q):
 		z=self.project(q)
 		return self.getyFromz(z)
 
 
-	def forwardForProjTest(self, q):
+	def forwardForUP(self, q):
 		if(self.training==False):
 			z=self.project(q)
 		else:
