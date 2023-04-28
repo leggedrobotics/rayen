@@ -549,14 +549,15 @@ classdef MyClampedUniformSpline < handle
             axis equal; view([45,45])
         end
         
-        function plotPos2D(obj)
-            figure; hold on;
+        function plotPos2D(obj, linewidth)
+            %figure; 
+            hold on;
             syms t real
             for j=1:obj.num_seg
                 interv=obj.timeSpanOfInterval(j);           
                 u=(t-min(interv))/(max(interv)-min(interv));
                 pos=obj.evalDerivativeU(0,u,j);
-                fplot(pos(1),pos(2),interv);
+                fplot(pos(1),pos(2),interv, 'LineWidth', linewidth);
             end           
             axis equal;% view([45,45])
         end

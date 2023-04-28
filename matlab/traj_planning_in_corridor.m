@@ -9,16 +9,39 @@
 close all; clc;clear;
 doSetup();
 
-P=3*[0 1 2 3 4 3 2;
-     0 1 1 2 4 4 4;
-     0 1 1 1 4 1 0];
+dimension=2;
+
+%%%So that random is repeatable
+rng('default');
+rng(1);
+%%%%%%%%%%%%
+
+if(dimension==2)
+    P=3*[-0.1 1.0 2.5 3.5 5.5 6.8 7.5;
+         3 1.0 1 0 4 4 0];
+    radius=4.0;
+    num_of_seg_per_region=1; 
+    samples_per_step=5;
+    N=15;
+else
+    P=3*[0 1 2 3 4 3 2;
+       0 1 1 2 4 4 4;
+       0 1 1 1 4 1 0];
+    radius=4*1.3;
+    num_of_seg_per_region=3; 
+    samples_per_step=5;
+    N=7;
+end
+
+
+
 allA={};
 allb={};
 allV={};
 
 steps=2;
-samples_per_step=5;
-radius=4*1.3;
+
+
 
 for i=1:(size(P,2)-1)
 %     [A, b]=getABgivenP1P2(P(:,i),P(:,i+1));
@@ -46,10 +69,19 @@ lighting phong
 delta=1.0;
 xlim([min(P(1,:))-delta,max(P(1,:))+delta]);
 ylim([min(P(2,:))-delta,max(P(2,:))+delta]);
-zlim([min(P(3,:))-delta,max(P(3,:))+delta]);
 
-plotSphere(p0,0.2,'g')
-plotSphere(pf,0.2,'r')
+if(dimension==2)
+    scatter(p0(1),p0(2),'filled','g')
+    scatter(pf(1),pf(2),'filled','r')
+end
+
+if(dimension==3)
+    zlim([min(P(3,:))-delta,max(P(3,:))+delta]);
+    plotSphere(p0,0.2,'g')
+    plotSphere(pf,0.2,'r')
+end
+
+
 
 
 %%
@@ -59,7 +91,8 @@ t0=0.0;
 tf=10.0;
 
 num_of_regions=size(allA,2);
-num_of_seg_per_region=3; %Note: IF YOU FIND THE ERROR "Matrix product with incompatible dimensions. Lhs is 3x1 and rhs is 3x3." when changing, this, the cause if the hand-coded "n_int_knots=15; " in computeMatrixForClampedUniformBSpline.m. Increase it.
+
+%Note: IF YOU FIND THE ERROR "Matrix product with incompatible dimensions. Lhs is 3x1 and rhs is 3x3." when changing, this, the cause if the hand-coded "n_int_knots=15; " in computeMatrixForClampedUniformBSpline.m. Increase it.
 
 basis="MINVO"; %MINVO OR B_SPLINE or BEZIER. This is the basis used for collision checking (in position, velocity, accel and jerk space), both in Matlab and in C++
 linear_solver_name='ma27'; %mumps [default, comes when installing casadi], ma27, ma57, ma77, ma86, ma97 
@@ -72,20 +105,23 @@ else
  opti = casadi.Opti();
 end
 deg_pos=3;
-dim_pos=3;
+dim_pos=dimension;
 num_seg =num_of_seg_per_region*num_of_regions;
 sp=MyClampedUniformSpline(t0,tf,deg_pos, dim_pos, num_seg, opti);
 
 guess=[p0(1)*ones(1,3) linspace(p0(1), pf(1), sp.num_cpoints-6) pf(1)*ones(1,3) 
-       p0(2)*ones(1,3) linspace(p0(2), pf(2), sp.num_cpoints-6) pf(1)*ones(1,3) 
-       p0(3)*ones(1,3) linspace(p0(3), pf(3), sp.num_cpoints-6) pf(1)*ones(1,3) ]
+       p0(2)*ones(1,3) linspace(p0(2), pf(2), sp.num_cpoints-6) pf(1)*ones(1,3)]
+
+if(dimension==3)
+    guess=[guess; p0(3)*ones(1,3) linspace(p0(3), pf(3), sp.num_cpoints-6) pf(1)*ones(1,3) ]
+end
 
 opti.set_initial(sp.getCPsAsMatrix,guess);
 
-v0=zeros(3,1); a0=zeros(3,1);
-vf=zeros(3,1); af=zeros(3,1);
+v0=zeros(dimension,1); a0=zeros(dimension,1);
+vf=zeros(dimension,1); af=zeros(dimension,1);
 
-v_max=4*ones(3,1);   a_max=6*ones(3,1);   j_max=50*ones(3,1);
+v_max=4*ones(dimension,1);   a_max=6*ones(dimension,1);   j_max=50*ones(dimension,1);
 
 %Initial conditions
 opti.subject_to( sp.getPosT(t0)== p0);
@@ -103,7 +139,9 @@ opti.subject_to( sp.getAccelT(tf)== af);
 const_p={}
 const_p=[const_p sp.getMaxVelConstraints(basis, v_max)];      %Max vel constraints (position)
 const_p=[const_p sp.getMaxAccelConstraints(basis, a_max)];    %Max accel constraints (position)
+if(deg_pos>=3)
 const_p=[const_p sp.getMaxJerkConstraints(basis, j_max)];     %Max jerk constraints (position)
+end
 opti.subject_to([const_p]);
 
 %Corridor constraints
@@ -166,7 +204,6 @@ opti.solver(my_solver,opts); %{"ipopt.hessian_approximation":"limited-memory"}
 
 a=0.001;
 b=0.3;
-N=7;
 all_wv=[a + (b-a).*rand(N,1)]'; 
 all_wa=[a + (b-a).*rand(N,1)]'; 
 all_wj=[a + (b-a).*rand(N,1)]'; 
@@ -175,66 +212,6 @@ all_wj=[a + (b-a).*rand(N,1)]';
 [all_x, all_y, all_Pobj, all_qobj, all_robj, all_costs, all_times_s]=solveProblemForDifferentGamma(all_wv, all_wa, all_wj, weights, my_solver, opti, sp, cost);
 factor=5;
 [all_x_out_dist, all_y_out_dist, all_Pobj_out_dist, all_qobj_out_dist, all_robj_out_dist, all_costs_out_dist, all_times_s_out_dist]=solveProblemForDifferentGamma(factor*all_wv, factor*all_wa, factor*all_wj, weights, my_solver, opti, sp, cost);
-
-% all_x={};
-% all_y={};
-% all_Pobj={};
-% all_qobj={};
-% all_robj={};
-% all_costs={};
-% all_times_s={};
-% for wv=all_wv
-%     for wa=all_wa
-%         for wj=all_wj
-%             weights_value=[wv;wa;wj];
-%             weights_value'
-%             opti.set_value(weights,weights_value);
-%             sol = opti.solve();
-%             checkSolverSucceeded(sol, my_solver)
-%             control_points=sol.value(sp.getCPsAsVector());
-%             all_x{end+1}=weights_value;
-%             all_y{end+1}=control_points(:);
-%             cost_substituted=casadi.substitute(cost,weights,weights_value);
-%             [P,q,r]=getPandqandrOfQuadraticExpressionCasadi(cost_substituted, sp.getCPsAsVector());
-%             all_Pobj{end+1}=P;   
-%             all_qobj{end+1}=q;
-%             all_robj{end+1}=r;
-%             all_costs{end+1}=sol.value(cost);
-%             all_times_s{end+1}=opti.stats().t_wall_solver; %This is the time the solver takes to solve the problem, see (for Gurobi) https://github.com/casadi/casadi/blob/e5d6977d621e3b7a0cd0b2e24cdd2b73a6c3a8fe/casadi/interfaces/gurobi/gurobi_interface.cpp#L447
-%         end
-%     end
-% end
-% 
-% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Generate samples outside the distribution
-% all_x_out_dist={};
-% all_y_out_dist={};
-% all_Pobj_out_dist={};
-% all_qobj_out_dist={};
-% all_robj_out_dist={};
-% all_costs_out_dist={};
-% all_times_s_out_dist={};
-% factor=5;
-% for wv=factor*all_wv
-%     for wa=factor*all_wa
-%         for wj=factor*all_wj
-%             weights_value=[wv;wa;wj];
-%             weights_value'
-%             opti.set_value(weights,weights_value);
-%             sol = opti.solve();
-%             checkSolverSucceeded(sol, my_solver)
-%             control_points=sol.value(sp.getCPsAsVector());
-%             all_x_out_dist{end+1}=weights_value;
-%             all_y_out_dist{end+1}=control_points(:);
-%             cost_substituted=casadi.substitute(cost,weights,weights_value);
-%             [P,q,r]=getPandqandrOfQuadraticExpressionCasadi(cost_substituted, sp.getCPsAsVector());
-%             all_Pobj_out_dist{end+1}=P;   
-%             all_qobj_out_dist{end+1}=q;
-%             all_robj_out_dist{end+1}=r;
-%             all_costs_out_dist{end+1}=sol.value(cost);
-%             all_times_s_out_dist{end+1}=opti.stats().t_wall_solver; %This is the time the solver takes to solve the problem, see (for Gurobi) https://github.com/casadi/casadi/blob/e5d6977d621e3b7a0cd0b2e24cdd2b73a6c3a8fe/casadi/interfaces/gurobi/gurobi_interface.cpp#L447
-%         end
-%     end
-% end
 
 %%%%%%Plotting
 num_sol=numel(all_y);
@@ -279,13 +256,22 @@ sp.updateCPsWithSolution(sol.value(sp.getCPsAsMatrix()));
 % ylim([-4,4]);zlim([-4,4]);
 
 figure(1);
-sp.plotPos3D(6)
+xlabel('x (m)'); ylabel('y (m)');
+if(dimension==2)
+    sp.plotPos2D(6)
+    plot(P(1,:),P(2,:),'--','LineWidth',2)
+else
+    sp.plotPos3D(6)
+    zlabel('z (m)');
+    view(48,38);
+    % plot3(P(1,:),P(2,:),P(3,:),'--','LineWidth',2)
+end
 
-% plot3(P(1,:),P(2,:),P(3,:),'--','LineWidth',2)
 
-view(48,38); axis equal
 
-xlabel('x (m)'); ylabel('y (m)'); zlabel('z (m)');
+ axis equal
+
+ 
 
 % sp.plotPosVelAccelJerk(v_max,a_max,j_max)
 %%
@@ -346,13 +332,15 @@ end
 function [A, b, V]=getAbVerticesPolyhedronAroundP1P2(p1,p2, steps, samples_per_step, radius)
 
 
+    dimension=size(p1,1);
+
 %     samples_per_step=5;
 %     radius=0.5;
     all_points=[];
 
     for alpha=linspace(0,1,steps)
         point=alpha*p1 + (1-alpha)*p2;
-        results=point + radius*uniformSampleInUnitBall(3,samples_per_step);
+        results=point + radius*uniformSampleInUnitBall(dimension,samples_per_step);
         all_points=[all_points results];
     end
 
@@ -430,78 +418,3 @@ b=[A(1,:)*w_p1_a;
    A(5,:)*w_p1_d;
    A(6,:)*w_p1_d;];
 end
-
-
-% for j=1:(sp.num_seg)
-%     %Get the control points of the interval
-% 
-%     Q_matrix=cell2mat(sp.getCPs_XX_Pos_ofInterval("MINVO",j));
-%     [k,av]=convhull(Q_matrix');
-%     if(basis=="MINVO")
-%         all_volumes.MINVO=[all_volumes.MINVO, av];
-%     elseif(basis=="BEZIER")
-%         all_volumes.BEZIER=[all_volumes.BEZIER, av];
-%     end
-%     
-% end
-
-% end
-
-% %Region is {x such that A1*x<=b1}
-% function [A1,b1]=getAb_Box(center,side)
-% 
-% A1=[1 0 0;
-%     0 1 0;
-%     0 0 1;
-%     -1 0 0;
-%     0 -1 0;
-%     0 0 -1];
-% 
-% of_x=center(1);
-% of_y=center(2);
-% of_z=center(3);
-% 
-% b1=[side(1)/2.0+of_x;
-%     side(2)/2.0+of_y;
-%     side(3)/2.0+of_z;
-%     side(1)/2.0-of_x;
-%     side(2)/2.0-of_y;
-%     side(3)/2.0-of_z];
-% 
-% end
-
-
-% [allA, allb, p0, pf]=getCorridorConstraintsFromCurve();
-% function [allA, allb, p0, pf]=getCorridorConstraintsFromCurve()
-%     syms t
-%     Pcurve= [ sin(t*3*pi)+2*sin(2*t*3*pi);
-%               cos(t*3*pi)-2*cos(2*t*3*pi);
-%              -sin(3*t*3*pi);];
-% 
-% 
-%     p_last=subs(Pcurve,t,0.0);
-%     allA={}; allb={};
-%     delta=0.3;
-%     last_tt=0;
-%     for tt=delta:delta:3
-% 
-%         p1=double(p_last);
-%         p2=double(subs(Pcurve,t,tt));
-% 
-%         [A b]=getABgivenP1P2(p1,p2);
-%         allA{end+1}= A;
-%         allb{end+1}=b;
-%         p_last=p2;
-%         last_tt=tt;
-%     end
-%     
-%     p0=double(0.9*subs(Pcurve,t,0.0)+0.1*subs(Pcurve,t,delta));
-%     pf=double(0.9*subs(Pcurve,t,last_tt)+0.1*subs(Pcurve,t,last_tt-delta));
-% end
-
-
-% polyhedron.Aeq=[]; %already included in (Aineq, bineq)
-% polyhedron.beq=[];
-
-% dataset.all_x=all_x;
-% dataset.all_y=all_y;
