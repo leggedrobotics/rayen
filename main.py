@@ -271,30 +271,30 @@ def main(params):
 		args_DC3 = None
 
 	######################### TRAINING
-	#Slide 4 of https://fleuret.org/dlc/materials/dlc-handout-4-6-writing-a-module.pdf
-	constraint_layer=ConstraintLayer(cs, input_dim=64, method=params['method'], create_map=True, args_DC3=args_DC3) 
-	model = nn.Sequential(nn.Flatten(),
-						  nn.Linear(my_dataset.getNumelX(), 64), 
-						  # nn.BatchNorm1d(64),
-						  nn.ReLU(),
-						  nn.Linear(64, 64),
-						  nn.ReLU(),
-						  # nn.Dropout(p=0.2), 
-						  # nn.Dropout(p=0.2),
-						  nn.Linear(64, 64),
-						  constraint_layer
-									 ) 
-
 	folder="./scripts/results/"
 	name_file=params['method']+"_weight_soft_cost_"+str(params["weight_soft_cost"])    #+uuid.uuid4().hex #https://stackoverflow.com/a/62277811
 	path_policy = folder + name_file +".pt"
 
 	if(params['train']==True):
+
+		#Slide 4 of https://fleuret.org/dlc/materials/dlc-handout-4-6-writing-a-module.pdf
+		model = nn.Sequential(nn.Flatten(),
+							  nn.Linear(my_dataset.getNumelX(), 64), 
+							  # nn.BatchNorm1d(64),
+							  nn.ReLU(),
+							  nn.Linear(64, 64),
+							  nn.ReLU(),
+							  # nn.Dropout(p=0.2), 
+							  # nn.Dropout(p=0.2),
+							  nn.Linear(64, 64),
+							  ConstraintLayer(cs, input_dim=64, method=params['method'], create_map=True, args_DC3=args_DC3)) 
+
 		training_metrics = train_model(model, params, sdag, tensorboard_writer, cs)
 
-		torch.save(model.state_dict(), path_policy) #Save the best model found
+		#torch.save(model.state_dict(), path_policy)  #We don't use this one because DC3 has some randomness in the selection of partial_vars, and they may be different if this file is called twice (first with train=True/test=False and then with train=False/test=True)
+		torch.save(model, path_policy)                #Save entire model, see https://pytorch.org/tutorials/beginner/saving_loading_models.html#save-load-entire-model
 
-		training_summary=f"k = {cs.k}, n = {cs.n}, dim_after_map={constraint_layer.dim_after_map}\n"\
+		training_summary=f"k = {cs.k}, n = {cs.n}\n"\
 						 f"Training: \n"\
 						 f"  [{params['method']}] loss: {training_metrics['train_loss'][-1]:.6} \n"\
 						 f"  [{params['method']}] val loss: {training_metrics['val_loss'][-1]:.6}"
@@ -304,7 +304,8 @@ def main(params):
 
 
 	if(params['test']==True):
-		model.load_state_dict(torch.load(path_policy))
+		# model.load_state_dict(torch.load(path_policy)) #We don't use this one because of the reason above
+		model = torch.load(path_policy) #See # https://pytorch.org/tutorials/beginner/saving_loading_models.html#save-load-entire-model
 		print("Testing model...")
 		testing_metrics = onePassOverDataset(model, params, sdag, 'test', cs)
 		testing_metrics_out_dist = onePassOverDataset(model, params, sdag_out_dist, 'test', cs)
@@ -323,6 +324,8 @@ def main(params):
 
 
 		df = pd.DataFrame(data=d, index=index)
+
+		pd.set_option('display.max_columns', None)
 		print(df)
 
 		path_pkl = folder + name_file +".pkl"
@@ -353,9 +356,9 @@ def str2bool(v):
 if __name__ == '__main__':
 
 	parser = argparse.ArgumentParser()
-	parser.add_argument('--method', type=str, default='UP') #walker_2, walker_1, Bar, UU, PP, UP, DC3
+	parser.add_argument('--method', type=str, default='DC3') #walker_2, walker_1, Bar, UU, PP, UP, DC3
 	parser.add_argument('--use_supervised', type=str2bool, default=False)
-	parser.add_argument('--weight_soft_cost', type=float, default=0.0)
+	parser.add_argument('--weight_soft_cost', type=float, default=100.0)
 	parser.add_argument('--device', type=int, default=0)
 	parser.add_argument('--num_epochs', type=int, default=500)
 	parser.add_argument('--batch_size', type=int, default=400)
