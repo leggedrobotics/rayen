@@ -2,13 +2,14 @@
 
 trap "exit" INT
 set -e
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
-# rm -rf results
-# mkdir results
+cd $SCRIPT_DIR
+rm -rf results
+mkdir results
 
 #TRAINING
-# tmuxp load ./mysession.yaml
-
+tmuxp load mysession.yaml
 
 #TESTING, one by one to get a better estimation of the computation time
 cd ..
@@ -26,7 +27,6 @@ python main.py --method DC3        --weight_soft_cost 0    --train False
 python main.py --method DC3        --weight_soft_cost 10   --train False
 python main.py --method DC3        --weight_soft_cost 100  --train False
 python main.py --method DC3        --weight_soft_cost 1000 --train False
-
 
 
 python merge_all_results.py
