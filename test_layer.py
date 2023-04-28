@@ -61,8 +61,6 @@ for method in methods:
 		else:
 			ax = fig.add_subplot(rows,cols,i+1) 
 
-		num_steps=4; #Only used in the ellipsoid_walker method
-
 		if(method=='DC3'):
 			args_DC3={}
 			args_DC3['lr'] = 1e-4
