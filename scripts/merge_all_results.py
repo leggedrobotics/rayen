@@ -8,7 +8,7 @@ for file in glob.glob("*.pkl"):
 
 
 all_pkl = sorted(all_pkl)
-print(all_pkl)
+# print(all_pkl)
 
 all_dataframes=[]
 for file in all_pkl:
@@ -16,5 +16,4 @@ for file in all_pkl:
 
 df = pd.concat(all_dataframes)
 
-print(df)
-
+df.to_csv('./merged.csv')  

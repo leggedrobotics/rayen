@@ -116,6 +116,7 @@ def onePassOverDataset(model, params, sdag, my_type, cs):
 			y = y.to(device)
 			time_start=time.time()
 			y_predicted = model(x)
+			# print(y_predicted.device)
 			sum_time_s += (time.time()-time_start)
 			loss=cost_computer.getSumLossAllSamples(params, y, y_predicted, Pobj, qobj, robj, isTesting=(my_type=='test'))
 			# print(f"Loss={loss.item()}")
@@ -234,12 +235,12 @@ def main(params):
 	torch.set_default_dtype(torch.float64) ##Use float32 here??
 
 	## PROJECTION EXAMPLES
-	cs=getExample(4)
-	my_dataset=createProjectionDataset(200, cs, 4.0);
-	my_dataset_out_dist=createProjectionDataset(200, cs, 7.0);
+	# cs=getExample(4)
+	# my_dataset=createProjectionDataset(200, cs, 4.0);
+	# my_dataset_out_dist=createProjectionDataset(200, cs, 7.0);
 
 	## CORRIDOR EXAMPLES
-	# my_dataset, my_dataset_out_dist, cs=getCorridorDatasetsAndConstraints()
+	my_dataset, my_dataset_out_dist, cs=getCorridorDatasetsAndConstraints()
 
 	############### THIS AVOIDS CREATING the dataset all the time
 	# import pickle
@@ -283,104 +284,85 @@ def main(params):
 						  nn.Linear(64, 64),
 						  constraint_layer
 									 ) 
-	### TRAIN THE MODEL 
-	training_metrics = train_model(model, params, sdag, tensorboard_writer, cs)
 
-	#Save the best model found
 	folder="./scripts/results/"
 	name_file=params['method']+"_weight_soft_cost_"+str(params["weight_soft_cost"])    #+uuid.uuid4().hex #https://stackoverflow.com/a/62277811
+	path_policy = folder + name_file +".pt"
 
-	torch.save(model.state_dict(), folder+name_file+".pt")
-	# model.load_state_dict(torch.load('checkpoint.pt'))
+	if(params['train']==True):
+		training_metrics = train_model(model, params, sdag, tensorboard_writer, cs)
 
-	# model.load_state_dict(torch.load('./results/UU.pt'))
+		torch.save(model.state_dict(), path_policy) #Save the best model found
 
-	print("Testing model...")
-	testing_metrics = onePassOverDataset(model, params, sdag, 'test', cs)
-	testing_metrics_out_dist = onePassOverDataset(model, params, sdag_out_dist, 'test', cs)
-	print("Model tested...")
-
-	#####PRINT STUFF
-	print("\n\n-----------------------------------------------------")
-	method=params['method']
-
-	num_trainable_params=sum(	p.numel() for p in model.parameters() if p.requires_grad)
-
-	training_summary=f"k = {cs.k}, n = {cs.n}, dim_after_map={constraint_layer.dim_after_map}\n"\
-					 f"Num of trainable params = {num_trainable_params}\n\n"\
-						f"Training: \n"\
-						  f"  [{method}] loss: {training_metrics['train_loss'][-1]:.6} \n"\
-						  f"  [{method}] val loss: {training_metrics['val_loss'][-1]:.6}"
-
-	# testing_summary=f"Testing: \n"\
-	# 					 f"  [{method}] loss: {testing_metrics['loss']:.6} \n"\
-	# 					 f"  [{method}] violation: {testing_metrics['violation']:.6} \n"\
-	# 					 f"  [{method}] time_ms: {1000.0*testing_metrics['time_s']:.6} \n"\
-	# 					 f"  [Opt] loss: {testing_metrics['optimization_loss']:.6} \n"\
-	# 					 f"  [Opt] violation: {testing_metrics['optimization_violation']:.6} \n"\
-	# 					 f"  [Opt] time_us: {1e6*testing_metrics['optimization_time_s']:.6} \n";
+		training_summary=f"k = {cs.k}, n = {cs.n}, dim_after_map={constraint_layer.dim_after_map}\n"\
+						 f"Training: \n"\
+						 f"  [{params['method']}] loss: {training_metrics['train_loss'][-1]:.6} \n"\
+						 f"  [{params['method']}] val loss: {training_metrics['val_loss'][-1]:.6}"
 
 
-	# testing_out_dist_summary=f"Testing outside distrib: \n"\
-	# 					 f"  [{method}] loss: {testing_metrics_out_dist['loss']:.6} \n"\
-	# 					 f"  [{method}] violation: {testing_metrics_out_dist['violation']:.6} \n"\
-	# 					 f"  [{method}] time_ms: {1000.0*testing_metrics_out_dist['time_s']:.6} \n"\
-	# 					 f"  [Opt] loss: {testing_metrics_out_dist['optimization_loss']:.6} \n"\
-	# 					 f"  [Opt] violation: {testing_metrics_out_dist['optimization_violation']:.6} \n"\
-	# 					 f"  [Opt] time_us: {1e6*testing_metrics_out_dist['optimization_time_s']:.6} \n";
+		utils.printInBoldBlue(training_summary)
 
 
-	utils.printInBoldBlue(training_summary)
-	# utils.printInBoldRed(testing_summary)
-	# utils.printInBoldGreen(testing_out_dist_summary)
+	if(params['test']==True):
+		model.load_state_dict(torch.load(path_policy))
+		print("Testing model...")
+		testing_metrics = onePassOverDataset(model, params, sdag, 'test', cs)
+		testing_metrics_out_dist = onePassOverDataset(model, params, sdag_out_dist, 'test', cs)
 
-	# index=                       [method+" In dist", method+"Out of dist", "Opt In dist", "Opt Out dist"]
-	# d = {'num_trainable_params': [num_trainable_params,         	 num_trainable_params,                     0, 												 0], 
-	#     'loss':                  [testing_metrics['loss'],      	 testing_metrics_out_dist['loss'],         testing_metrics['optimization_loss'],            testing_metrics_out_dist['optimization_loss']     ], 
-	#     'violation':             [testing_metrics['violation'], 	 testing_metrics_out_dist['violation'],    testing_metrics['optimization_violation'],       testing_metrics_out_dist['optimization_violation'] ],
-	#     'time_us':               [1e6*testing_metrics['time_s'],     1e6*testing_metrics_out_dist['time_s'],   1e6*testing_metrics['optimization_time_s'],      1e6*testing_metrics_out_dist['optimization_time_s']             ]   }
+		num_trainable_params=sum(	p.numel() for p in model.parameters() if p.requires_grad)
 
-
-	index=                       [name_file, "Optimization"]
-	d = {'num_trainable_params': [num_trainable_params,         	  0], 
-	    '[In dist] loss':        [testing_metrics['loss'],      	  testing_metrics['optimization_loss']      ], 
-	    '[In dist] violation':   [testing_metrics['violation'], 	  testing_metrics['optimization_violation'] ],
-	    '[In dist] time_us':     [1e6*testing_metrics['time_s'],     1e6*testing_metrics['optimization_time_s'] ],
-	    #
-	    '[Out dist] loss':        [testing_metrics_out_dist['loss'],      	  testing_metrics_out_dist['optimization_loss']      ], 
-	    '[Out dist] violation':   [testing_metrics_out_dist['violation'], 	  testing_metrics_out_dist['optimization_violation'] ],
-	    '[Out dist] time_us':     [1e6*testing_metrics_out_dist['time_s'],     1e6*testing_metrics_out_dist['optimization_time_s'] ]}
+		index=                       [name_file, "Optimization"]
+		d = {'num_trainable_params': [num_trainable_params,         	  0], 
+		    '[In dist] loss':        [testing_metrics['loss'],      	  testing_metrics['optimization_loss']      ], 
+		    '[In dist] violation':   [testing_metrics['violation'], 	  testing_metrics['optimization_violation'] ],
+		    '[In dist] time_us':     [1e6*testing_metrics['time_s'],     1e6*testing_metrics['optimization_time_s'] ],
+		    #
+		    '[Out dist] loss':        [testing_metrics_out_dist['loss'],      	  testing_metrics_out_dist['optimization_loss']      ], 
+		    '[Out dist] violation':   [testing_metrics_out_dist['violation'], 	  testing_metrics_out_dist['optimization_violation'] ],
+		    '[Out dist] time_us':     [1e6*testing_metrics_out_dist['time_s'],     1e6*testing_metrics_out_dist['optimization_time_s'] ]}
 
 
-	df = pd.DataFrame(data=d, index=index)
-	print(df)
+		df = pd.DataFrame(data=d, index=index)
+		print(df)
 
+		path_pkl = folder + name_file +".pkl"
 
+		df.to_pickle(path_pkl) 	
 
 	# f = open(name+".txt", "w")
 	# f.write(df.to_string())
 	# f.write("\n\n\n"+training_summary)
 	# f.close()
-
 	# df.to_csv(name+".csv")
-
-	df.to_pickle(folder+name_file+".pkl")  
-
+	 
 
 	tensorboard_writer.close()
+
+#See https://stackoverflow.com/a/43357954/6057617
+def str2bool(v):
+    if isinstance(v, bool):
+        return v
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
 
 
 if __name__ == '__main__':
 
 	parser = argparse.ArgumentParser()
-	parser.add_argument('--method', type=str, default='walker_1') #walker_2, walker_1, Bar, UU, PP, UP, DC3
-	parser.add_argument('--use_supervised', type=bool, default=False)
+	parser.add_argument('--method', type=str, default='UP') #walker_2, walker_1, Bar, UU, PP, UP, DC3
+	parser.add_argument('--use_supervised', type=str2bool, default=False)
 	parser.add_argument('--weight_soft_cost', type=float, default=0.0)
 	parser.add_argument('--device', type=int, default=0)
-	parser.add_argument('--num_epochs', type=int, default=100)
+	parser.add_argument('--num_epochs', type=int, default=500)
 	parser.add_argument('--batch_size', type=int, default=400)
 	parser.add_argument('--verbosity', type=int, default=1)
 	parser.add_argument('--learning_rate', type=float, default=1e-4)
+	parser.add_argument('--train', type=str2bool, default=True)
+	parser.add_argument('--test', type=str2bool, default=True)
 	#Parameters specific to DC3
 	parser.add_argument('--DC3_lr', type=float, default=3e-4)
 	parser.add_argument('--DC3_eps_converge', type=float, default=1e-5)
