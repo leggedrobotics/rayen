@@ -13,13 +13,14 @@ import constraints
 # create custom dataset class
 class CustomDataset(Dataset):
 	def __init__(self, all_x, all_y, all_Pobj, all_qobj, all_robj, all_times_s, all_costs):
-		self.all_x = all_x
-		self.all_y = all_y
-		self.all_Pobj = all_Pobj
-		self.all_qobj = all_qobj
-		self.all_robj = all_robj
-		self.all_times_s = all_times_s
-		self.all_costs = all_costs
+		self.all_x = [torch.Tensor(item) for item in all_x] 
+		self.all_y = [torch.Tensor(item) for item in all_y] 
+		self.all_Pobj = [torch.Tensor(item) for item in all_Pobj] 
+		self.all_qobj = [torch.Tensor(item) for item in all_qobj] 
+		self.all_robj = [torch.Tensor(item) for item in all_robj] 
+		self.all_times_s = [torch.Tensor(item) for item in all_times_s]
+		self.all_costs = [torch.Tensor(item) for item in all_costs] 
+
 
 	def __len__(self):
 		return len(self.all_y)
@@ -28,10 +29,10 @@ class CustomDataset(Dataset):
 		return self.all_x[idx], self.all_y[idx], self.all_Pobj[idx], self.all_qobj[idx], self.all_robj[idx], self.all_times_s[idx], self.all_costs[idx]
 
 	def getNumelX(self):
-		return self.all_x[0].size #Using the first element
+		return self.all_x[0].shape[0] #Using the first element
 
 	def getNumelY(self):
-		return self.all_y[0].size #Using the first element
+		return self.all_y[0].shape[0] #Using the first element
 
 	# def plot(self, ax):
 	# 	dim=self.all_x[0].shape[0]

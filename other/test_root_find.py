@@ -39,7 +39,7 @@ def newton(func, guess, runs=5000):
     return guess.data # return our final `guess` after 5 updates
 
 # call starts
-guess = torch.tensor([1], dtype=torch.float64, requires_grad = True) 
+guess = torch.Tensor([1], dtype=torch.float64, requires_grad = True) 
 result = newton(my_tracer, guess)
 
 print(my_tracer(result))

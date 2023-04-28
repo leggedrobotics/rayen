@@ -232,8 +232,6 @@ def main(params):
 
 	tensorboard_writer = SummaryWriter()
 
-	torch.set_default_dtype(torch.float64) ##Use float32 here??
-
 	## PROJECTION EXAMPLES
 	# cs=getExample(4)
 	# my_dataset=createProjectionDataset(200, cs, 4.0);

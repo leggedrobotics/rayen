@@ -29,11 +29,11 @@ class CostComputer(nn.Module): #Using nn.Module to be able to use register_buffe
 
 		#See https://discuss.pytorch.org/t/model-cuda-does-not-convert-all-variables-to-cuda/114733/9
 		# and https://discuss.pytorch.org/t/keeping-constant-value-in-module-on-correct-device/10129
-		self.register_buffer("A_p", torch.tensor(cs.A_p))
-		self.register_buffer("b_p", torch.tensor(cs.b_p))
-		self.register_buffer("y1", torch.tensor(cs.y1))
-		self.register_buffer("NA_E", torch.tensor(cs.NA_E))
-		self.register_buffer("z0", torch.tensor(cs.z0))
+		self.register_buffer("A_p", torch.Tensor(cs.A_p))
+		self.register_buffer("b_p", torch.Tensor(cs.b_p))
+		self.register_buffer("y1", torch.Tensor(cs.y1))
+		self.register_buffer("NA_E", torch.Tensor(cs.NA_E))
+		self.register_buffer("z0", torch.Tensor(cs.z0))
 
 		self.has_linear_ineq_constraints=cs.has_linear_ineq_constraints
 		self.has_linear_eq_constraints=cs.has_linear_eq_constraints

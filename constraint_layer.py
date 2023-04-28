@@ -47,7 +47,7 @@ class ConstraintLayer(torch.nn.Module):
 
 		#See https://discuss.pytorch.org/t/model-cuda-does-not-convert-all-variables-to-cuda/114733/9
 		# and https://discuss.pytorch.org/t/keeping-constant-value-in-module-on-correct-device/10129
-		self.register_buffer("D", torch.tensor(D))
+		self.register_buffer("D", torch.Tensor(D))
 		self.register_buffer("all_P", torch.Tensor(np.array(all_P)))
 		self.register_buffer("all_q", torch.Tensor(np.array(all_q)))
 		self.register_buffer("all_r", torch.Tensor(np.array(all_r)))
@@ -56,12 +56,12 @@ class ConstraintLayer(torch.nn.Module):
 		self.register_buffer("all_c", torch.Tensor(np.array(all_c)))
 		self.register_buffer("all_d", torch.Tensor(np.array(all_d)))
 		self.register_buffer("all_F", torch.Tensor(np.array(all_F)))
-		self.register_buffer("A_p", torch.tensor(cs.A_p))
-		self.register_buffer("b_p", torch.tensor(cs.b_p))
-		self.register_buffer("y1", torch.tensor(cs.y1))
-		self.register_buffer("NA_E", torch.tensor(cs.NA_E))
-		self.register_buffer("z0", torch.tensor(cs.z0))
-		self.register_buffer("y0", torch.tensor(cs.y0))
+		self.register_buffer("A_p", torch.Tensor(cs.A_p))
+		self.register_buffer("b_p", torch.Tensor(cs.b_p))
+		self.register_buffer("y1", torch.Tensor(cs.y1))
+		self.register_buffer("NA_E", torch.Tensor(cs.NA_E))
+		self.register_buffer("z0", torch.Tensor(cs.z0))
+		self.register_buffer("y0", torch.Tensor(cs.y0))
 
 		if(self.method=='PP' or self.method=='UP'):
 			#Section 8.1.1 of https://web.stanford.edu/~boyd/cvxbook/bv_cvxbook.pdf
@@ -79,8 +79,8 @@ class ConstraintLayer(torch.nn.Module):
 			print(f"b_p={cs.b_p}")
 			print("Computing vertices and rays...")
 			V, R = utils.H_to_V(cs.A_p, cs.b_p);
-			self.register_buffer("V", torch.tensor(V))
-			self.register_buffer("R", torch.tensor(R))
+			self.register_buffer("V", torch.Tensor(V))
+			self.register_buffer("R", torch.Tensor(R))
 			self.num_vertices=self.V.shape[1];
 			self.num_rays=self.R.shape[1];
 			assert (self.num_vertices+self.num_rays)>0
@@ -91,10 +91,10 @@ class ConstraintLayer(torch.nn.Module):
 
 			A2_DC3, b2_DC3=utils.removeRedundantEquationsFromEqualitySystem(cs.A_E, cs.b_E) 
 
-			self.register_buffer("A2_DC3", torch.tensor(A2_DC3))
-			self.register_buffer("b2_DC3", torch.tensor(b2_DC3))
-			self.register_buffer("A1_DC3", torch.tensor(cs.A_I))
-			self.register_buffer("b1_DC3", torch.tensor(cs.b_I))
+			self.register_buffer("A2_DC3", torch.Tensor(A2_DC3))
+			self.register_buffer("b2_DC3", torch.Tensor(b2_DC3))
+			self.register_buffer("A1_DC3", torch.Tensor(cs.A_I))
+			self.register_buffer("b1_DC3", torch.Tensor(cs.b_I))
 
 			#Constraints are now 
 			# A2_DC3 y = b2_DC3

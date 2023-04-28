@@ -30,8 +30,6 @@ num_of_examples=len(index_examples_to_run)
 rows=math.ceil(math.sqrt(num_of_examples))
 cols=rows
 
-torch.set_default_dtype(torch.float64) ##Use float32 here??
-
 # if method=='walker_1':
 # 	os.system("rm -rf ./examples_mat");
 # 	os.system("mkdir ./examples_mat");

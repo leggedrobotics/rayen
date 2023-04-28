@@ -16,14 +16,14 @@ import numpy as np
 
 # import torch
 
-# a = torch.tensor([2., 3.], requires_grad=True)
-# b = torch.tensor([6., 4.], requires_grad=True)
+# a = torch.Tensor([2., 3.], requires_grad=True)
+# b = torch.Tensor([6., 4.], requires_grad=True)
 
 # Q = 3*a**3 - b**2
 
 # print(Q.shape)
 
-# external_grad = torch.tensor([1., 1.])
+# external_grad = torch.Tensor([1., 1.])
 # Q.backward(gradient=external_grad)
 
 # # check if collected gradients are correct
