@@ -29,7 +29,9 @@ class EarlyStopping:
         self.early_stop = False
         self.val_loss_min = np.Inf
         self.delta = delta
-        self.path = 'checkpoint_'+uuid.uuid4().hex #https://stackoverflow.com/a/62277811
+        folder="./early_stopping_checkpoints/"
+        os.system("mkdir -p "+folder)
+        self.path = folder+"checkpoint_"+uuid.uuid4().hex+".pt" #https://stackoverflow.com/a/62277811
         self.trace_func = trace_func
     def __call__(self, val_loss, model):
 
