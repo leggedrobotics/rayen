@@ -20,11 +20,11 @@ import time
 
 
 methods=['walker_2', 'walker_1', 'Bar', 'UU', 'PP', 'UP', 'DC3']
-methods=['walker_2', 'walker_1', 'Bar', 'UU', 'DC3']
+# methods=['walker_2', 'walker_1', 'Bar', 'UU', 'DC3']
 
 index_examples_to_run=list(range(15))
-# index_examples_to_run=[14]
-methods=['walker_1']
+# index_examples_to_run=[0]
+# methods=['UP']
 num_of_examples=len(index_examples_to_run)
 ###############
 rows=math.ceil(math.sqrt(num_of_examples))
@@ -77,8 +77,8 @@ for method in methods:
 		numel_output_mapper=my_layer.getDimAfterMap()
 
 		# x_batched=torch.Tensor(1000, numel_output_mapper, 1).uniform_(-8, 8)
-		num_samples=12000
-		x_batched=torch.Tensor(12000, numel_output_mapper, 1).uniform_(-2.5, 2.5)
+		num_samples=500 #12000
+		x_batched=torch.Tensor(num_samples, numel_output_mapper, 1).uniform_(-5.0, 5.0)
 		# x_batched.requires_grad=True
 		# print(x_batched.requires_grad)
 		# exit()
