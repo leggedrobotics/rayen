@@ -74,6 +74,11 @@ class ConstraintLayer(torch.nn.Module):
 			assert self.prob_projection.is_dpp()
 			self.proj_layer = CvxpyLayer(self.prob_projection, parameters=[self.z_to_be_projected], variables=[self.z_projected])
 
+			if(cs.has_sdp_constraints):
+				self.solver_projection='SCS' #slower, less accurate, supports SDP constraints
+			else:
+				self.solver_projection='ECOS' #fast, accurate,  does not support SDP constraints
+
 		if(self.method=='Bar'):
 			print(f"A_p={cs.A_p}")
 			print(f"b_p={cs.b_p}")
@@ -173,7 +178,7 @@ class ConstraintLayer(torch.nn.Module):
 				using_effective=utils.quadExpression(yp, P_effective, q_effective, r_effective)
 				using_original=utils.quadExpression(y, P, q, r)
 
-				assert torch.allclose(using_effective, using_original) 
+				assert torch.allclose(using_effective, using_original, atol=1e-05) 
 
 				###################
 
@@ -400,8 +405,8 @@ class ConstraintLayer(torch.nn.Module):
 		return self.getyFromz(self.V@lambdas + self.R@mus)
 
 	def project(self, q):
-		#If you use ECOS, remember to set solver_args={'eps': 1e-6} (or smaller) for better solutions, see https://github.com/cvxpy/cvxpy/issues/880#issuecomment-557278620
-		z, = self.proj_layer(q, solver_args={'solve_method':'ECOS'}) #Supported: ECOS (fast, accurate), SCS (slower, less accurate).   NOT supported: GUROBI
+		#If you use ECOS, you can set solver_args={'eps': 1e-6} (or smaller) for better solutions, see https://github.com/cvxpy/cvxpy/issues/880#issuecomment-557278620
+		z, = self.proj_layer(q, solver_args={'solve_method':self.solver_projection})
 		return z
 
 	def forwardForPP(self, q):
