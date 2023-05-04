@@ -9,12 +9,15 @@
 close all; clc;clear;
 doSetup();
 
-dimension=2;
+dimension=3;
 
 %%%So that random is repeatable
 rng('default');
 rng(1);
 %%%%%%%%%%%%
+
+t0=0.0;
+tf=15.0;
 
 if(dimension==2)
     P=3*[-0.1 1.0 2.5 3.5 5.5 6.8 7.5;
@@ -23,6 +26,7 @@ if(dimension==2)
     num_of_seg_per_region=1; 
     samples_per_step=5;
     N=15;
+    use_quadratic=false;
 else
     P=3*[0 1 2 3 4 3 2;
        0 1 1 2 4 4 4;
@@ -30,7 +34,8 @@ else
     radius=4*1.3;
     num_of_seg_per_region=3; 
     samples_per_step=5;
-    N=7;
+    N=5;
+    use_quadratic=true;
 end
 
 
@@ -87,9 +92,6 @@ end
 %%
 
 
-t0=0.0;
-tf=10.0;
-
 num_of_regions=size(allA,2);
 
 %Note: IF YOU FIND THE ERROR "Matrix product with incompatible dimensions. Lhs is 3x1 and rhs is 3x3." when changing, this, the cause if the hand-coded "n_int_knots=15; " in computeMatrixForClampedUniformBSpline.m. Increase it.
@@ -123,26 +125,33 @@ vf=zeros(dimension,1); af=zeros(dimension,1);
 
 v_max=4*ones(dimension,1);   a_max=6*ones(dimension,1);   j_max=50*ones(dimension,1);
 
+linear_eq_const={};
 %Initial conditions
-opti.subject_to( sp.getPosT(t0)== p0);
-opti.subject_to( sp.getVelT(t0)== v0);
-opti.subject_to( sp.getAccelT(t0)== a0);
+linear_eq_const=[linear_eq_const   {sp.getPosT(t0)== p0}];
+linear_eq_const=[linear_eq_const   {sp.getVelT(t0)== v0}];
+linear_eq_const=[linear_eq_const   {sp.getAccelT(t0)== a0}];
 
 %Final conditions
 % opti.subject_to( sp.getPosT(tf)== pf);
-opti.subject_to( sp.getVelT(tf)== vf);
-opti.subject_to( sp.getAccelT(tf)== af);
+linear_eq_const=[linear_eq_const   {sp.getVelT(tf)==vf}];
+linear_eq_const=[linear_eq_const   {sp.getAccelT(tf)==af}];
 
 
-% all_binary={};
-
-const_p={}
-const_p=[const_p sp.getMaxVelConstraints(basis, v_max)];      %Max vel constraints (position)
-const_p=[const_p sp.getMaxAccelConstraints(basis, a_max)];    %Max accel constraints (position)
+dyn_lim_const={};
+dyn_lim_const=[dyn_lim_const sp.getMaxVelConstraints(basis, v_max, use_quadratic)];      %Max vel constraints (position)
+dyn_lim_const=[dyn_lim_const sp.getMaxAccelConstraints(basis, a_max, use_quadratic)];    %Max accel constraints (position)
 if(deg_pos>=3)
-const_p=[const_p sp.getMaxJerkConstraints(basis, j_max)];     %Max jerk constraints (position)
+    dyn_lim_const=[dyn_lim_const sp.getMaxJerkConstraints(basis, j_max, use_quadratic)];     %Max jerk constraints (position)
 end
-opti.subject_to([const_p]);
+
+linear_ineq_const={};
+quadratic_const={};
+
+if(use_quadratic)
+    quadratic_const = dyn_lim_const;
+else
+    linear_ineq_const = dyn_lim_const;
+end
 
 %Corridor constraints
 for j=1:(sp.num_seg)
@@ -153,26 +162,26 @@ for j=1:(sp.num_seg)
     ip=ceil(j/num_of_seg_per_region); %ip is the index of the polyhedron
     
     for kk=1:size(Q,2)
-            opti.subject_to( allA{ip}*Q{kk}<=allb{ip}); %Each segment must be in each corridor
+            linear_ineq_const=[linear_ineq_const {allA{ip}*Q{kk}<=allb{ip}}];   %Each segment must be in each corridor
     end
-    
-    %%%%%To use binary variables for the interval allocation
-%     tmp=opti.variable(num_of_regions,1);
-%     
-%     M=1000;
-%     for ip=1:num_of_regions
-%         for kk=1:size(Q,2)
-%                 opti.subject_to( allA{ip}*Q{kk}<=allb{ip}+M*(1-tmp(ip))); %Each segment must be in each corridor
-%         end
-%     end
-%     
-%     opti.subject_to(sum(tmp)>=1);
-%     
-%     all_binary{end+1}=tmp;
     
 end
 
+%%%%%%%%%%%%%%%%%%%%%%%%%% EXTRACT THE CONSTRAINTS
+opti.subject_to(); %delete any constraints in the model
+opti.subject_to(linear_eq_const);
+opti.subject_to(linear_ineq_const);
+[A1,b1]=getAbLinearConstraints(opti);
 
+opti.subject_to(); %delete any constraints in the model
+opti.subject_to(quadratic_const);
+[all_P, all_q, all_r]=getAllPqrQuadraticConstraints(opti);
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+opti.subject_to(); %delete any constraints in the model
+opti.subject_to(linear_eq_const);
+opti.subject_to(linear_ineq_const);
+opti.subject_to(quadratic_const);
 
 %%%%%%%%%%%%%%%%%% COST
 vel_cost=sp.getVelCost();
@@ -187,8 +196,6 @@ opti.minimize(cost)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 opts = struct;
-% num_of_iv=numel(all_binary)*size(all_binary{1},1); %Num of integer variables
-% opts.discrete = [false*ones(1,numel(opti.x)-num_of_iv) true*ones(1,num_of_iv)];
 opts.expand=true; %When this option is true, it goes WAY faster!
 opts.print_time=true;
 if (strcmp(my_solver,'ipopt'))
@@ -200,6 +207,7 @@ else
 end
 % opts.error_on_fail=false;
 opti.solver(my_solver,opts); %{"ipopt.hessian_approximation":"limited-memory"} 
+
 
 
 a=0.001;
@@ -226,14 +234,9 @@ figure;
 imagesc(dist_matrix); colorbar; axis equal
 %%%%%%%%%%%%%%%%%%
 
-[A1,b1]=getAbLinearConstraints(opti);
-polyhedron.A1=A1;
-polyhedron.b1=b1;
-
-
-save('corridor.mat','all_x','all_y','all_Pobj','all_qobj','all_robj','all_costs','all_times_s', ...
+save(['corridor_dim',num2str(dimension),'.mat'],'all_x','all_y','all_Pobj','all_qobj','all_robj','all_costs','all_times_s', ...
      'all_x_out_dist','all_y_out_dist','all_Pobj_out_dist','all_qobj_out_dist','all_robj_out_dist','all_costs_out_dist','all_times_s_out_dist', ...
-     'polyhedron');
+     'A1','b1','all_P','all_q','all_r');
 
 sol = opti.solve();
 

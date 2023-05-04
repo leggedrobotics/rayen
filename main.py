@@ -230,6 +230,9 @@ def main(params):
 	# proc2 = subprocess.Popen(["google-chrome","http://localhost:6006/"], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
 	############################################
 
+	torch.set_default_dtype(torch.float64) #This is very important. If you use float32, you may end up with a "large" negative discriminant (like -0.000259) in solveSecondOrderEq 
+										   #This is also related to the fact that the P matrices need to be PSD matrices (while numerically this is sometimes difficult to achieve)
+
 	tensorboard_writer = SummaryWriter()
 
 	## PROJECTION EXAMPLES
@@ -238,7 +241,7 @@ def main(params):
 	# my_dataset_out_dist=createProjectionDataset(200, cs, 7.0);
 
 	## CORRIDOR EXAMPLES
-	my_dataset, my_dataset_out_dist, cs=getCorridorDatasetsAndConstraints()
+	my_dataset, my_dataset_out_dist, cs=getCorridorDatasetsAndConstraints(params['dimension_dataset'])
 
 	############### THIS AVOIDS CREATING the dataset all the time
 	# import pickle
@@ -248,7 +251,7 @@ def main(params):
 	# 	my_dataset_out_dist = utils.loadpickle("my_dataset_out_dist.pkl",)
 	# 	cs = utils.loadpickle("cs.pkl",)
 	# except:
-	# 	my_dataset, my_dataset_out_dist, cs=getCorridorDatasetsAndConstraints()
+	# 	my_dataset, my_dataset_out_dist, cs=getCorridorDatasetsAndConstraints(params['dimension_dataset'])
 	# 	utils.savepickle(my_dataset, "my_dataset.pkl")
 	# 	utils.savepickle(my_dataset_out_dist, "my_dataset_out_dist.pkl")
 	# 	utils.savepickle(cs, "cs.pkl")
@@ -354,11 +357,12 @@ def str2bool(v):
 if __name__ == '__main__':
 
 	parser = argparse.ArgumentParser()
-	parser.add_argument('--method', type=str, default='DC3') #walker_2, walker_1, Bar, UU, PP, UP, DC3
+	parser.add_argument('--method', type=str, default='UP') #walker_2, walker_1, Bar, UU, PP, UP, DC3
+	parser.add_argument('--dimension_dataset', type=int, default=3)
 	parser.add_argument('--use_supervised', type=str2bool, default=False)
-	parser.add_argument('--weight_soft_cost', type=float, default=100.0)
+	parser.add_argument('--weight_soft_cost', type=float, default=0.0)
 	parser.add_argument('--device', type=int, default=0)
-	parser.add_argument('--num_epochs', type=int, default=500)
+	parser.add_argument('--num_epochs', type=int, default=2000)
 	parser.add_argument('--batch_size', type=int, default=400)
 	parser.add_argument('--verbosity', type=int, default=1)
 	parser.add_argument('--learning_rate', type=float, default=1e-4)

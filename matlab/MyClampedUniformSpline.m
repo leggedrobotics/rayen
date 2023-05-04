@@ -673,60 +673,56 @@ classdef MyClampedUniformSpline < handle
             end
         end
         
-        function constraints=getMaxVelConstraints(obj, basis, v_max_scaled)
+        function constraints=getMaxVelConstraints(obj, basis, v_max_scaled, use_quadratic)
             constraints={};
             for j=1:obj.num_seg
                 cps=obj.getCPs_XX_Vel_ofInterval(basis, j);
                 for u=1:size(cps,2)
-                    if(j==1 && (u==1 || u==2) && obj.dim==3)
-                        continue   %Not impose constraint on the first vel ctrl points for position[to allow "infeasible" initial velocities due to planning in body frame and v constraints in each axis].
+                    if(use_quadratic)
+                        constraints{end+1}=(cps{u}'*cps{u})<=(v_max_scaled'*v_max_scaled);
+                    else
+                        for xyz=1:size(cps{u},1)
+                            constraints{end+1}=cps{u}(xyz) <= v_max_scaled(xyz);
+                            constraints{end+1}=cps{u}(xyz) >= -v_max_scaled(xyz);
+                        end
                     end
-%                     constraints{end+1}=(cps{u}'*cps{u})<=(v_max_scaled^2);
-%                     total_squared=0;
-                    for xyz=1:size(cps{u},1)
-                        constraints{end+1}=cps{u}(xyz) <= v_max_scaled(xyz);
-                        constraints{end+1}=cps{u}(xyz) >= -v_max_scaled(xyz);
-%                         total_squared=total_squared+(cps{u}(xyz)^2);
-                    end
-%                     constraints{end+1}=total_squared<=(v_max_scaled^2);
+
+
                 end
             end
         end
         
-        function constraints=getMaxAccelConstraints(obj, basis, a_max_scaled)
+        function constraints=getMaxAccelConstraints(obj, basis, a_max_scaled, use_quadratic)
             constraints={};
             for j=1:obj.num_seg
                 cps=obj.getCPs_XX_Accel_ofInterval(basis,j);
                 for u=1:size(cps,2)
-                    if(j==1 && (u==1 || u==2) && obj.dim==3)
-                        continue   %Not impose constraint on the first accel ctrl points [to allow "infeasible" initial accelerations due to planning in body frame and a constraints in each axis].
+                    if(use_quadratic)
+                        constraints{end+1}=(cps{u}'*cps{u})<=(a_max_scaled'*a_max_scaled);
+                    else
+                        for xyz=1:size(cps{u},1)
+                            constraints{end+1}=cps{u}(xyz) <= a_max_scaled(xyz);
+                            constraints{end+1}=cps{u}(xyz) >= -a_max_scaled(xyz);
+                        end
                     end
-%                     constraints{end+1}=(cps{u}'*cps{u})<=(a_max_scaled^2);
-%                     total_squared=0;
-                    for xyz=1:size(cps{u},1)
-                        constraints{end+1}=cps{u}(xyz) <= a_max_scaled(xyz);
-                        constraints{end+1}=cps{u}(xyz) >= -a_max_scaled(xyz);
-%                         total_squared=total_squared+(cps{u}(xyz)^2);
-                    end
-%                     constraints{end+1}=total_squared<=(a_max_scaled^2);
                 end
             end
         end
         
         
-        function constraints=getMaxJerkConstraints(obj, basis, j_max_scaled)
+        function constraints=getMaxJerkConstraints(obj, basis, j_max_scaled, use_quadratic)
             constraints={};
             for j=1:obj.num_seg
                 cps=obj.getCPs_XX_Jerk_ofInterval(basis,j);
                 for u=1:size(cps,2)
-%                      constraints{end+1}=(cps{u}'*cps{u})<=(j_max_scaled^2);
-%                     total_squared=0;
-                    for xyz=1:size(cps{u},1)
-                        constraints{end+1}=cps{u}(xyz) <= j_max_scaled(xyz);
-                        constraints{end+1}=cps{u}(xyz) >= -j_max_scaled(xyz);
-%                         total_squared=total_squared+(cps{u}(xyz)^2);
+                    if(use_quadratic)
+                        constraints{end+1}=(cps{u}'*cps{u})<=(j_max_scaled'*j_max_scaled);
+                    else
+                        for xyz=1:size(cps{u},1)
+                            constraints{end+1}=cps{u}(xyz) <= j_max_scaled(xyz);
+                            constraints{end+1}=cps{u}(xyz) >= -j_max_scaled(xyz);
+                        end
                     end
-%                     constraints{end+1}=total_squared<=(j_max_scaled^2);
                 end
             end
         end

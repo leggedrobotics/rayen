@@ -106,9 +106,9 @@ def createProjectionDataset(num_samples, cs, bbox_half_side):
 
 	return my_dataset
 
-def getCorridorDatasetsAndConstraints():
+def getCorridorDatasetsAndConstraints(dimension):
 
-	mat = scipy.io.loadmat('./matlab/corridor.mat')
+	mat = scipy.io.loadmat('./matlab/corridor_dim'+str(dimension)+'.mat')
 
 	all_x=list(mat["all_x"][0])
 	all_y=list(mat["all_y"][0])
@@ -126,10 +126,36 @@ def getCorridorDatasetsAndConstraints():
 	all_times_s_out_dist=list(mat["all_times_s_out_dist"][0])
 	all_costs_out_dist=list(mat["all_costs_out_dist"][0])
 
-	polyhedron=mat["polyhedron"]
+	# polyhedron=mat["polyhedron"]
 
-	A1=polyhedron['A1'][0,0];
-	b1=polyhedron['b1'][0,0];
+	# A1=polyhedron['A1'][0,0];
+	# b1=polyhedron['b1'][0,0];
+
+	# polyhedron=mat["polyhedron"]
+
+	# A1=polyhedron['A1'][0,0];
+	# b1=polyhedron['b1'][0,0];
+
+	A1=mat['A1'];
+	b1=mat['b1'];
+
+	all_P=list(mat["all_P"][0])
+	all_q=list(mat["all_q"][0])
+	all_r=list(mat["all_r"][0])
+
+
+	# print(f"Shape of A1={A1.shape}")
+	# print(f"Shape of b1={b1.shape}")
+
+	# # print(len(all_P))
+	# # print(len(all_q))
+	# # print(len(all_r))
+
+	# print(all_P[0].shape)
+	# print(all_q[0].shape)
+	# print(all_r[0].shape)
+	# exit()
+
 
 	assert A1.ndim==2
 	assert b1.ndim==2
@@ -141,7 +167,12 @@ def getCorridorDatasetsAndConstraints():
 
 	lc=constraints.LinearConstraint(A1=A1, b1=b1, A2=None, b2=None);
 
-	cs=constraints.convexConstraints(lc=lc, qcs=[], socs=[], sdpc=None)
+	qcs=[];
+	for i in range(len(all_P)):
+		qc=constraints.convexQuadraticConstraint(P=all_P[i], q=all_q[i], r=all_r[i]);
+		qcs.append(qc)
+
+	cs=constraints.convexConstraints(lc=lc, qcs=qcs, socs=[], sdpc=None)
 	my_dataset = CustomDataset(all_x, all_y, all_Pobj, all_qobj, all_robj, all_times_s, all_costs)
 	my_dataset_out_dist = CustomDataset(all_x_out_dist, all_y_out_dist, all_Pobj_out_dist, all_qobj_out_dist, all_robj_out_dist, all_times_s_out_dist, all_costs_out_dist)
 
