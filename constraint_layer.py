@@ -302,7 +302,8 @@ class ConstraintLayer(torch.nn.Module):
 
 	def solveSecondOrderEq(self, a, b, c, is_quad_constraint):
 		discriminant = torch.square(b) - 4*(a)*(c)
-		assert torch.all(discriminant >= 0) 
+
+		assert torch.all(discriminant >= 0), f"Smallest element is {torch.min(discriminant)}"
 		sol1=torch.div(  -(b)  - torch.sqrt(discriminant) , 2*a)  #note that for quad constraints the positive solution has the minus: (... - sqrt(...))/(...)
 		if(is_quad_constraint):
 			return sol1
@@ -330,7 +331,7 @@ class ConstraintLayer(torch.nn.Module):
 				a_prime=(0.5*self.y0.T@P@self.y0 + q.T@self.y0 +r) #This could be computed offline
 
 				kappa_positive_i=self.solveSecondOrderEq(a_prime, b_prime, c_prime, True) 
-				assert torch.all(kappa_positive_i >= 0) #If not, then either the feasible set is infeasible (note that z0 is inside the feasible set)
+				assert torch.all(kappa_positive_i >= 0), f"Smallest element is {kappa_positive_i}" #If not, then either the feasible set is infeasible (note that z0 is inside the feasible set)
 				all_kappas_positives = torch.cat((all_kappas_positives, kappa_positive_i), dim=1)
 
 			for i in range(self.all_M.shape[0]): #for each of the SOC constraints
