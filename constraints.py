@@ -62,8 +62,37 @@ class convexQuadraticConstraint():
 		self.q=q;
 		self.r=r;
 
-		utils.checkMatrixisPsd(self.P, tol=1e-7);
 		utils.checkMatrixisNotZero(self.P);
+		utils.checkMatrixisSymmetric(self.P)
+		
+		eigenvalues=np.linalg.eigvalsh(self.P);
+		smallest_eigenvalue= (np.amin(eigenvalues))
+
+		######## Check that the matrix is PSD up to a tolerance
+		tol=1e-7
+		if(smallest_eigenvalue<-tol):
+			assert False, f"Matrix P is not PSD, smallest eigenvalue is {smallest_eigenvalue}"
+		#########################
+
+		#Note: All the code assummes that P is a PSD matrix. This is specially important when:
+		#--> Using  cp.quad_form(...) You can use the argument assume_PSD=True (see https://github.com/cvxpy/cvxpy/issues/407)
+		#--> Computting kappa (if P is not a PSD matrix, you end up with a negative discriminant when solving the 2nd order equation)
+
+		######### Correct for possible numerical errors
+		if( (-tol)<=smallest_eigenvalue<0  ):
+			#Correction due to numerical errors
+			
+			# utils.printInBoldGreen(f"Correcting with smallest_eigenvalue={smallest_eigenvalue}")
+
+			##Option 1
+			self.P = self.P +np.abs(smallest_eigenvalue)*np.eye(self.P.shape[0]) 
+
+			##Option 2 https://stackoverflow.com/a/63131250  and https://math.stackexchange.com/a/1380345
+			# C = (self.P + self.P.T)/2  #https://en.wikipedia.org/wiki/Symmetric_matrix#Decomposition_into_symmetric_and_skew-symmetric
+			# eigval, eigvec = np.linalg.eigh(C)
+			# eigval[eigval < 0] = 0
+			# self.P=eigvec.dot(np.diag(eigval)).dot(eigvec.T)
+		##########
 
 	def dim(self):
 		return self.P.shape[1]
