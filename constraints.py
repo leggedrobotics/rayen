@@ -62,14 +62,15 @@ class convexQuadraticConstraint():
 		self.q=q;
 		self.r=r;
 
-		utils.checkMatrixisPsd(self.P);
+		utils.checkMatrixisPsd(self.P, tol=1e-7);
 		utils.checkMatrixisNotZero(self.P);
 
 	def dim(self):
 		return self.P.shape[1]
 
 	def asCvxpy(self, y, epsilon=0.0):
-		return [0.5*cp.quad_form(y, self.P) + self.q.T@y + self.r <= -epsilon]
+
+		return [0.5*cp.quad_form(y, self.P, assume_PSD=True) + self.q.T@y + self.r <= -epsilon]  #assume_PSD needs to be True because of this: https://github.com/cvxpy/cvxpy/issues/407. We have already checked that it is Psd within a tolerance
 
 class SOCConstraint():
 	#Constraint is ||My+s||<=c'y+d

@@ -13,7 +13,6 @@ class ConstraintLayer(torch.nn.Module):
 	def __init__(self, cs, input_dim=None, method='walker_2', create_map=True, args_DC3=None):
 		super().__init__()
 
-		assert cp.__version__=='1.2.3' #See this issue: https://github.com/cvxgrp/cvxpylayers/issues/143
 
 		self.method=method
 
@@ -105,30 +104,28 @@ class ConstraintLayer(torch.nn.Module):
 			# A2_DC3 y = b2_DC3
 			# A1_DC3 y <= b1_DC3
 
-			det = 0
-			i = 0
 			self.neq_DC3 = self.A2_DC3.shape[0]
 
-			#######################################################
-			#Note: This section follows the original implementation of DC3: https://github.com/locuslab/DC3/blob/35437af7f22390e4ed032d9eef90cc525764d26f/utils.py#L67
-			#There are probably more efficient ways to do this though (probably using the QR decomposition)
-			print("DC3: Obtaining partial_vars and other_vars")
-			while True:
-				self.partial_vars = np.random.choice(self.k, self.k - self.neq_DC3, replace=False)
-				self.other_vars = np.setdiff1d( np.arange(self.k), self.partial_vars)
-				det = torch.det(self.A2_DC3[:, self.other_vars])
-				if(abs(det) > 0.0001):
-					break
-				i += 1
-				if i > 1e8:
-					raise Exception
-			print("Done")
-			#######################################################
+			#################################### Find partial_vars and other_vars
 
+			if(A2_DC3.shape[0]==0): #There are no equality constraints
+				self.partial_vars=np.arange(self.k)
+				self.other_vars=np.setdiff1d( np.arange(self.k), self.partial_vars)
+			else:
+				# This is a more efficient way to do https://github.com/locuslab/DC3/blob/35437af7f22390e4ed032d9eef90cc525764d26f/utils.py#L67
+				# Here, we follow  https://stackoverflow.com/a/27907936
+				(A2_DC3_rref, pivots_pos, row_exchanges) = utils.rref(A2_DC3);
+				self.other_vars = [i[1] for i in pivots_pos];
+				self.partial_vars = np.setdiff1d( np.arange(self.k), self.other_vars)
+
+			#######################################################
 
 			A2p = self.A2_DC3[:, self.partial_vars]
-			A2oi = torch.inverse(self.A2_DC3[:, self.other_vars])			
+			A2o = self.A2_DC3[:, self.other_vars]
 
+			# assert np.linalg.matrix_rank(A2_DC3) == np.linalg.matrix_rank(A2o) == A2o.shape[-1]
+
+			A2oi = torch.inverse(A2o)			
 
 			####################################################
 			####################################################

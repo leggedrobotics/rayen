@@ -142,10 +142,10 @@ def checkMatrixisSymmetric(A):
 	assert A.shape[0]==A.shape[1]
 	assert np.allclose(A, A.T)
 
-def checkMatrixisPsd(A):
+def checkMatrixisPsd(A, tol=0.0):
 	checkMatrixisSymmetric(A)
 	eigenvalues=np.linalg.eigvals(A);
-	assert np.all(eigenvalues >= 0.0), f"Matrix is not PSD, min eigenvalue is {np.amin(eigenvalues)}"
+	assert np.all(eigenvalues >= -tol), f"Matrix is not PSD, min eigenvalue is {np.amin(eigenvalues)}"
 
 def checkMatrixisPd(A):
 	checkMatrixisSymmetric(A)
@@ -155,37 +155,80 @@ def checkMatrixisPd(A):
 def isMatrixSingular(A):
 	return (np.linalg.matrix_rank(A) < self.E.shape[0])
 
-# Removes redundant equations from Ax=b
-# Note that 
-#Ax=b                     is equivalent to
-#[A b][x;-1]=0            Performing now the QR decomposition we have:
-#QR[x;-1]=0               As Q^T=Q^-1, we have that:
-#R[x;-1]=0                Noting now that R=[Rnz;0], we have that:
-#[Rnz;0][x;-1]=0          Here, 0 is a matrix/vector of zeros. Getting rid of the zero part
-#[Rnz][x;-1]=0            Denoting now Rnz:=[Aresult bresult]
-# Aresult x = bresult     This is the equivalent system to Ax=b
+#Taken from https://gist.github.com/sgsfak/77a1c08ac8a9b0af77393b24e44c9547
+#Compute the Reduced Row Echelon Form (RREF) in Python
+def rref(B, tol=1e-8):
+  A = B.copy()
+  rows, cols = A.shape
+  r = 0
+  pivots_pos = []
+  row_exchanges = np.arange(rows)
+  for c in range(cols):
+
+    ## Find the pivot row:
+    pivot = np.argmax (np.abs (A[r:rows,c])) + r
+    m = np.abs(A[pivot, c])
+    if m <= tol:
+      ## Skip column c, making sure the approximately zero terms are
+      ## actually zero.
+      A[r:rows, c] = np.zeros(rows-r)
+    else:
+      ## keep track of bound variables
+      pivots_pos.append((r,c))
+
+      if pivot != r:
+        ## Swap current row and pivot row
+        A[[pivot, r], c:cols] = A[[r, pivot], c:cols]
+        row_exchanges[[pivot,r]] = row_exchanges[[r,pivot]]
+
+      ## Normalize pivot row
+      A[r, c:cols] = A[r, c:cols] / A[r, c];
+
+      ## Eliminate the current column
+      v = A[r, c:cols]
+      ## Above (before row r):
+      if r > 0:
+        ridx_above = np.arange(r)
+        A[ridx_above, c:cols] = A[ridx_above, c:cols] - np.outer(v, A[ridx_above, c]).T
+      ## Below (after row r):
+      if r < rows-1:
+        ridx_below = np.arange(r+1,rows)
+        A[ridx_below, c:cols] = A[ridx_below, c:cols] - np.outer(v, A[ridx_below, c]).T
+      r += 1
+    ## Check if done
+    if r == rows:
+      break;
+  return (A, pivots_pos, row_exchanges)
+
+# Input is the matrices (A,b) that define the system Ax=b
+# Ouput is the matrices (A',b') such that A'x=b' has the same solutions as Ax=b, and (A',b') have the smallest possible number of rows
+# See https://mathoverflow.net/a/48867  and the row echelon form in https://en.wikipedia.org/wiki/Gaussian_elimination#General_algorithm_to_compute_ranks_and_bases
 def removeRedundantEquationsFromEqualitySystem(A, b):
+
 	A_b=np.concatenate((A, b), axis=1)
 
-	# (_, rref1) = scipy.linalg.qr(A_b) 
-	# rref2=sympy.Matrix(A_b).rref();
+	A_b_new, pivots_pos, row_exchanges = rref(A_b)
 
-	#See section titled "Alternatively" of https://stackoverflow.com/a/39621887
-	#See also http://www.ryanhmckenna.com/2021/03/removing-redundant-constraints-from.html
-	(_, R) = np.linalg.qr(A_b) 
-
+	##### Now remove the rows that are zero
 	rows_that_are_zero=[]
-	for i in range(R.shape[0]):
-		if(np.linalg.norm(R[i,:])<1e-7):
+	for i in range(A_b_new.shape[0]):
+		if(np.linalg.norm(A_b_new[i,:])<1e-7):
 			rows_that_are_zero.append(i)
 
+	A_b_new = np.delete(A_b_new, rows_that_are_zero, axis=0)
+	#####################################
 
-	Rnz = np.delete(R, rows_that_are_zero, axis=0)
+	##### Now get A_new and b_new from A_b_new
+	A_new=A_b_new[:,:-1].reshape((-1, A.shape[1]))
+	b_new=A_b_new[:,-1].reshape((-1, 1))
+	#####################################
 
-	A_result=Rnz[:,:-1].reshape((-1, A.shape[1]))
-	b_result=Rnz[:,-1].reshape((-1, 1))
+	if(A_b_new.shape[0]>0):
+		assert np.linalg.matrix_rank(A_b_new)==A_b_new.shape[0]
 
-	return A_result, b_result
+	return A_new, b_new
+
+
 
 #Everything in numpy
 #Ellipsoid is defined as {x | (x-c)'E(x-c)<=1}
