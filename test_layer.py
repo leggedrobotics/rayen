@@ -23,8 +23,8 @@ methods=['walker_2', 'walker_1', 'Bar', 'UU', 'PP', 'UP', 'DC3']
 # methods=['walker_2', 'walker_1', 'Bar', 'UU', 'DC3']
 
 index_examples_to_run=list(range(15))
-# index_examples_to_run=[0]
-# methods=['UP']
+index_examples_to_run=[2]
+methods=['DC3']
 num_of_examples=len(index_examples_to_run)
 ###############
 rows=math.ceil(math.sqrt(num_of_examples))
@@ -132,7 +132,7 @@ for method in methods:
 			my_dict["total_time_per_sample"]=total_time_per_sample
 			scipy.io.savemat('./examples_mat/example_'+str(index_example)+'.mat', my_dict)
 
-		utils.printInBoldBlue(f"Example {i}, total_time_per_sample={total_time_per_sample}")
+		utils.printInBoldBlue(f"Example {index_example}, total_time_per_sample={total_time_per_sample}")
 
 
 plt.show()
