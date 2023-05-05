@@ -78,6 +78,32 @@ class ConstraintLayer(torch.nn.Module):
 			else:
 				self.solver_projection='ECOS' #fast, accurate,  does not support SDP constraints
 
+
+		if(self.method=='walker_1' or self.method=='walker_2'):
+
+			if(cs.has_quadratic_constraints):
+				all_delta=[]
+				all_phi=[]
+
+				for i in range(self.all_P.shape[0]): #for each of the quadratic constraints
+					P=self.all_P[i,:,:]
+					q=self.all_q[i,:,:]
+					r=self.all_r[i,:,:]
+					y0=self.y0
+
+					sigma=2*(0.5*y0.T@P@y0 + q.T@y0 + r)
+					phi = -(y0.T@P + q.T)/sigma
+					delta= ( (y0.T@P + q.T).T@(y0.T@P + q.T) - 4*(0.5*y0.T@P@y0 + q.T@y0 + r)*0.5*P         )/torch.square(sigma)
+
+					all_delta.append(delta)
+					all_phi.append(phi)
+
+				all_delta = torch.stack(all_delta)
+				all_phi = torch.stack(all_phi)
+
+				self.register_buffer("all_delta", all_delta)
+				self.register_buffer("all_phi", all_phi)
+
 		if(self.method=='Bar'):
 			print(f"A_p={cs.A_p}")
 			print(f"b_p={cs.b_p}")
@@ -322,15 +348,25 @@ class ConstraintLayer(torch.nn.Module):
 			all_kappas_positives=torch.empty((v_bar.shape[0],0,1), device=v_bar.device)
 
 			for i in range(self.all_P.shape[0]): #for each of the quadratic constraints
-				P=self.all_P[i,:,:]
-				q=self.all_q[i,:,:]
-				r=self.all_r[i,:,:]
-				
-				c_prime=0.5*rhoT@P@rho;
-				b_prime=(self.y0.T@P@rho + q.T@rho);
-				a_prime=(0.5*self.y0.T@P@self.y0 + q.T@self.y0 +r) #This could be computed offline
 
-				kappa_positive_i=self.solveSecondOrderEq(a_prime, b_prime, c_prime, True) 
+				#FIRST WAY (slower, easier to understand)
+				# P=self.all_P[i,:,:]
+				# q=self.all_q[i,:,:]
+				# r=self.all_r[i,:,:]
+				
+				# c_prime=0.5*rhoT@P@rho;
+				# b_prime=(self.y0.T@P+ q.T)@rho;
+				# a_prime=(0.5*self.y0.T@P@self.y0 + q.T@self.y0 +r) 
+
+				# kappa_positive_i_first_way=self.solveSecondOrderEq(a_prime, b_prime, c_prime, True) 
+
+				#SECOND WAY (faster)
+				kappa_positive_i = self.all_phi[i,:,:]@rho + torch.sqrt(rhoT@self.all_delta[i,:,:]@rho)
+
+
+				# assert torch.allclose(kappa_positive_i,kappa_positive_i_first_way, atol=1e-06), f"{torch.max(torch.abs(kappa_positive_i-kappa_positive_i_first_way))}"
+
+
 				assert torch.all(kappa_positive_i >= 0), f"Smallest element is {kappa_positive_i}" #If not, then either the feasible set is infeasible (note that z0 is inside the feasible set)
 				all_kappas_positives = torch.cat((all_kappas_positives, kappa_positive_i), dim=1)
 
@@ -445,6 +481,6 @@ class ConstraintLayer(torch.nn.Module):
 
 		y=self.forwardForMethod(q)
 
-		assert (torch.isnan(y).any())==False, "If you are using DC3, try reducing args_DC3[lr]"
+		assert (torch.isnan(y).any())==False, f"If you are using DC3, try reducing args_DC3[lr]. Right now it's {self.args_DC3['lr']}"
 
 		return y

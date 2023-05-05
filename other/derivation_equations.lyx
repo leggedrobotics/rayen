@@ -76,7 +76,147 @@
 \begin_body
 
 \begin_layout Title
-Derivation of the equations for DC3
+Derivation of the equations 
+\end_layout
+
+\begin_layout Part
+Ours
+\end_layout
+
+\begin_layout Standard
+For quadratic constraints, we need to solve that:
+\end_layout
+
+\begin_layout Standard
+
+\lang american
+\begin_inset Formula 
+\[
+0=\underbrace{\frac{1}{2}\boldsymbol{\rho}^{T}\boldsymbol{P}\boldsymbol{\rho}}_{=a}\lambda^{2}+\underbrace{\left(\boldsymbol{y}_{0}^{T}\boldsymbol{P}+\boldsymbol{q}^{T}\right)\boldsymbol{\rho}}_{=b}\lambda+\underbrace{\frac{1}{2}\boldsymbol{y}_{0}^{T}\boldsymbol{P}\boldsymbol{y}_{0}+\boldsymbol{q}^{T}\boldsymbol{y}_{0}+r}_{=c}
+\]
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+
+\lang american
+Multiplying everything with 
+\begin_inset Formula $\kappa^{2}=\frac{1}{\lambda^{2}}$
+\end_inset
+
+ we have that 
+\begin_inset Formula $\underbrace{a}_{:=c'}+\underbrace{b}_{:=b'}\kappa+\underbrace{c}_{:=a'}\kappa^{2}=0$
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+
+\lang american
+The solution is then:
+\end_layout
+
+\begin_layout Standard
+
+\lang american
+\begin_inset Formula 
+\[
+\frac{-b'\pm\sqrt{\left(b'\right)^{2}-4a'c'}}{2a'}
+\]
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+
+\lang american
+\begin_inset Formula 
+\[
+\frac{-\left(\boldsymbol{y}_{0}^{T}\boldsymbol{P}+\boldsymbol{q}^{T}\right)\boldsymbol{\rho}\pm\sqrt{\left(\left(\boldsymbol{y}_{0}^{T}\boldsymbol{P}+\boldsymbol{q}^{T}\right)\boldsymbol{\rho}\right)^{2}-4\left(\frac{1}{2}\boldsymbol{y}_{0}^{T}\boldsymbol{P}\boldsymbol{y}_{0}+\boldsymbol{q}^{T}\boldsymbol{y}_{0}+r\right)\left(\frac{1}{2}\boldsymbol{\rho}^{T}\boldsymbol{P}\boldsymbol{\rho}\right)}}{2\left(\frac{1}{2}\boldsymbol{y}_{0}^{T}\boldsymbol{P}\boldsymbol{y}_{0}+\boldsymbol{q}^{T}\boldsymbol{y}_{0}+r\right)}
+\]
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+
+\lang american
+Note that the discriminant is equal to
+\end_layout
+
+\begin_layout Standard
+
+\lang american
+\begin_inset Formula 
+\[
+\boldsymbol{\rho}^{T}\left(\underbrace{\left(\boldsymbol{y}_{0}^{T}\boldsymbol{P}+\boldsymbol{q}^{T}\right)^{T}\left(\boldsymbol{y}_{0}^{T}\boldsymbol{P}+\boldsymbol{q}^{T}\right)-4\left(\frac{1}{2}\boldsymbol{y}_{0}^{T}\boldsymbol{P}\boldsymbol{y}_{0}+\boldsymbol{q}^{T}\boldsymbol{y}_{0}+r\right)\frac{1}{2}\boldsymbol{P}}_{:=\psi}\right)\boldsymbol{\rho}=
+\]
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+
+\lang american
+Hence, denoting: 
+\end_layout
+
+\begin_layout Standard
+
+\lang american
+\begin_inset Formula 
+\[
+\sigma=2\left(\frac{1}{2}\boldsymbol{y}_{0}^{T}\boldsymbol{P}\boldsymbol{y}_{0}+\boldsymbol{q}^{T}\boldsymbol{y}_{0}+r\right)
+\]
+
+\end_inset
+
+
+\begin_inset Formula 
+\[
+\boldsymbol{\phi}:=\frac{-\left(\boldsymbol{y}_{0}^{T}\boldsymbol{P}+\boldsymbol{q}^{T}\right)}{\sigma}
+\]
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+
+\lang american
+\begin_inset Formula 
+\[
+\delta:=\frac{\psi}{\sigma^{2}}
+\]
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+
+\lang american
+The solution is simply 
+\begin_inset Formula $\boldsymbol{\phi}\boldsymbol{\rho}\pm\sqrt{\boldsymbol{\rho}^{T}\delta\boldsymbol{\rho}}$
+\end_inset
+
+
+\end_layout
+
+\begin_layout Part
+DC3
 \end_layout
 
 \begin_layout Standard
