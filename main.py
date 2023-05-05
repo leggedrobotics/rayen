@@ -382,10 +382,10 @@ if __name__ == '__main__':
 	parser.add_argument('--test', type=str2bool, default=True)
 	#Parameters specific to DC3
 	parser.add_argument('--DC3_lr', type=float, default=1e-5)
-	parser.add_argument('--DC3_eps_converge', type=float, default=1e-5)
+	parser.add_argument('--DC3_eps_converge', type=float, default=1e-6)
 	parser.add_argument('--DC3_momentum', type=float, default=0.5)
 	parser.add_argument('--DC3_max_steps_training', type=int, default=10)
-	parser.add_argument('--DC3_max_steps_testing', type=int, default=10) #float("inf")
+	parser.add_argument('--DC3_max_steps_testing', type=int, default=30) #float("inf")
 
 
 	args = parser.parse_args()
