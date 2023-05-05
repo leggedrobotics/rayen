@@ -281,6 +281,9 @@ def main(params):
 	folder="./scripts/results/"
 	name_file='dataset'+str(params['dimension_dataset'])+'d_'+params['method']+"_weight_soft_cost_"+str(params["weight_soft_cost"])    #+uuid.uuid4().hex #https://stackoverflow.com/a/62277811
 	path_policy = folder + name_file +".pt"
+	path_training_metrics = folder + "metrics_train_" + name_file +".pkl"
+	path_testing_in_dist_metrics = folder + "metrics_test_in_dist_" + name_file +".pkl"
+	path_testing_out_dist_metrics = folder + "metrics_test_out_dist_" + name_file +".pkl"
 
 	if(params['train']==True):
 
@@ -301,6 +304,8 @@ def main(params):
 
 		training_metrics = train_model(model, params, sdag, tensorboard_writer, cs)
 
+		utils.savepickle(training_metrics, path_training_metrics)
+
 		#torch.save(model.state_dict(), path_policy)  #We don't use this one because DC3 has some randomness in the selection of partial_vars, and they may be different if this file is called twice (first with train=True/test=False and then with train=False/test=True)
 		torch.save(model, path_policy)                #Save entire model, see https://pytorch.org/tutorials/beginner/saving_loading_models.html#save-load-entire-model
 
@@ -317,17 +322,20 @@ def main(params):
 		# model.load_state_dict(torch.load(path_policy)) #We don't use this one because of the reason above
 		model = torch.load(path_policy) #See # https://pytorch.org/tutorials/beginner/saving_loading_models.html#save-load-entire-model
 		utils.printInBoldGreen("Testing model inside dist...")
-		testing_metrics = onePassOverDataset(model, params, sdag, 'test', cs)
+		testing_metrics_in_dist = onePassOverDataset(model, params, sdag, 'test', cs)
 		utils.printInBoldGreen("Testing model outside dist...")
 		testing_metrics_out_dist = onePassOverDataset(model, params, sdag_out_dist, 'test', cs)
+
+		utils.savepickle(testing_metrics_in_dist, path_testing_in_dist_metrics)
+		utils.savepickle(testing_metrics_out_dist, path_testing_out_dist_metrics)
 
 		num_trainable_params=sum(	p.numel() for p in model.parameters() if p.requires_grad)
 
 		d = {'method': 				 [name_file,                         'dataset'+str(params['dimension_dataset'])+'d_'+'Optimization'],
 		     'num_trainable_params': [num_trainable_params,         	  0], 
-		    '[In dist] loss':        [testing_metrics['loss'],      	  testing_metrics['optimization_loss']      ], 
-		    '[In dist] violation':   [testing_metrics['violation'], 	  testing_metrics['optimization_violation'] ],
-		    '[In dist] time_us':     [1e6*testing_metrics['time_s'],     1e6*testing_metrics['optimization_time_s'] ],
+		    '[In dist] loss':        [testing_metrics_in_dist['loss'],      	  testing_metrics_in_dist['optimization_loss']      ], 
+		    '[In dist] violation':   [testing_metrics_in_dist['violation'], 	  testing_metrics_in_dist['optimization_violation'] ],
+		    '[In dist] time_us':     [1e6*testing_metrics_in_dist['time_s'],     1e6*testing_metrics_in_dist['optimization_time_s'] ],
 		    #
 		    '[Out dist] loss':        [testing_metrics_out_dist['loss'],      	  testing_metrics_out_dist['optimization_loss']      ], 
 		    '[Out dist] violation':   [testing_metrics_out_dist['violation'], 	  testing_metrics_out_dist['optimization_violation'] ],
@@ -342,13 +350,6 @@ def main(params):
 		path_pkl = folder + name_file +".pkl"
 
 		df.to_pickle(path_pkl) 	
-
-	# f = open(name+".txt", "w")
-	# f.write(df.to_string())
-	# f.write("\n\n\n"+training_summary)
-	# f.close()
-	# df.to_csv(name+".csv")
-	 
 
 	tensorboard_writer.close()
 
@@ -369,7 +370,7 @@ if __name__ == '__main__':
 	utils.printInBoldGreen("\n\n\n==========================================")
 
 	parser = argparse.ArgumentParser()
-	parser.add_argument('--method', type=str, default='Bar') #walker_2, walker_1, Bar, UU, PP, UP, DC3
+	parser.add_argument('--method', type=str, default='walker_1') #walker_2, walker_1, Bar, UU, PP, UP, DC3
 	parser.add_argument('--dimension_dataset', type=int, default=3)
 	parser.add_argument('--use_supervised', type=str2bool, default=False)
 	parser.add_argument('--weight_soft_cost', type=float, default=0.0)
