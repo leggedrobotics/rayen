@@ -18,6 +18,9 @@ from examples_sets import getExample
 import utils
 import tqdm
 
+import waitGPU
+
+
 # import random
 
 from torch.utils.tensorboard import SummaryWriter
@@ -34,6 +37,9 @@ class SplittedDatasetAndGenerator():
 		val_size = int(percent_val * len(dataset))
 		test_size = len(dataset) - train_size - val_size
 
+		# train_size = 1
+		# val_size = 1
+		# test_size = 1
 
 		#First option
 		# self.train_dataset, self.val_dataset, self.test_dataset = torch.utils.data.random_split(dataset, [train_size, val_size, test_size])
@@ -132,7 +138,9 @@ def onePassOverDataset(model, params, sdag, my_type, cs):
 
 
 			if(my_type=='test'):
+				print("Computing violations...")
 				sum_all_violations += np.sum(np.apply_along_axis(cs.getViolation,axis=1, arr=y_predicted.cpu().numpy())).item()
+				print("Violations computed")
 
 				###### compute the results from the optimization. TODO: Change to a different place?
 				y_predicted=y
@@ -142,7 +150,9 @@ def onePassOverDataset(model, params, sdag, my_type, cs):
 				# print(f"Original Loss Opt={torch.sum(cost).item()}")
 				assert abs(loss_optimization.item()-torch.sum(cost).item())<0.001
 
+				print("Computing violations optimization...")
 				sum_all_violations_optimization += np.sum(np.apply_along_axis(cs.getViolation,axis=1, arr=y_predicted.cpu().numpy())).item()
+				print("Violations computed")
 				sum_all_time_s_optimization += torch.sum(opt_time_s).item()
 				#########################################################
 
@@ -189,11 +199,7 @@ def train_model(model, params, sdag, tensorboard_writer, cs):
 		metrics_all_epochs['val_loss'].append(metrics_validation_this_epoch['loss']) 
 		
 		if epoch % params['verbosity'] == 0:
-			print('{}: train: {}, val: {}, lr: {:.2E}'.format(
-				epoch,
-				metrics_all_epochs['train_loss'][-1],
-				metrics_all_epochs['val_loss'][-1],
-				optimizer.param_groups[0]['lr']))
+			print(f"[{params['method']}, w={params['weight_soft_cost']}] {epoch}: train: {metrics_all_epochs['train_loss'][-1]}, val: {metrics_all_epochs['val_loss'][-1]}")
 
 		#This creates two separate plots
 		# tensorboard_writer.add_scalar("Loss/train", metrics_all_epochs['train_loss'][-1], epoch)
@@ -273,7 +279,7 @@ def main(params):
 
 	######################### TRAINING
 	folder="./scripts/results/"
-	name_file=params['method']+"_weight_soft_cost_"+str(params["weight_soft_cost"])    #+uuid.uuid4().hex #https://stackoverflow.com/a/62277811
+	name_file='dataset'+str(params['dimension_dataset'])+'d_'+params['method']+"_weight_soft_cost_"+str(params["weight_soft_cost"])    #+uuid.uuid4().hex #https://stackoverflow.com/a/62277811
 	path_policy = folder + name_file +".pt"
 
 	if(params['train']==True):
@@ -289,6 +295,9 @@ def main(params):
 							  # nn.Dropout(p=0.2),
 							  nn.Linear(64, 64),
 							  ConstraintLayer(cs, input_dim=64, method=params['method'], create_map=True, args_DC3=args_DC3)) 
+
+		waitGPU.wait(utilization=70, memory_ratio=0.7) #This is to avoid erros like "CUDA error: CUBLAS_STATUS_NOT_INITIALIZED" when launching many trainings in parallel
+		print("Done waiting for GPU")
 
 		training_metrics = train_model(model, params, sdag, tensorboard_writer, cs)
 
@@ -307,14 +316,15 @@ def main(params):
 	if(params['test']==True):
 		# model.load_state_dict(torch.load(path_policy)) #We don't use this one because of the reason above
 		model = torch.load(path_policy) #See # https://pytorch.org/tutorials/beginner/saving_loading_models.html#save-load-entire-model
-		print("Testing model...")
+		utils.printInBoldGreen("Testing model inside dist...")
 		testing_metrics = onePassOverDataset(model, params, sdag, 'test', cs)
+		utils.printInBoldGreen("Testing model outside dist...")
 		testing_metrics_out_dist = onePassOverDataset(model, params, sdag_out_dist, 'test', cs)
 
 		num_trainable_params=sum(	p.numel() for p in model.parameters() if p.requires_grad)
 
-		index=                       [name_file, "Optimization"]
-		d = {'num_trainable_params': [num_trainable_params,         	  0], 
+		d = {'method': 				 [name_file,                         'dataset'+str(params['dimension_dataset'])+'d_'+'Optimization'],
+		     'num_trainable_params': [num_trainable_params,         	  0], 
 		    '[In dist] loss':        [testing_metrics['loss'],      	  testing_metrics['optimization_loss']      ], 
 		    '[In dist] violation':   [testing_metrics['violation'], 	  testing_metrics['optimization_violation'] ],
 		    '[In dist] time_us':     [1e6*testing_metrics['time_s'],     1e6*testing_metrics['optimization_time_s'] ],
@@ -324,7 +334,7 @@ def main(params):
 		    '[Out dist] time_us':     [1e6*testing_metrics_out_dist['time_s'],     1e6*testing_metrics_out_dist['optimization_time_s'] ]}
 
 
-		df = pd.DataFrame(data=d, index=index)
+		df = pd.DataFrame(data=d)
 
 		pd.set_option('display.max_columns', None)
 		print(df)
@@ -356,20 +366,22 @@ def str2bool(v):
 
 if __name__ == '__main__':
 
+	utils.printInBoldGreen("\n\n\n==========================================")
+
 	parser = argparse.ArgumentParser()
-	parser.add_argument('--method', type=str, default='UP') #walker_2, walker_1, Bar, UU, PP, UP, DC3
+	parser.add_argument('--method', type=str, default='Bar') #walker_2, walker_1, Bar, UU, PP, UP, DC3
 	parser.add_argument('--dimension_dataset', type=int, default=3)
 	parser.add_argument('--use_supervised', type=str2bool, default=False)
 	parser.add_argument('--weight_soft_cost', type=float, default=0.0)
 	parser.add_argument('--device', type=int, default=0)
-	parser.add_argument('--num_epochs', type=int, default=2000)
-	parser.add_argument('--batch_size', type=int, default=400)
+	parser.add_argument('--num_epochs', type=int, default=1000)
+	parser.add_argument('--batch_size', type=int, default=256)
 	parser.add_argument('--verbosity', type=int, default=1)
 	parser.add_argument('--learning_rate', type=float, default=1e-4)
 	parser.add_argument('--train', type=str2bool, default=True)
 	parser.add_argument('--test', type=str2bool, default=True)
 	#Parameters specific to DC3
-	parser.add_argument('--DC3_lr', type=float, default=3e-4)
+	parser.add_argument('--DC3_lr', type=float, default=1e-5)
 	parser.add_argument('--DC3_eps_converge', type=float, default=1e-5)
 	parser.add_argument('--DC3_momentum', type=float, default=0.5)
 	parser.add_argument('--DC3_max_steps_training', type=int, default=10)

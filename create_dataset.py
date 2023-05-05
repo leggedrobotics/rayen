@@ -139,9 +139,14 @@ def getCorridorDatasetsAndConstraints(dimension):
 	A1=mat['A1'];
 	b1=mat['b1'];
 
-	all_P=list(mat["all_P"][0])
-	all_q=list(mat["all_q"][0])
-	all_r=list(mat["all_r"][0])
+	if(len(mat["all_P"])>0):
+		all_P=list(mat["all_P"][0])
+		all_q=list(mat["all_q"][0])
+		all_r=list(mat["all_r"][0])
+	else:
+		all_P=[]
+		all_q=[]
+		all_r=[]
 
 
 	# print(f"Shape of A1={A1.shape}")

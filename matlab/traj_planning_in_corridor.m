@@ -9,7 +9,7 @@
 close all; clc;clear;
 doSetup();
 
-dimension=3;
+dimension=2;
 
 %%%So that random is repeatable
 rng('default');
@@ -28,17 +28,15 @@ if(dimension==2)
     N=10;
     use_quadratic=false;
 else
-    P=3*[0 1 2 3 4 3 2;
+    P=3*[0 1 2 3 4 3 0;
        0 1 1 2 4 4 4;
        0 1 1 1 4 1 0];
     radius=4*1.3;
-    num_of_seg_per_region=3; 
-    samples_per_step=5;
+    num_of_seg_per_region=2; 
+    samples_per_step=3;
     N=10;
     use_quadratic=true;
 end
-
-
 
 allA={};
 allb={};
@@ -46,11 +44,13 @@ allV={};
 
 steps=2;
 
-
-
 for i=1:(size(P,2)-1)
-%     [A, b]=getABgivenP1P2(P(:,i),P(:,i+1));
-    [A, b, V]=getAbVerticesPolyhedronAroundP1P2(P(:,i),P(:,i+1), steps, samples_per_step, radius);
+    if(dimension==3)
+        [A, b, V]=getABVerticesgivenP1P2(P(:,i),P(:,i+1), 1.0, 1.0, 2);
+    else
+        [A, b, V]=getAbVerticesPolyhedronAroundP1P2(P(:,i),P(:,i+1), steps, samples_per_step, radius);
+    end
+%     
     allA{end+1}=A;
     allb{end+1}=b;
     allV{end+1}=V;
@@ -80,6 +80,10 @@ else
     xlim([min(P(1,:))-delta,max(P(1,:))+delta]);
     ylim([min(P(2,:))-delta,max(P(2,:))+delta]);
     zlim([min(P(3,:))-delta,max(P(3,:))+delta]);
+    view(-71,40)
+    xlabel('x')
+    ylabel('y')
+    zlabel('z')
 end
 
 if(dimension==2)
@@ -373,58 +377,3 @@ function [A, b, V]=getAbVerticesPolyhedronAroundP1P2(p1,p2, steps, samples_per_s
 
 end
 
-%This gives a polyhedron with 6 faces around the line p1-->p2
-%Region is {x such that A1*x<=b1}
-function [A, b]=getABgivenP1P2(p1,p2)
-
-h=norm(p1-p2);
-
-hside=0.4;
-b_p1_a=[hside -hside 0]';
-b_p1_b=[hside hside 0]';
-b_p1_c=[-hside hside 0]';
-b_p1_d=[-hside -hside 0]';
-
-b_p2_a=[hside -hside h]';
-b_p2_b=[hside hside h]';
-b_p2_c=[-hside hside h]';
-b_p2_d=[-hside -hside h]';
-
-yaw=0.0;
-
-zb=(p2-p1)/norm(p2-p1);
-xb=cross([-sin(yaw) cos(yaw) 0]',zb); 
-assert(norm(xb)>0)
-xb=xb/norm(xb);
-yb=cross(zb,xb);
-w_R_b=[xb yb zb];
-
-w_p1_a=w_R_b*b_p1_a+p1;
-w_p1_b=w_R_b*b_p1_b+p1;
-w_p1_c=w_R_b*b_p1_c+p1;
-w_p1_d=w_R_b*b_p1_d+p1;
-
-w_p2_a=w_R_b*b_p2_a+p1;
-w_p2_b=w_R_b*b_p2_b+p1;
-w_p2_c=w_R_b*b_p2_c+p1;
-w_p2_d=w_R_b*b_p2_d+p1;
-
-b_A=[1 0 0;
-    0 1 0;
-    0 0 1;
-    -1 0 0;
-    0 -1 0;
-    0 0 -1];
-A=[];
-
-for i=1:size(b_A,1)
-    A=[A;(w_R_b*b_A(i,:)')'];
-end
-
-b=[A(1,:)*w_p1_a;
-   A(2,:)*w_p1_b;
-   A(3,:)*w_p2_a;
-   A(4,:)*w_p1_c;
-   A(5,:)*w_p1_d;
-   A(6,:)*w_p1_d;];
-end
