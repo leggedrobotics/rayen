@@ -25,7 +25,7 @@ if(dimension==2)
     radius=4.0;
     num_of_seg_per_region=1; 
     samples_per_step=5;
-    N=15;
+    N=10;
     use_quadratic=false;
 else
     P=3*[0 1 2 3 4 3 2;
@@ -34,7 +34,7 @@ else
     radius=4*1.3;
     num_of_seg_per_region=3; 
     samples_per_step=5;
-    N=5;
+    N=10;
     use_quadratic=true;
 end
 
@@ -71,9 +71,16 @@ end
 camlight
 lighting phong
 
-delta=1.0;
-xlim([min(P(1,:))-delta,max(P(1,:))+delta]);
-ylim([min(P(2,:))-delta,max(P(2,:))+delta]);
+if(dimension==2)
+    delta=4.0;
+    xlim([min(P(1,:))-delta,max(P(1,:))+delta]);
+    ylim([min(P(2,:))-delta,max(P(2,:))+delta]);
+else
+    delta=4.0;
+    xlim([min(P(1,:))-delta,max(P(1,:))+delta]);
+    ylim([min(P(2,:))-delta,max(P(2,:))+delta]);
+    zlim([min(P(3,:))-delta,max(P(3,:))+delta]);
+end
 
 if(dimension==2)
     scatter(p0(1),p0(2),'filled','g')
