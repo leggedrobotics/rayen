@@ -9,7 +9,7 @@
 close all; clc;clear;
 doSetup();
 
-dimension=2;
+dimension=3;
 
 %%%So that random is repeatable
 rng('default');
@@ -25,7 +25,7 @@ if(dimension==2)
     radius=4.0;
     num_of_seg_per_region=1; 
     samples_per_step=5;
-    N=10;
+    N=12;
     use_quadratic=false;
 else
     P=3*[0 1 2 3 4 3 0;
@@ -34,7 +34,7 @@ else
     radius=4*1.3;
     num_of_seg_per_region=2; 
     samples_per_step=3;
-    N=10;
+    N=12;
     use_quadratic=true;
 end
 
@@ -117,7 +117,7 @@ opti = casadi.Opti('conic');%'conic' I think you need to use 'conic' for gurobi
 else
  opti = casadi.Opti();
 end
-deg_pos=3;
+deg_pos=3; %Note that I'm including the jerk cost. If I use deg_pos=2, then the jerk cost will always be zero
 dim_pos=dimension;
 num_seg =num_of_seg_per_region*num_of_regions;
 sp=MyClampedUniformSpline(t0,tf,deg_pos, dim_pos, num_seg, opti);
@@ -180,9 +180,9 @@ end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%% EXTRACT THE CONSTRAINTS
 opti.subject_to(); %delete any constraints in the model
-opti.subject_to(linear_eq_const);
 opti.subject_to(linear_ineq_const);
-[A1,b1]=getAbLinearConstraints(opti);
+opti.subject_to(linear_eq_const);
+[A1,b1, A2, b2]=getAbLinearConstraints(opti);
 
 opti.subject_to(); %delete any constraints in the model
 opti.subject_to(quadratic_const);
@@ -193,6 +193,17 @@ opti.subject_to(); %delete any constraints in the model
 opti.subject_to(linear_eq_const);
 opti.subject_to(linear_ineq_const);
 opti.subject_to(quadratic_const);
+
+num_variables=numel(opti.x);
+num_linear_ineq_const=countNumOfConstraints(linear_ineq_const);
+num_linear_eq_const=countNumOfConstraints(linear_eq_const);
+num_quadratic_const=countNumOfConstraints(quadratic_const);
+
+
+%%
+
+
+%%
 
 %%%%%%%%%%%%%%%%%% COST
 vel_cost=sp.getVelCost();
@@ -221,8 +232,8 @@ opti.solver(my_solver,opts); %{"ipopt.hessian_approximation":"limited-memory"}
 
 
 
-a=0.001;
-b=0.3;
+a=0.1;
+b=0.4;
 all_wv=[a + (b-a).*rand(N,1)]'; 
 all_wa=[a + (b-a).*rand(N,1)]'; 
 all_wj=[a + (b-a).*rand(N,1)]'; 
@@ -247,7 +258,7 @@ imagesc(dist_matrix); colorbar; axis equal
 
 save(['corridor_dim',num2str(dimension),'.mat'],'all_x','all_y','all_Pobj','all_qobj','all_robj','all_costs','all_times_s', ...
      'all_x_out_dist','all_y_out_dist','all_Pobj_out_dist','all_qobj_out_dist','all_robj_out_dist','all_costs_out_dist','all_times_s_out_dist', ...
-     'A1','b1','all_P','all_q','all_r');
+     'A1','b1','A2','b2','all_P','all_q','all_r');
 
 sol = opti.solve();
 
@@ -374,6 +385,15 @@ function [A, b, V]=getAbVerticesPolyhedronAroundP1P2(p1,p2, steps, samples_per_s
 %         plotSphere(P(:,tmp), 0.03, 'r');
 %     end
 
+
+end
+
+function num_of_constraints=countNumOfConstraints(constraints)
+
+num_of_constraints=0;
+for i=1:numel(constraints)
+    num_of_constraints= num_of_constraints + numel(constraints{i});
+end
 
 end
 

@@ -1,20 +1,32 @@
 %opti_tmp is an optimization problem from Casadi
-%Feasible set is Ax<=b
-%Note that en equality constraint Aeq=b is equivalent to Aeq<=b Aeq>=b
-%The equality constraints are also returned in [A,b] using the transformation explained in the above line
-function [A,b]=getAbLinearConstraints(opti_tmp)
+%Feasible set is A1x<=b1 \cap A2x=b2 
+function [A1,b1, A2, b2]=getAbLinearConstraints(opti_tmp)
     
-    all_g_minus_all_upper=getAllConstraintsFromOptiCasadi(opti_tmp);
+   [inequality_expressions, equality_expressions]=getIneqAndEqConstraintsFromOptiCasadi(opti_tmp);
 
     variables=opti_tmp.x;
 
-    b=-casadi.substitute(all_g_minus_all_upper, variables, zeros(size(variables))); %Note the - sign
-    A=jacobian(all_g_minus_all_upper, variables);
+    %%%%%%%%%% INEQUALITY CONSTRAINTS
+    b1=-casadi.substitute(inequality_expressions, variables, zeros(size(variables))); %Note the - sign
+    A1=jacobian(inequality_expressions, variables);
     try
-        b=convertMX2Matlab(b);
-        A=convertMX2Matlab(A);
+        A1=convertMX2Matlab(A1);
+        b1=convertMX2Matlab(b1);
     catch %Constraints are not linear
         error('Are you sure you only have linear constraints?');
     end
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+    %%%%%%%%%% EQUALITY CONSTRAINTS
+    b2=-casadi.substitute(equality_expressions, variables, zeros(size(variables))); %Note the - sign
+    A2=jacobian(equality_expressions, variables);
+    try
+        A2=convertMX2Matlab(A2);
+        b2=convertMX2Matlab(b2);
+    catch %Constraints are not linear
+        error('Are you sure you only have linear constraints?');
+    end
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 end

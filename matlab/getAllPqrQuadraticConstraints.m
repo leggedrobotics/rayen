@@ -2,7 +2,12 @@
 %Feasible set is 0.5*x'P_i x + q'x + r <=0
 function [all_P, all_q, all_r]=getAllPqrQuadraticConstraints(opti_tmp)
     
-    all_g_minus_all_upper=getAllConstraintsFromOptiCasadi(opti_tmp);
+     [inequality_expressions, equality_expressions]=getIneqAndEqConstraintsFromOptiCasadi(opti_tmp);
+
+
+    if(numel(equality_expressions)>0)
+        error("Not implemented yet")
+    end
 
     variables=opti_tmp.x;
 
@@ -10,10 +15,10 @@ function [all_P, all_q, all_r]=getAllPqrQuadraticConstraints(opti_tmp)
     all_q={};
     all_r={};
 
-    %%%%%%%%%%%%%%%%%%%%%%%%%
-    for i=1:size(all_g_minus_all_upper,1)
+    %%%%%% INEQUALITY CONSTRAINTS
+    for i=1:size(inequality_expressions,1)
         i
-        [P,q,r]=getPandqandrOfQuadraticExpressionCasadi(all_g_minus_all_upper(i), variables);
+        [P,q,r]=getPandqandrOfQuadraticExpressionCasadi(inequality_expressions(i), variables);
 
         try
             P=convertMX2Matlab(P);
