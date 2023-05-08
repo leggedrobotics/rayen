@@ -238,6 +238,7 @@ class ConstraintLayer(torch.nn.Module):
 		elif(self.method=='DC3'):
 			self.forwardForMethod=self.forwardForDC3
 			self.dim_after_map=(self.k - self.neq_DC3)
+			assert (self.dim_after_map==self.n)
 		else:
 			raise NotImplementedError
 
