@@ -139,6 +139,9 @@ def getCorridorDatasetsAndConstraints(dimension):
 	A1=mat['A1'];
 	b1=mat['b1'];
 
+	A2=mat['A2'];
+	b2=mat['b2'];
+
 	if(len(mat["all_P"])>0):
 		all_P=list(mat["all_P"][0])
 		all_q=list(mat["all_q"][0])
@@ -165,12 +168,15 @@ def getCorridorDatasetsAndConstraints(dimension):
 	assert A1.ndim==2
 	assert b1.ndim==2
 
+	assert A2.ndim==2
+	assert b2.ndim==2
+
 	assert all_y[0].shape[1]==1
 	assert all_x[0].shape[1]==1
 	assert all_x_out_dist[0].shape[1]==1
 	assert all_y_out_dist[0].shape[1]==1
 
-	lc=constraints.LinearConstraint(A1=A1, b1=b1, A2=None, b2=None);
+	lc=constraints.LinearConstraint(A1=A1, b1=b1, A2=A2, b2=b2);
 
 	qcs=[];
 	for i in range(len(all_P)):
