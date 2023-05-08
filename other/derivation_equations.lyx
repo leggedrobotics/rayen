@@ -83,8 +83,19 @@ Derivation of the equations
 Ours
 \end_layout
 
+\begin_layout Itemize
+
+\series bold
+\lang american
+For convex quadratic functions
+\end_layout
+
+\begin_deeper
 \begin_layout Standard
-For quadratic constraints, we need to solve that:
+
+\lang american
+Let's extend this for any convex quadratic function: Following slide 3.9
+ of https://web.stanford.edu/~boyd/cvxbook/bv_cvxslides.pdf we have that:
 \end_layout
 
 \begin_layout Standard
@@ -92,7 +103,44 @@ For quadratic constraints, we need to solve that:
 \lang american
 \begin_inset Formula 
 \[
-0=\underbrace{\frac{1}{2}\boldsymbol{\rho}^{T}\boldsymbol{P}\boldsymbol{\rho}}_{=a}\lambda^{2}+\underbrace{\left(\boldsymbol{y}_{0}^{T}\boldsymbol{P}+\boldsymbol{q}^{T}\right)\boldsymbol{\rho}}_{=b}\lambda+\underbrace{\frac{1}{2}\boldsymbol{y}_{0}^{T}\boldsymbol{P}\boldsymbol{y}_{0}+\boldsymbol{q}^{T}\boldsymbol{y}_{0}+r}_{=c}
+g(\boldsymbol{y})=\frac{1}{2}\boldsymbol{y}^{T}\boldsymbol{P}\boldsymbol{y}+\boldsymbol{q}^{T}\boldsymbol{y}+r
+\]
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+
+\lang american
+where 
+\begin_inset Formula $\boldsymbol{P}\succeq\boldsymbol{0}$
+\end_inset
+
+.
+ Hence:
+\end_layout
+
+\begin_layout Standard
+
+\lang american
+\begin_inset Formula 
+\[
+g(\boldsymbol{y}(\lambda))=\frac{1}{2}\left(\lambda\boldsymbol{\rho}+\boldsymbol{y}_{0}\right)^{T}\boldsymbol{P}\left(\lambda\boldsymbol{\rho}+\boldsymbol{y}_{0}\right)+\boldsymbol{q}^{T}\left(\lambda\boldsymbol{\rho}+\boldsymbol{y}_{0}\right)+r=\frac{1}{2}\lambda^{2}\boldsymbol{\rho}^{T}\boldsymbol{P}\boldsymbol{\rho}+\lambda\boldsymbol{y}_{0}^{T}\boldsymbol{P}\boldsymbol{\rho}+\frac{1}{2}\boldsymbol{y}_{0}^{T}\boldsymbol{P}\boldsymbol{y}_{0}+\lambda\boldsymbol{q}^{T}\boldsymbol{\rho}+\boldsymbol{q}^{T}\boldsymbol{y}_{0}+r=
+\]
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+
+\lang american
+\begin_inset Formula 
+\[
+=\underbrace{\frac{1}{2}\boldsymbol{\rho}^{T}\boldsymbol{P}\boldsymbol{\rho}}_{=a}\lambda^{2}+\underbrace{\left(\boldsymbol{y}_{0}^{T}\boldsymbol{P}+\boldsymbol{q}^{T}\right)\boldsymbol{\rho}}_{=b}\lambda+\underbrace{\frac{1}{2}\boldsymbol{y}_{0}^{T}\boldsymbol{P}\boldsymbol{y}_{0}+\boldsymbol{q}^{T}\boldsymbol{y}_{0}+r}_{=c}
 \]
 
 \end_inset
@@ -215,6 +263,203 @@ The solution is simply
 
 \end_layout
 
+\end_deeper
+\begin_layout Itemize
+
+\series bold
+\lang american
+For SOC functions
+\end_layout
+
+\begin_deeper
+\begin_layout Standard
+
+\lang american
+The frontier is defined by
+\end_layout
+
+\begin_layout Standard
+
+\lang american
+\begin_inset Formula 
+\[
+h(\boldsymbol{y})=\left\Vert \boldsymbol{M}\boldsymbol{y}+\boldsymbol{s}\right\Vert -\boldsymbol{c}^{T}\boldsymbol{y}-d=0
+\]
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+
+\lang american
+As we have that 
+\begin_inset Formula $\boldsymbol{y}=\left(\lambda\boldsymbol{\rho}+\boldsymbol{y}_{0}\right)$
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+
+\lang american
+\begin_inset Formula 
+\[
+h(\boldsymbol{y})=\left\Vert \boldsymbol{M}\left(\lambda\boldsymbol{\rho}+\boldsymbol{y}_{0}\right)+\boldsymbol{s}\right\Vert -\boldsymbol{c}^{T}\left(\lambda\boldsymbol{\rho}+\boldsymbol{y}_{0}\right)-d=0
+\]
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+
+\lang american
+\begin_inset Formula 
+\[
+\left\Vert \boldsymbol{M}\left(\lambda\boldsymbol{\rho}+\boldsymbol{y}_{0}\right)+\boldsymbol{s}\right\Vert =\boldsymbol{c}^{T}\left(\lambda\boldsymbol{\rho}+\boldsymbol{y}_{0}\right)+d
+\]
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+
+\lang american
+\begin_inset Formula 
+\[
+\left\Vert \boldsymbol{M}\left(\lambda\boldsymbol{\rho}+\boldsymbol{y}_{0}\right)+\boldsymbol{s}\right\Vert ^{2}=\left(\boldsymbol{c}^{T}\left(\lambda\boldsymbol{\rho}+\boldsymbol{y}_{0}\right)+d\right)^{2}
+\]
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+
+\lang american
+\begin_inset Formula 
+\[
+\left\Vert \lambda\boldsymbol{M}\boldsymbol{\rho}+\underbrace{\boldsymbol{M}\boldsymbol{y}_{0}+\boldsymbol{s}}_{:=\boldsymbol{\beta}}\right\Vert ^{2}=\left(\lambda\boldsymbol{c}^{T}\boldsymbol{\rho}+\underbrace{\boldsymbol{c}^{T}\boldsymbol{y}_{0}+d}_{:=\tau}\right)^{2}
+\]
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+
+\lang american
+(Note that we need to check that 
+\begin_inset Formula $\boldsymbol{c}^{T}\left(\lambda\boldsymbol{\rho}+\boldsymbol{w}\right)+d>0$
+\end_inset
+
+ later on)
+\end_layout
+
+\begin_layout Standard
+
+\lang american
+\begin_inset Formula 
+\[
+\left\Vert \lambda\boldsymbol{M}\boldsymbol{\rho}+\boldsymbol{\beta}\right\Vert ^{2}=\left(\lambda\boldsymbol{c}^{T}\boldsymbol{\rho}+\tau\right)^{2}
+\]
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+
+\lang american
+\begin_inset Formula 
+\[
+\left(\lambda\boldsymbol{M}\boldsymbol{\rho}+\boldsymbol{\beta}\right)^{T}\left(\lambda\boldsymbol{M}\boldsymbol{\rho}+\boldsymbol{\beta}\right)=\left(\lambda\boldsymbol{c}^{T}\boldsymbol{\rho}+\tau\right)^{2}
+\]
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+
+\lang american
+\begin_inset Formula 
+\[
+\boldsymbol{\rho}^{T}\boldsymbol{M}^{T}\boldsymbol{M}\boldsymbol{\rho}\lambda^{2}+\underbrace{\lambda\boldsymbol{\rho}^{T}\boldsymbol{M}^{T}\boldsymbol{\beta}+\lambda\boldsymbol{\beta}^{T}\boldsymbol{M}\boldsymbol{\rho}}_{=2\boldsymbol{\rho}^{T}\boldsymbol{M}^{T}\boldsymbol{\beta}\lambda}+\boldsymbol{\beta}^{T}\boldsymbol{\beta}=\lambda^{2}\left(\boldsymbol{c}^{T}\boldsymbol{\rho}\right)^{2}+2\lambda\left(\boldsymbol{c}^{T}\boldsymbol{\rho}\right)\tau+\tau^{2}
+\]
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+
+\lang american
+\begin_inset Formula 
+\[
+\left(\underbrace{\boldsymbol{\rho}^{T}\boldsymbol{M}^{T}\boldsymbol{M}\boldsymbol{\rho}-\left(\boldsymbol{c}^{T}\boldsymbol{\rho}\right)^{2}}_{=a}\right)\lambda^{2}+\left(\underbrace{2\boldsymbol{\rho}^{T}\boldsymbol{M}^{T}\boldsymbol{\beta}-2\left(\boldsymbol{c}^{T}\boldsymbol{\rho}\right)\tau}_{=b}\right)\lambda+\underbrace{\left(\boldsymbol{\beta}^{T}\boldsymbol{\beta}-\tau^{2}\right)}_{=c}=0
+\]
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+
+\lang american
+Multiplying everything with 
+\begin_inset Formula $\kappa^{2}=\frac{1}{\lambda^{2}}$
+\end_inset
+
+ we have that:
+\end_layout
+
+\begin_layout Standard
+
+\lang american
+\begin_inset Formula 
+\[
+\underbrace{a}_{:=c'}+\underbrace{b}_{:=b'}\kappa+\underbrace{c}_{:=a'}\kappa^{2}=0
+\]
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+
+\lang american
+Now, note that the two solutions to this equation can be both negative or
+ both positive! This is due to the fact that by squaring both sides above
+ we are including both sides of the cone.
+ Hence, the solution will be 
+\begin_inset Formula $\kappa=\text{relu}\left(\text{max}\left(\kappa_{1},\kappa_{2}\right)\right)$
+\end_inset
+
+, where 
+\begin_inset Formula $\kappa_{1}$
+\end_inset
+
+ and 
+\begin_inset Formula $\kappa_{2}$
+\end_inset
+
+ are the two solutions shown above.
+\end_layout
+
+\end_deeper
 \begin_layout Part
 DC3
 \end_layout
