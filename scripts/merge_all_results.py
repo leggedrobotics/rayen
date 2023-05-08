@@ -3,7 +3,7 @@ import pandas as pd
 
 os.chdir("./results")
 all_pkl=[]
-for file in glob.glob("*.pkl"):
+for file in glob.glob("dataset*.pkl"):
     all_pkl.append(file)
 all_pkl = sorted(all_pkl)
 all_dataframes=[]
