@@ -107,18 +107,9 @@ def findLargestEigenvalueUsingPowerIteration(A, v):
 		return lamb
 
 
-#Options to find Largest Eigenvalue:
-
-# Power iteration: 
+# Other links: 
 # --> https://github.com/pytorch/pytorch/blob/main/torch/nn/utils/spectral_norm.py#L80
-# --> https://github.com/rfeinman/Torch-ARPACK/blob/master/arpack/power_iteration.py
 
-# Torch ARPACK (https://github.com/rfeinman/Torch-ARPACK)  --> Valid for symmetric matrices
-# --> Does not have the backward() method implemented yet
-
-# LOBPCG (https://pytorch.org/docs/stable/generated/torch.lobpcg.html)
-# --> Does not have backward() implemented with B!=I // See https://github.com/pytorch/pytorch/blob/main/torch/_lobpcg.py#L384
-# --> It seems to have some bugs: https://github.com/pytorch/pytorch/issues/101075
 
 ########################################################
 ########################################################
