@@ -410,33 +410,32 @@ class ConstraintLayer(torch.nn.Module):
 				
 				############# COMPUTE THE EIGENVALUES
 
-				## First option (compute whole spectrum of the matrix, using the non-symmetric matrix self.mHinv@S)
+				## Option 1: (compute whole spectrum of the matrix, using the non-symmetric matrix self.mHinv@S)
 				# print(f"Computing eigenvalues")
 				# eigenvalues = torch.unsqueeze(torch.linalg.eigvals(self.mHinv@S),2) #Note that mHinv@M is not symmetric but always have real eigenvalues
 				# assert (torch.all(torch.isreal(eigenvalues)))
-				# largest_eigenvalue_novale = torch.max(eigenvalues.real, dim=1, keepdim=True).values 
+				# largest_eigenvalue = torch.max(eigenvalues.real, dim=1, keepdim=True).values 
 				
 				LTmSL=self.L.T @ (-S) @ self.L #This matrix is symmetric
 
-				## Second Option (compute whole spectrum of the matrix, using the symmetric matrix LTmSL )
+				## Option 2: (compute whole spectrum of the matrix, using the symmetric matrix LTmSL). Much faster than Option 1
 				eigenvalues = torch.unsqueeze(torch.linalg.eigvalsh(LTmSL),2) #Note that L^T (-S) L is a symmetric matrix
-				largest_eigenvalue_novale = torch.max(eigenvalues, dim=1, keepdim=True).values 
-				time_eig=timer.endAndGetTimeSeconds();
+				largest_eigenvalue = torch.max(eigenvalues, dim=1, keepdim=True).values 
 
-				## Third option: Use LOBPCG with A=LTmSL and B=I. The advante of thie method is that only the largest eigenvalue is computed. But, empirically, this option is faster than option 2 only for very big matrices (>1000x1000)
+				## Option 3: Use LOBPCG with A=LTmSL and B=I. The advante of thie method is that only the largest eigenvalue is computed. But, empirically, this option is faster than option 2 only for very big matrices (>1000x1000)
 				# guess_lobpcg=torch.rand(1, H.shape[0], 1);
 				# size_batch=v_bar.shape[0]
 				# largest_eigenvalue, _ = torch.lobpcg(A=LTmSL, k=1, B=None, niter=-1) #, X=guess_lobpcg.expand(size_batch, -1, -1)
 				# largest_eigenvalue=torch.unsqueeze(largest_eigenvalue, 1)
 
-				## Fourth option: Use power iteration to compute the largest eigenvalue. Often times is slower than just computing the whole spectrum, and sometimes it does not converge
+				## Option 4: Use power iteration to compute the largest eigenvalue. Often times is slower than just computing the whole spectrum, and sometimes it does not converge
 				# start=time.time()
 				# guess_v = torch.nn.functional.normalize(torch.rand(S.shape[1],1), dim=0)
 				# largest_eigenvalue=utils.findLargestEigenvalueUsingPowerIteration(self.mHinv@S, guess_v)
 				# time_pi=time.time()-start;
 				# print(f"Improvement={time_eig/time_pi}")
 
-				## Fifth option: Use LOBPCG with A=-S and B=H. There are two problems though:
+				## Option 5: Use LOBPCG with A=-S and B=H. There are two problems though:
 				# --> This issue: https://github.com/pytorch/pytorch/issues/101075
 				# --> Backward is not implemented for B!=I, see: https://github.com/pytorch/pytorch/blob/d54fcd571af48685b0699f6ac1e31b6871d0d768/torch/_lobpcg.py#L329 
 
