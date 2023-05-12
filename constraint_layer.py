@@ -40,8 +40,11 @@ class ConstraintLayer(torch.nn.Module):
 			H=all_F[-1]
 			for i in range(cs.sdpc.dim()):
 				H += cs.y0[i,0]*cs.sdpc.all_F[i]
-			mHinv=-np.linalg.inv(H);
+			Hinv=np.linalg.inv(H)
+			mHinv=-Hinv;
+			L=np.linalg.cholesky(Hinv) # Hinv = L @ L^T 
 			self.register_buffer("mHinv", torch.Tensor(mHinv))
+			self.register_buffer("L", torch.Tensor(L))
 
 		else:
 			all_F=[]
@@ -394,36 +397,52 @@ class ConstraintLayer(torch.nn.Module):
 
 			if(len(self.all_F)>0): #If there are SDP constraints:
 
-				#First option (much slower)
+				############# OBTAIN S
+				# First option (much slower)
 				# S=self.all_F[0,:,:]*rho[:,0:(0+1),0:1]
 				# for i in range(1,len(self.all_F)-1):
 				# 	#See https://discuss.pytorch.org/t/scalar-matrix-multiplication-for-a-tensor-and-an-array-of-scalars/100174/2	
 				# 	S += self.all_F[i,:,:]*rho[:,i:(i+1),0:1] 
 
 
-				#Second option (much faster)
+				# Second option (much faster)
 				S=torch.einsum('ajk,ial->ijk', [self.all_F[0:-1,:,:], rho]) #See the tutorial https://rockt.github.io/2018/04/30/einsum
 				
+				############# COMPUTE THE EIGENVALUES
 
-				# tmp=torch.nn.functional.mse_loss(S, S_2)
-				# assert tmp<1e-6, f"tmp={tmp}"
+				## First option (compute whole spectrum of the matrix, using the non-symmetric matrix self.mHinv@S)
+				# print(f"Computing eigenvalues")
+				# eigenvalues = torch.unsqueeze(torch.linalg.eigvals(self.mHinv@S),2) #Note that mHinv@M is not symmetric but always have real eigenvalues
+				# assert (torch.all(torch.isreal(eigenvalues)))
+				# largest_eigenvalue_novale = torch.max(eigenvalues.real, dim=1, keepdim=True).values 
+				
+				LTmSL=self.L.T @ (-S) @ self.L #This matrix is symmetric
 
+				## Second Option (compute whole spectrum of the matrix, using the symmetric matrix LTmSL )
+				eigenvalues = torch.unsqueeze(torch.linalg.eigvalsh(LTmSL),2) #Note that L^T (-S) L is a symmetric matrix
+				largest_eigenvalue_novale = torch.max(eigenvalues, dim=1, keepdim=True).values 
+				time_eig=timer.endAndGetTimeSeconds();
 
-				#First option (compute whole spectrum of the matrices)
-				print(f"Computing eigenvalues")
+				## Third option: Use LOBPCG with A=LTmSL and B=I. The advante of thie method is that only the largest eigenvalue is computed. But, empirically, this option is faster than option 2 only for very big matrices (>1000x1000)
+				# guess_lobpcg=torch.rand(1, H.shape[0], 1);
+				# size_batch=v_bar.shape[0]
+				# largest_eigenvalue, _ = torch.lobpcg(A=LTmSL, k=1, B=None, niter=-1) #, X=guess_lobpcg.expand(size_batch, -1, -1)
+				# largest_eigenvalue=torch.unsqueeze(largest_eigenvalue, 1)
+
+				## Fourth option: Use power iteration to compute the largest eigenvalue. Often times is slower than just computing the whole spectrum, and sometimes it does not converge
 				# start=time.time()
-				eigenvalues = torch.unsqueeze(torch.linalg.eigvals(self.mHinv@S),2) #Note that mHinv@M is not symmetric but always have real eigenvalues
-				assert (torch.all(torch.isreal(eigenvalues)))
-				largest_eigenvalue = torch.max(eigenvalues.real, dim=1, keepdim=True).values 
-				# time_eig=time.time()-start;
-
-				# start=time.time()
-				# #Second option (use power iteration to compute the largest one. Often times is slower than just computing the whole spectrum)
 				# guess_v = torch.nn.functional.normalize(torch.rand(S.shape[1],1), dim=0)
 				# largest_eigenvalue=utils.findLargestEigenvalueUsingPowerIteration(self.mHinv@S, guess_v)
 				# time_pi=time.time()-start;
 				# print(f"Improvement={time_eig/time_pi}")
 
+				## Fifth option: Use LOBPCG with A=-S and B=H. There are two problems though:
+				# --> This issue: https://github.com/pytorch/pytorch/issues/101075
+				# --> Backward is not implemented for B!=I, see: https://github.com/pytorch/pytorch/blob/d54fcd571af48685b0699f6ac1e31b6871d0d768/torch/_lobpcg.py#L329 
+
+				## Sixth option: Use https://github.com/rfeinman/Torch-ARPACK with LTmSL. The problem is that backward() is not implemented yet 
+
+				## Seventh option: Use https://github.com/buwantaiji/DominantSparseEigenAD. But it does not have support for batched matrices, see https://github.com/buwantaiji/DominantSparseEigenAD/issues/1
 
 				kappa_positive_i = torch.relu( largest_eigenvalue )
 
