@@ -9,8 +9,7 @@ rm -rf results
 mkdir results
 
 #TRAINING
-tmuxp load train_dataset2d.yaml
-tmuxp load train_dataset3d.yaml
+tmuxp load train.yaml
 
 #TESTING, one by one to get a more accurate computation time
 cd ..
@@ -60,3 +59,5 @@ python -O main.py --method PP       --dimension_dataset 3  --weight_soft_cost 0 
 
 cd $SCRIPT_DIR
 python merge_all_results.py
+
+python -O time_analysis.py

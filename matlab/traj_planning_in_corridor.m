@@ -25,7 +25,7 @@ if(dimension==2)
     radius=4.0;
     num_of_seg_per_region=1; 
     samples_per_step=5;
-    N=12;
+    N=10;
     use_quadratic=false;
 else
     P=3*[0 1 2 3 4 3 0;
@@ -34,7 +34,7 @@ else
     radius=4*1.3;
     num_of_seg_per_region=2; 
     samples_per_step=3;
-    N=12;
+    N=10;
     use_quadratic=true;
 end
 

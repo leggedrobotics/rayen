@@ -20,8 +20,8 @@ import tqdm
 
 import waitGPU
 
-
-# import random
+import random
+import time
 
 from torch.utils.tensorboard import SummaryWriter
 
@@ -113,6 +113,7 @@ def onePassOverDataset(model, params, sdag, my_type, cs):
 
 	num_samples_dataset=len(generator.dataset);
 
+	cuda_timer=utils.CudaTimer()
 
 	with torch.set_grad_enabled(enable_grad):
 		for x, y, Pobj, qobj, robj, opt_time_s, cost in generator: #For each of the batches	
@@ -120,10 +121,10 @@ def onePassOverDataset(model, params, sdag, my_type, cs):
 			#----------------------
 			x = x.to(device)
 			y = y.to(device)
-			time_start=time.time()
+			
+			cuda_timer.start()
 			y_predicted = model(x)
-			# print(y_predicted.device)
-			sum_time_s += (time.time()-time_start)
+			sum_time_s += cuda_timer.endAndGetTimeSeconds()
 			loss=cost_computer.getSumLossAllSamples(params, y, y_predicted, Pobj, qobj, robj, isTesting=(my_type=='test'))
 			# print(f"Loss={loss.item()}")
 			sum_all_losses +=  loss.item();
@@ -299,7 +300,13 @@ def main(params):
 							  nn.Linear(64, 64),
 							  ConstraintLayer(cs, input_dim=64, method=params['method'], create_map=True, args_DC3=args_DC3)) 
 
-		waitGPU.wait(utilization=70, memory_ratio=0.7) #This is to avoid erros like "CUDA error: CUBLAS_STATUS_NOT_INITIALIZED" when launching many trainings in parallel
+		for i in range(torch.cuda.device_count()):
+		   print(torch.cuda.get_device_properties(i).name)
+
+		sleep_time=random.randint(0,20)
+		print(f"Sleeping for {sleep_time} s")
+		time.sleep(sleep_time) #Without this, you get the errors CUBLAS_STATUS_NOT_INITIALIZED or CUDA out of memory when running several training processes in parallel
+		waitGPU.wait(utilization=50, memory_ratio=0.5, interval=random.randint(1, 20), available_memory=2000) #This is to avoid erros like "CUDA error: CUBLAS_STATUS_NOT_INITIALIZED" when launching many trainings in parallel
 		print("Done waiting for GPU")
 
 		training_metrics = train_model(model, params, sdag, tensorboard_writer, cs)
@@ -332,14 +339,14 @@ def main(params):
 		num_trainable_params=sum(	p.numel() for p in model.parameters() if p.requires_grad)
 
 		d = {'method': 				 [name_file,                         'dataset'+str(params['dimension_dataset'])+'d_'+'Optimization'],
-		     'num_trainable_params': [num_trainable_params,         	  0], 
-		    '[In dist] loss':        [testing_metrics_in_dist['loss'],      	  testing_metrics_in_dist['optimization_loss']      ], 
-		    '[In dist] violation':   [testing_metrics_in_dist['violation'], 	  testing_metrics_in_dist['optimization_violation'] ],
-		    '[In dist] time_us':     [1e6*testing_metrics_in_dist['time_s'],     1e6*testing_metrics_in_dist['optimization_time_s'] ],
-		    #
-		    '[Out dist] loss':        [testing_metrics_out_dist['loss'],      	  testing_metrics_out_dist['optimization_loss']      ], 
-		    '[Out dist] violation':   [testing_metrics_out_dist['violation'], 	  testing_metrics_out_dist['optimization_violation'] ],
-		    '[Out dist] time_us':     [1e6*testing_metrics_out_dist['time_s'],     1e6*testing_metrics_out_dist['optimization_time_s'] ]}
+			 'num_trainable_params': [num_trainable_params,         	  0], 
+			'[In dist] loss':        [testing_metrics_in_dist['loss'],      	  testing_metrics_in_dist['optimization_loss']      ], 
+			'[In dist] violation':   [testing_metrics_in_dist['violation'], 	  testing_metrics_in_dist['optimization_violation'] ],
+			'[In dist] time_us':     [1e6*testing_metrics_in_dist['time_s'],     1e6*testing_metrics_in_dist['optimization_time_s'] ],
+			#
+			'[Out dist] loss':        [testing_metrics_out_dist['loss'],      	  testing_metrics_out_dist['optimization_loss']      ], 
+			'[Out dist] violation':   [testing_metrics_out_dist['violation'], 	  testing_metrics_out_dist['optimization_violation'] ],
+			'[Out dist] time_us':     [1e6*testing_metrics_out_dist['time_s'],     1e6*testing_metrics_out_dist['optimization_time_s'] ]}
 
 
 		df = pd.DataFrame(data=d)
@@ -355,14 +362,14 @@ def main(params):
 
 #See https://stackoverflow.com/a/43357954/6057617
 def str2bool(v):
-    if isinstance(v, bool):
-        return v
-    if v.lower() in ('yes', 'true', 't', 'y', '1'):
-        return True
-    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
-        return False
-    else:
-        raise argparse.ArgumentTypeError('Boolean value expected.')
+	if isinstance(v, bool):
+		return v
+	if v.lower() in ('yes', 'true', 't', 'y', '1'):
+		return True
+	elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+		return False
+	else:
+		raise argparse.ArgumentTypeError('Boolean value expected.')
 
 
 if __name__ == '__main__':
@@ -370,7 +377,7 @@ if __name__ == '__main__':
 	utils.printInBoldGreen("\n\n\n==========================================")
 
 	parser = argparse.ArgumentParser()
-	parser.add_argument('--method', type=str, default='walker_1') #walker_2, walker_1, Bar, UU, PP, UP, DC3
+	parser.add_argument('--method', type=str, default='DC3') #walker_2, walker_1, Bar, UU, PP, UP, DC3
 	parser.add_argument('--dimension_dataset', type=int, default=3)
 	parser.add_argument('--use_supervised', type=str2bool, default=False)
 	parser.add_argument('--weight_soft_cost', type=float, default=0.0)
@@ -386,7 +393,7 @@ if __name__ == '__main__':
 	parser.add_argument('--DC3_eps_converge', type=float, default=1e-6)
 	parser.add_argument('--DC3_momentum', type=float, default=0.5)
 	parser.add_argument('--DC3_max_steps_training', type=int, default=10)
-	parser.add_argument('--DC3_max_steps_testing', type=int, default=30) #float("inf")
+	parser.add_argument('--DC3_max_steps_testing', type=int, default=200) #float("inf")
 
 
 	args = parser.parse_args()

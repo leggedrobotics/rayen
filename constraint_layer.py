@@ -8,6 +8,7 @@ import math
 from cvxpylayers.torch import CvxpyLayer
 import random
 import copy
+import time
 
 class ConstraintLayer(torch.nn.Module):
 	def __init__(self, cs, input_dim=None, method='walker_2', create_map=True, args_DC3=None):
@@ -39,8 +40,9 @@ class ConstraintLayer(torch.nn.Module):
 			H=all_F[-1]
 			for i in range(cs.sdpc.dim()):
 				H += cs.y0[i,0]*cs.sdpc.all_F[i]
-			Hinv=np.linalg.inv(H);
-			self.register_buffer("Hinv", torch.Tensor(Hinv))
+			mHinv=-np.linalg.inv(H);
+			self.register_buffer("mHinv", torch.Tensor(mHinv))
+
 		else:
 			all_F=[]
 
@@ -54,7 +56,8 @@ class ConstraintLayer(torch.nn.Module):
 		self.register_buffer("all_s", torch.Tensor(np.array(all_s)))
 		self.register_buffer("all_c", torch.Tensor(np.array(all_c)))
 		self.register_buffer("all_d", torch.Tensor(np.array(all_d)))
-		self.register_buffer("all_F", torch.Tensor(np.array(all_F)))
+		# self.register_buffer("all_F", torch.Tensor(np.array(all_F))) #This one dies (probably because out of memory) when all_F contains more than 7000 matrices 500x500 approx
+		self.register_buffer("all_F", torch.Tensor(all_F))
 		self.register_buffer("A_p", torch.Tensor(cs.A_p))
 		self.register_buffer("b_p", torch.Tensor(cs.b_p))
 		self.register_buffer("y1", torch.Tensor(cs.y1))
@@ -391,15 +394,40 @@ class ConstraintLayer(torch.nn.Module):
 
 			if(len(self.all_F)>0): #If there are SDP constraints:
 
-				M=self.all_F[0,:,:]*rho[:,0:(0+1),0:1]
-				for i in range(1,len(self.all_F)-1):
-					M += self.all_F[i,:,:]*rho[:,i:(i+1),0:1] #See https://discuss.pytorch.org/t/scalar-matrix-multiplication-for-a-tensor-and-an-array-of-scalars/100174/2			
+				#First option (much slower)
+				# S=self.all_F[0,:,:]*rho[:,0:(0+1),0:1]
+				# for i in range(1,len(self.all_F)-1):
+				# 	#See https://discuss.pytorch.org/t/scalar-matrix-multiplication-for-a-tensor-and-an-array-of-scalars/100174/2	
+				# 	S += self.all_F[i,:,:]*rho[:,i:(i+1),0:1] 
 
-				eigenvalues = torch.unsqueeze(torch.linalg.eigvals(-self.Hinv@M),2) #Note that Hinv@M is not symmetric but always have real eigenvalues
 
+				#Second option (much faster)
+				S=torch.einsum('ajk,ial->ijk', [self.all_F[0:-1,:,:], rho]) #See the tutorial https://rockt.github.io/2018/04/30/einsum
+				
+
+				# tmp=torch.nn.functional.mse_loss(S, S_2)
+				# assert tmp<1e-6, f"tmp={tmp}"
+
+
+				#First option (compute whole spectrum of the matrices)
+				print(f"Computing eigenvalues")
+				# start=time.time()
+				eigenvalues = torch.unsqueeze(torch.linalg.eigvals(self.mHinv@S),2) #Note that mHinv@M is not symmetric but always have real eigenvalues
 				assert (torch.all(torch.isreal(eigenvalues)))
+				largest_eigenvalue = torch.max(eigenvalues.real, dim=1, keepdim=True).values 
+				# time_eig=time.time()-start;
 
-				kappa_positive_i = torch.relu( torch.max(eigenvalues.real, dim=1, keepdim=True).values  )
+				# start=time.time()
+				# #Second option (use power iteration to compute the largest one. Often times is slower than just computing the whole spectrum)
+				# guess_v = torch.nn.functional.normalize(torch.rand(S.shape[1],1), dim=0)
+				# largest_eigenvalue=utils.findLargestEigenvalueUsingPowerIteration(self.mHinv@S, guess_v)
+				# time_pi=time.time()-start;
+				# print(f"Improvement={time_eig/time_pi}")
+
+
+				kappa_positive_i = torch.relu( largest_eigenvalue )
+
+				
 				all_kappas_positives = torch.cat((all_kappas_positives, kappa_positive_i), dim=1)
 
 

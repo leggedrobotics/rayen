@@ -57,42 +57,44 @@ class LinearConstraint():
 
 class convexQuadraticConstraint():
 	# Constraint is (1/2)x'Px + q'x +r <=0
-	def __init__(self, P, q, r):
+	def __init__(self, P, q, r, do_checks_P=True):
 		self.P=P;
 		self.q=q;
 		self.r=r;
 
-		utils.checkMatrixisNotZero(self.P);
-		utils.checkMatrixisSymmetric(self.P)
-		
-		eigenvalues=np.linalg.eigvalsh(self.P);
-		smallest_eigenvalue= (np.amin(eigenvalues))
-
-		######## Check that the matrix is PSD up to a tolerance
-		tol=1e-7
-		if(smallest_eigenvalue<-tol):
-			assert False, f"Matrix P is not PSD, smallest eigenvalue is {smallest_eigenvalue}"
-		#########################
-
-		#Note: All the code assummes that P is a PSD matrix. This is specially important when:
-		#--> Using  cp.quad_form(...) You can use the argument assume_PSD=True (see https://github.com/cvxpy/cvxpy/issues/407)
-		#--> Computting kappa (if P is not a PSD matrix, you end up with a negative discriminant when solving the 2nd order equation)
-
-		######### Correct for possible numerical errors
-		if( (-tol)<=smallest_eigenvalue<0  ):
-			#Correction due to numerical errors
+		if(do_checks_P==True):
 			
-			# utils.printInBoldGreen(f"Correcting with smallest_eigenvalue={smallest_eigenvalue}")
+			utils.checkMatrixisNotZero(self.P);
+			utils.checkMatrixisSymmetric(self.P)
+		
+			eigenvalues=np.linalg.eigvalsh(self.P);
+			smallest_eigenvalue= (np.amin(eigenvalues))
 
-			##Option 1
-			self.P = self.P +np.abs(smallest_eigenvalue)*np.eye(self.P.shape[0]) 
+			######## Check that the matrix is PSD up to a tolerance
+			tol=1e-7
+			if(smallest_eigenvalue<-tol):
+				assert False, f"Matrix P is not PSD, smallest eigenvalue is {smallest_eigenvalue}"
+			#########################
 
-			##Option 2 https://stackoverflow.com/a/63131250  and https://math.stackexchange.com/a/1380345
-			# C = (self.P + self.P.T)/2  #https://en.wikipedia.org/wiki/Symmetric_matrix#Decomposition_into_symmetric_and_skew-symmetric
-			# eigval, eigvec = np.linalg.eigh(C)
-			# eigval[eigval < 0] = 0
-			# self.P=eigvec.dot(np.diag(eigval)).dot(eigvec.T)
-		##########
+			#Note: All the code assummes that P is a PSD matrix. This is specially important when:
+			#--> Using  cp.quad_form(...) You can use the argument assume_PSD=True (see https://github.com/cvxpy/cvxpy/issues/407)
+			#--> Computting kappa (if P is not a PSD matrix, you end up with a negative discriminant when solving the 2nd order equation)
+
+			######### Correct for possible numerical errors
+			if( (-tol)<=smallest_eigenvalue<0  ):
+				#Correction due to numerical errors
+				
+				# utils.printInBoldGreen(f"Correcting with smallest_eigenvalue={smallest_eigenvalue}")
+
+				##Option 1
+				self.P = self.P +np.abs(smallest_eigenvalue)*np.eye(self.P.shape[0]) 
+
+				##Option 2 https://stackoverflow.com/a/63131250  and https://math.stackexchange.com/a/1380345
+				# C = (self.P + self.P.T)/2  #https://en.wikipedia.org/wiki/Symmetric_matrix#Decomposition_into_symmetric_and_skew-symmetric
+				# eigval, eigvec = np.linalg.eigh(C)
+				# eigval[eigval < 0] = 0
+				# self.P=eigvec.dot(np.diag(eigval)).dot(eigvec.T)
+			##########
 
 	def dim(self):
 		return self.P.shape[1]
@@ -131,6 +133,10 @@ class SDPConstraint():
 	def __init__(self, all_F):
 		for F in all_F:
 			utils.checkMatrixisSymmetric(F);
+		
+		for F_i in all_F:
+			assert F_i.shape==all_F[0].shape
+
 		self.all_F=all_F
 
 	def dim(self):
@@ -149,7 +155,12 @@ class SDPConstraint():
 ######################################
 
 class convexConstraints():
-	def __init__(self, lc=None, qcs=[], socs=[], sdpc=None):
+	# y0 (a point in the relative interior of the feasible set) can be provided or not
+	# If it's not provided, this code will find one point in the relative interior of the feasible set
+	# If it's provided, this code does not check whether or not that point is in the relative interior of the set. It's the user's responsibility to do that 
+
+	# do_preprocessing_linear can be set to True ONLY when the user knows beforehand that affine_hull{y:A1y<=b1} = R^k  . Again, it's the user's responsibility to ensure that that is actually the case 
+	def __init__(self, lc=None, qcs=[], socs=[], sdpc=None, y0=None, do_preprocessing_linear=True):
 
 		if(lc is not None):
 			self.has_linear_eq_constraints=lc.hasEqConstraints();
@@ -190,19 +201,38 @@ class convexConstraints():
 
 		self.k=all_dim[0]
 
+		##################### CHOOSE SOLVER
+		###################################################
+		installed_solvers=cp.installed_solvers();
+		if ('GUROBI' in installed_solvers) and self.has_sdp_constraints==False:
+			self.solver='GUROBI' #You need to do `python -m pip install gurobipy`
+		elif ('ECOS' in installed_solvers) and self.has_sdp_constraints==False:
+			self.solver='ECOS'
+		elif ('SCS' in installed_solvers):
+			self.solver='SCS'
+		# elif 'OSQP' in installed_solvers:
+		# 	self.solver='OSQP'
+		# elif 'CVXOPT' in installed_solvers:	
+		# 	self.solver='CVXOPT'
+		else:
+			#TODO: There are more solvers, see https://www.cvxpy.org/tutorial/advanced/index.html#choosing-a-solver
+			raise Exception(f"Which solver do you have installed?")
+		###################################################
 
-		###########################################
-		# Ensure that the feasible set is not empty
-		z = cp.Variable((self.k,1))
-		objective = cp.Minimize(0.0)
-		constraints_cvxpy = self.getConstraintsCvxpy(z)
-		prob = cp.Problem(objective, constraints_cvxpy)
-		result = prob.solve(verbose=False);
-		if(prob.status != 'optimal'):
-			raise Exception("The feasible set is empty")
-		############################################
+		if(y0 is None):
+			###########################################
+			# Ensure that the feasible set is not empty
+			z = cp.Variable((self.k,1))
+			objective = cp.Minimize(0.0)
+			constraints_cvxpy = self.getConstraintsCvxpy(z)
+			prob = cp.Problem(objective, constraints_cvxpy)
+			result = prob.solve(verbose=False, solver=self.solver);
+			if(prob.status != 'optimal'):
+				raise Exception("The feasible set is empty")
+			############################################
 
 		if(self.has_linear_constraints):
+
 
 			######################################## Stack the matrices so that the linear constraints look like Ax<=b 
 			if(self.has_linear_ineq_constraints):
@@ -219,65 +249,89 @@ class convexConstraints():
 			utils.printInBoldGreen(f"A is {A.shape} and b is {b.shape}")
 			########################################
 
-			TOL=1e-7;
-			z = cp.Variable((self.k,1))
-			if(A.shape[0]>1): #If there is more than one constraint
-				#Remove redundant constraints
+			if(do_preprocessing_linear):
+
+				TOL=1e-7;
+				z = cp.Variable((self.k,1))
+				if(A.shape[0]>1): #If there is more than one constraint
+					#Remove redundant constraints
+					################################################
+					#Eq 1.5 of https://www.research-collection.ethz.ch/bitstream/handle/20.500.11850/167108/1/thesisFinal_MaySzedlak.pdf
+					#See also https://mathoverflow.net/a/69667
+					utils.printInBoldBlue("Removing redundant constraints...")
+					indexes_const_removed=[]
+					reversed_indexes=list(reversed(range(A.shape[0])));
+					for i in tqdm(reversed_indexes):
+						# print(i)
+						all_rows_but_i=[x for x in range(A.shape[0]) if x != i]
+						objective = cp.Maximize(A[i,:]@z)
+						constraints=[A[all_rows_but_i,:]@z<=b[all_rows_but_i,:],   A[i,:]@z<=(b[i,0]+1)]
+						prob = cp.Problem(objective, constraints)
+						result = prob.solve(verbose=False, solver=self.solver);
+						if(prob.status != 'optimal' and prob.status!='optimal_inaccurate'):
+							raise Exception("Value is not optimal")
+
+						if ((objective.value-b[i,0])<=TOL):
+							# print(f"Deleting constraint {i}")
+							indexes_const_removed.append(i)
+							A = np.delete(A, (i), axis=0)
+							b = np.delete(b, (i), axis=0)
+
+					# printInBoldBlue(f"Removed constraints {indexes_const_removed}")
+					utils.printInBoldBlue(f"Removed {len(indexes_const_removed)} constraints ")
+					utils.printInBoldGreen(f"A is {A.shape} and b is {b.shape}")
+					################################################
+
+
+
+				#Find equality set
 				################################################
-				#Eq 1.5 of https://www.research-collection.ethz.ch/bitstream/handle/20.500.11850/167108/1/thesisFinal_MaySzedlak.pdf
-				#See also https://mathoverflow.net/a/69667
-				utils.printInBoldBlue("Removing redundant constraints...")
-				indexes_const_removed=[]
-				reversed_indexes=list(reversed(range(A.shape[0])));
-				for i in tqdm(reversed_indexes):
-					# print(i)
-					all_rows_but_i=[x for x in range(A.shape[0]) if x != i]
-					objective = cp.Maximize(A[i,:]@z)
-					constraints=[A[all_rows_but_i,:]@z<=b[all_rows_but_i,:],   A[i,:]@z<=(b[i,0]+1)]
+				# Section 5.2 of https://www.researchgate.net/publication/268373838_Polyhedral_Tools_for_Control
+				# See also Definition 2.16 of https://sites.math.washington.edu/~thomas/teaching/m583_s2008_web/main.pdf
+
+				E=[] #contains the indexes of the constraints in the equality set
+
+				utils.printInBoldBlue("Finding Affine Hull and projecting...")
+
+				for i in tqdm(range(A.shape[0])):
+					objective = cp.Minimize(A[i,:]@z-b[i,0]) #I try to go far from the constraint, into the feasible set
+					constraints=[A@z<=b]
 					prob = cp.Problem(objective, constraints)
-					result = prob.solve(verbose=False);
-					if(prob.status != 'optimal' and prob.status!='optimal_inaccurate'):
-						raise Exception("Value is not optimal")
+					if(self.solver=='GUROBI'):
+						result = prob.solve(verbose=False, solver=self.solver, reoptimize=True)
+					else:
+						result = prob.solve(verbose=False, solver=self.solver)                # When using Gurobi, we need the reoptimize parameter because if not the solver cannot distinguish between infeasible or unbounded. This is the error you get:
+																							  #   The problem is either infeasible or unbounded, but the solver
+																							  #   cannot tell which. Disable any solver-specific presolve methods
+																							  #   and re-solve to determine the precise problem status.
 
-					if ((objective.value-b[i,0])<=TOL):
-						# print(f"Deleting constraint {i}")
-						indexes_const_removed.append(i)
-						A = np.delete(A, (i), axis=0)
-						b = np.delete(b, (i), axis=0)
+																							  #   For GUROBI and CPLEX you can automatically perform this re-solve
+																							  #   with the keyword argument prob.solve(reoptimize=True, ...).
+																							    
+																							  #   warnings.warn(INF_OR_UNB_MESSAGE)
 
-				# printInBoldBlue(f"Removed constraints {indexes_const_removed}")
-				utils.printInBoldBlue(f"Removed {len(indexes_const_removed)} constraints ")
-				utils.printInBoldGreen(f"A is {A.shape} and b is {b.shape}")
-				################################################
+					obj_value=objective.value;
 
+					if(prob.status=='unbounded'):
+						obj_value=-math.inf #note that we are minimizing
 
+					if(prob.status != 'optimal' and prob.status!='unbounded' and prob.status!='optimal_inaccurate'):
+						raise Exception(f"prob.status={prob.status}")
 
-			#Find equality set
-			################################################
-			# Section 5.2 of https://www.researchgate.net/publication/268373838_Polyhedral_Tools_for_Control
-			# See also Definition 2.16 of https://sites.math.washington.edu/~thomas/teaching/m583_s2008_web/main.pdf
+					assert obj_value<TOL#The objective should be negative
 
-			E=[] #contains the indexes of the constraints in the equality set
+					if (obj_value>-TOL): #if the objective value is zero (I tried to go far from the constraint, but I couldn't)
+						E.append(i)
 
-			utils.printInBoldBlue("Finding Affine Hull and projecting...")
-
-			for i in tqdm(range(A.shape[0])):
-				objective = cp.Minimize(A[i,:]@z-b[i,0]) #I try to go far from the constraint, into the feasible set
-				constraints=[A@z<=b]
-				prob = cp.Problem(objective, constraints)
-				result = prob.solve(verbose=False);
-				obj_value=objective.value;
-
-				if(prob.status=='unbounded'):
-					obj_value=-math.inf #note that we are minimizing
-
-				if(prob.status != 'optimal' and prob.status!='unbounded' and prob.status!='optimal_inaccurate'):
-					raise Exception(f"prob.status={prob.status}")
-
-				assert obj_value<TOL#The objective should be negative
-
-				if (obj_value>-TOL): #if the objective value is zero (I tried to go far from the constraint, but I couldn't)
-					E.append(i)
+			else:
+				#Here we simply choose E such that
+				# A_E == A2, b_E == b_2
+				# A_I == A1, b_I == b_1
+				if(self.has_linear_ineq_constraints):
+					start=self.lc.A1.shape[0]
+				else:
+					start=0
+				E=list(range(start, A.shape[0]))
 
 			utils.printInBoldGreen(f"E={E}")
 
@@ -352,27 +406,33 @@ class convexConstraints():
 		#############Obtain a strictly feasible point z0
 		###################################################
 
-		epsilon=cp.Variable()
-		z0 = cp.Variable((self.n,1))
+		if(y0 is None):
+			epsilon=cp.Variable()
+			z0 = cp.Variable((self.n,1))
 
-		constraints=self.getConstraintsInSubspaceCvxpy(z0, epsilon)
+			print("Getting constraints cvxpy")
+			constraints=self.getConstraintsInSubspaceCvxpy(z0, epsilon)
+			print("Obtained")
 
-		constraints.append(epsilon>=0)
-		constraints.append(epsilon<=0.5) #This constraint is needed for the case where the set is unbounded. Any positive value is valid
-		
-		objective = cp.Minimize(-epsilon)
-		prob = cp.Problem(objective, constraints)
+			constraints.append(epsilon>=0)
+			constraints.append(epsilon<=0.5) #This constraint is needed for the case where the set is unbounded. Any positive value is valid
+			
+			objective = cp.Minimize(-epsilon)
+			prob = cp.Problem(objective, constraints)
 
-		result = prob.solve(verbose=False);
-		if(prob.status != 'optimal' and prob.status!='optimal_inaccurate'):
-			raise Exception(f"Value is not optimal, prob_status={prob.status}")
+			result = prob.solve(verbose=False, solver=self.solver);
+			if(prob.status != 'optimal' and prob.status!='optimal_inaccurate'):
+				raise Exception(f"Value is not optimal, prob_status={prob.status}")
 
-		assert epsilon.value>1e-8 #If not, there are no strictly feasible points in the subspace
-								  #TODO: change hand-coded tolerance
+			assert epsilon.value>1e-8 #If not, there are no strictly feasible points in the subspace
+									  #TODO: change hand-coded tolerance
 
-		self.z0 = z0.value
+			self.z0 = z0.value
+			self.y0 = self.NA_E@self.z0 + self.y1	
 
-		self.y0 = self.NA_E@self.z0 + self.y1	
+		else:
+			self.y0 = y0
+			self.z0 = self.NA_E.T@(self.y0-self.y1)
 
 		assert np.allclose(NA_E.T@NA_E, np.eye(NA_E.shape[1])) #By definition, N'*N=I
 
@@ -386,22 +446,6 @@ class convexConstraints():
 		self.prob_projection = cp.Problem(objective, constraints)
 		###################################################
 
-
-		##################### CHOOSE QP SOLVER FOR PROJECTION
-		###################################################
-		installed_solvers=cp.installed_solvers();
-		if 'GUROBI' in installed_solvers:
-			self.solver='GUROBI' #You need to do `python -m pip install gurobipy`
-		elif 'ECOS' in installed_solvers:
-			self.solver='ECOS'
-		elif 'OSQP' in installed_solvers:
-			self.solver='OSQP'
-		elif 'CVXOPT' in installed_solvers:	
-			self.solver='CVXOPT'
-		else:
-			#TODO: There are more solvers, see https://www.cvxpy.org/tutorial/advanced/index.html#choosing-a-solver
-			raise Exception(f"Which solver do you have installed?")
-		###################################################
 
 	def getDataAsDict(self):
 

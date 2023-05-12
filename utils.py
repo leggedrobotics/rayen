@@ -44,6 +44,85 @@ def getAllMscdFromQcs(socs):
 
 		return all_M, all_s, all_c, all_d
 
+
+class CudaTimer():
+	def __init__(self):
+			pass
+	def start(self):
+			#See https://discuss.pytorch.org/t/how-to-measure-time-in-pytorch/26964
+			self.start_event = torch.cuda.Event(enable_timing=True)
+			self.end_event = torch.cuda.Event(enable_timing=True)
+			self.start_event.record()
+
+	def endAndGetTimeSeconds(self):
+			self.end_event.record()
+			torch.cuda.synchronize()
+			return  (1e-3)*self.start_event.elapsed_time(self.end_event) #Note that elapsed_time returns the time in milliseconds
+
+
+
+
+########################################################
+########################################################
+
+# Inspired by https://github.com/rfeinman/Torch-ARPACK/blob/master/arpack/power_iteration.py
+# See also https://ergodic.ugr.es/cphys/LECCIONES/FORTRAN/power_method.pdf
+# Note that powerIteration find the eigenvalue with largest absolute value (i.e., the dominant eigenvalue)
+# v is the initial guess of the eigenvector associated with the dominant eigenvalue
+# A should have shape [size_batch, n, n]
+# v should have shape [n, 1]
+# Everything in Pytorch
+def powerIteration(A, v, tol=1e-5, max_iter=100000, eps=1e-12, check_freq=2):
+		n_iter = 0
+		v = torch.nn.functional.normalize(v)
+		while n_iter < max_iter:
+				n_iter += 1
+				u = torch.nn.functional.normalize(A@v, dim=1)
+
+				if n_iter>1 and ((n_iter % check_freq) == 0):
+						distance=torch.mean(torch.abs(1 - torch.abs(  torch.transpose(v,1,2)@u ))) #Note: one disadvantage of this is that it will keep iterating until ALL the elements of the batch have converged
+						if distance<tol:
+								v = u
+								break
+				v = u
+		else:
+				print(f"distance={distance}")
+				print('Power iteration did not converge')
+
+		lamb =  torch.transpose(v,1,2)@A@v #torch.dot(v, torch.mv(A, v))
+
+		return lamb
+
+#See https://math.stackexchange.com/a/835568 (note that there are some signs wrong in that answer, but otherwise is good)
+# v is the initial guess for the power iteration
+# A should have shape [size_batch, n, n]
+# v should have shape [n, 1]
+# Everything in Pytorch
+def findLargestEigenvalueUsingPowerIteration(A, v):
+		lamb = powerIteration(A, v)
+		condition=(lamb.flatten()<0)
+		if (torch.all(condition == False)):
+				return lamb
+		lamb[condition,:,:]+=powerIteration(A[condition,:,:]-lamb[condition,:,:]*torch.eye(A.shape[1]), v)
+		return lamb
+
+
+#Options to find Largest Eigenvalue:
+
+# Power iteration: 
+# --> https://github.com/pytorch/pytorch/blob/main/torch/nn/utils/spectral_norm.py#L80
+# --> https://github.com/rfeinman/Torch-ARPACK/blob/master/arpack/power_iteration.py
+
+# Torch ARPACK (https://github.com/rfeinman/Torch-ARPACK)  --> Valid for symmetric matrices
+# --> Does not have the backward() method implemented yet
+
+# LOBPCG (https://pytorch.org/docs/stable/generated/torch.lobpcg.html)
+# --> Does not have backward() implemented with B!=I // See https://github.com/pytorch/pytorch/blob/main/torch/_lobpcg.py#L384
+# --> It seems to have some bugs: https://github.com/pytorch/pytorch/issues/101075
+
+########################################################
+########################################################
+
 #Ellisoid is represented by {x | x'*E*x <=1}
 def plotEllipsoid(E, x0, ax):
 	#Partly taken from https://github.com/CircusMonkey/covariance-ellipsoid/blob/master/ellipsoid.py
@@ -88,7 +167,7 @@ def plotEllipsoid(E, x0, ax):
 	X,Y,Z = X.flatten(), Y.flatten(), Z.flatten()
 	X,Y,Z = np.matmul(eigvecs, np.array([X,Y,Z]))
 	X,Y,Z = X.reshape(old_shape), Y.reshape(old_shape), Z.reshape(old_shape)
-   
+	 
 	# Add in offsets for the center
 	X = X + x0[0]
 	Y = Y + x0[1]
@@ -158,47 +237,47 @@ def isMatrixSingular(A):
 #Taken from https://gist.github.com/sgsfak/77a1c08ac8a9b0af77393b24e44c9547
 #Compute the Reduced Row Echelon Form (RREF) in Python
 def rref(B, tol=1e-8):
-  A = B.copy()
-  rows, cols = A.shape
-  r = 0
-  pivots_pos = []
-  row_exchanges = np.arange(rows)
-  for c in range(cols):
+	A = B.copy()
+	rows, cols = A.shape
+	r = 0
+	pivots_pos = []
+	row_exchanges = np.arange(rows)
+	for c in range(cols):
 
-    ## Find the pivot row:
-    pivot = np.argmax (np.abs (A[r:rows,c])) + r
-    m = np.abs(A[pivot, c])
-    if m <= tol:
-      ## Skip column c, making sure the approximately zero terms are
-      ## actually zero.
-      A[r:rows, c] = np.zeros(rows-r)
-    else:
-      ## keep track of bound variables
-      pivots_pos.append((r,c))
+		## Find the pivot row:
+		pivot = np.argmax (np.abs (A[r:rows,c])) + r
+		m = np.abs(A[pivot, c])
+		if m <= tol:
+			## Skip column c, making sure the approximately zero terms are
+			## actually zero.
+			A[r:rows, c] = np.zeros(rows-r)
+		else:
+			## keep track of bound variables
+			pivots_pos.append((r,c))
 
-      if pivot != r:
-        ## Swap current row and pivot row
-        A[[pivot, r], c:cols] = A[[r, pivot], c:cols]
-        row_exchanges[[pivot,r]] = row_exchanges[[r,pivot]]
+			if pivot != r:
+				## Swap current row and pivot row
+				A[[pivot, r], c:cols] = A[[r, pivot], c:cols]
+				row_exchanges[[pivot,r]] = row_exchanges[[r,pivot]]
 
-      ## Normalize pivot row
-      A[r, c:cols] = A[r, c:cols] / A[r, c];
+			## Normalize pivot row
+			A[r, c:cols] = A[r, c:cols] / A[r, c];
 
-      ## Eliminate the current column
-      v = A[r, c:cols]
-      ## Above (before row r):
-      if r > 0:
-        ridx_above = np.arange(r)
-        A[ridx_above, c:cols] = A[ridx_above, c:cols] - np.outer(v, A[ridx_above, c]).T
-      ## Below (after row r):
-      if r < rows-1:
-        ridx_below = np.arange(r+1,rows)
-        A[ridx_below, c:cols] = A[ridx_below, c:cols] - np.outer(v, A[ridx_below, c]).T
-      r += 1
-    ## Check if done
-    if r == rows:
-      break;
-  return (A, pivots_pos, row_exchanges)
+			## Eliminate the current column
+			v = A[r, c:cols]
+			## Above (before row r):
+			if r > 0:
+				ridx_above = np.arange(r)
+				A[ridx_above, c:cols] = A[ridx_above, c:cols] - np.outer(v, A[ridx_above, c]).T
+			## Below (after row r):
+			if r < rows-1:
+				ridx_below = np.arange(r+1,rows)
+				A[ridx_below, c:cols] = A[ridx_below, c:cols] - np.outer(v, A[ridx_below, c]).T
+			r += 1
+		## Check if done
+		if r == rows:
+			break;
+	return (A, pivots_pos, row_exchanges)
 
 # Input is the matrices (A,b) that define the system Ax=b
 # Ouput is the matrices (A',b') such that A'x=b' has the same solutions as Ax=b, and (A',b') have the smallest possible number of rows
@@ -330,10 +409,10 @@ def create_mlp(
 
 #https://stackoverflow.com/questions/65154622/sample-uniformly-at-random-from-a-simplex-in-python
 def runif_in_simplex(n):
-  ''' Return uniformly random vector in the n-simplex '''
+	''' Return uniformly random vector in the n-simplex '''
 
-  k = np.random.exponential(scale=1.0, size=n)
-  return k / sum(k)
+	k = np.random.exponential(scale=1.0, size=n)
+	return k / sum(k)
 
 #This function is taken from https://github.com/tfrerix/constrained-nets
 def H_to_V(A, b):
