@@ -23,8 +23,8 @@ methods=['walker_2', 'walker_1', 'Bar', 'UU', 'PP', 'UP', 'DC3']
 # methods=['walker_2', 'walker_1', 'Bar', 'UU', 'DC3']
 
 index_examples_to_run=list(range(15))
-index_examples_to_run=[2]
-methods=['DC3']
+index_examples_to_run=[12]
+methods=['walker_1']
 num_of_examples=len(index_examples_to_run)
 ###############
 rows=math.ceil(math.sqrt(num_of_examples))
