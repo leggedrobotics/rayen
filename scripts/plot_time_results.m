@@ -9,6 +9,7 @@ addpath(genpath('./../submodules/minvo/'))
 addpath(genpath('./../submodules/export_fig/'))
 addpath(genpath('./utils'))
 
+
 lin=readtable('./results/times_lin.csv');
 qp=readtable('./results/times_qp.csv');
 soc=readtable('./results/times_soc.csv');
@@ -27,7 +28,7 @@ tmp/sum(tmp) %This is for latex
 % %Linear CONSTRAINTS
 figure; hold on;  legend;
 num_color=1;
-for i=sort(unique(lin.r_A1)')
+for i=sort(unique(lin.r_A1)','descend')
     indexes=(lin.r_A1==i);
     plot(lin.k(indexes), 1e3*lin.Time(indexes),'-o','DisplayName',['$r=',num2str(i),'$'], 'LineWidth',linewidth, 'MarkerFaceColor',default_colors(num_color,:),'MarkerEdgeColor',default_colors(num_color,:))
     xlabel('$k$'); ylabel('Time (ms)')
@@ -42,7 +43,7 @@ export_fig time_linear.png -m2.5
 % %QP CONSTRAINTS
 figure; hold on;  legend;
 num_color=1;
-for i=sort(unique(qp.eta)')
+for i=sort(unique(qp.eta)','descend')
     indexes=(qp.eta==i);
     plot(qp.k(indexes), 1e3*qp.Time(indexes),'-o','DisplayName',['$\eta=',num2str(i),'$'], 'LineWidth',linewidth, 'MarkerFaceColor',default_colors(num_color,:),'MarkerEdgeColor',default_colors(num_color,:))
     xlabel('$k$'); ylabel('Time (ms)')
@@ -56,13 +57,13 @@ export_fig time_qp.png -m2.5
 %SOC CONSTRAINTS
 % tiledlayout(2,2); 
 figure; hold on;
-for mu=sort(unique(soc.mu)')
+for mu=sort(unique(soc.mu)','descend')
     if(mu==1 || mu==200 || mu==400 )%|| r_M==200
         continue
     end
     nexttile; hold on;  legend;
     num_color=1;
-    for r_M=sort(unique(soc.r_M)')
+    for r_M=sort(unique(soc.r_M)','descend')
         if(r_M==1 )%|| r_M==200
             continue
         end
@@ -81,7 +82,7 @@ export_fig time_soc.png -m2.5
 % %SDP CONSTRAINTS
 num_color=1;
 figure; hold on; legend;
-for i=sort(unique(sdp.r_F)')
+for i=sort(unique(sdp.r_F)','descend')
     indexes=(sdp.r_F==i);
     plot(sdp.k(indexes), 1e3*sdp.Time(indexes),'-o','DisplayName',['$r=',num2str(i),'$'], 'LineWidth',linewidth, 'MarkerFaceColor',default_colors(num_color,:),'MarkerEdgeColor',default_colors(num_color,:))
     xlabel('$k$'); ylabel('Time (ms)')
