@@ -12,22 +12,26 @@ doSetup();
 dimension=3;
 
 %%%So that random is repeatable
-rng('default');
-rng(1);
+
 %%%%%%%%%%%%
 
 t0=0.0;
-tf=15.0;
 
 if(dimension==2)
-    P=3*[-0.1 1.0 2.5 3.5 5.5 6.8 7.5;
-         3 1.0 1 0 4 4 0];
+    rng('default');
+    rng(3);
+    P=3*[0.5 1.0 2.5 3.5 5.5 6.8 7.5 10.5 12.5 14.5;
+         2.0 1.0 1 0 4 4 0 0 4 4];
     radius=4.0;
     num_of_seg_per_region=1; 
     samples_per_step=5;
-    N=10;
-    use_quadratic=false;
+    use_quadratic=false;    
+    N_inside=13;
+    N_outside=10;
+    tf=25.0;
 else
+    rng('default');
+    rng(1);
     P=3*[0 1 2 3 4 3 0;
        0 1 1 2 4 4 4;
        0 1 1 1 4 1 0];
@@ -36,6 +40,9 @@ else
     samples_per_step=3;
     N=10;
     use_quadratic=true;
+    N_inside=13;
+    N_outside=10;
+    tf=15.0;
 end
 
 allA={};
@@ -225,23 +232,27 @@ if (strcmp(my_solver,'ipopt'))
     opts.ipopt.print_frequency_iter=1e10;%1e10 %Big if you don't want to print all the iteratons
     opts.ipopt.linear_solver=linear_solver_name;
 else
-%     opts.gurobi.verbose=true; 
+%      opts.gurobi.verbose=true; 
 end
 % opts.error_on_fail=false;
 opti.solver(my_solver,opts); %{"ipopt.hessian_approximation":"limited-memory"} 
 
 
 
-a=0.1;
-b=0.4;
-all_wv=[a + (b-a).*rand(N,1)]'; 
-all_wa=[a + (b-a).*rand(N,1)]'; 
-all_wj=[a + (b-a).*rand(N,1)]'; 
+a=0.5; b=0.9;
+all_wv=[a + (b-a).*rand(N_inside,1)]'; 
+all_wa=[a + (b-a).*rand(N_inside,1)]'; 
+all_wj=[a + (b-a).*rand(N_inside,1)]'; 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Generate samples inside the distribution
 
 [all_x, all_y, all_Pobj, all_qobj, all_robj, all_costs, all_times_s]=solveProblemForDifferentGamma(all_wv, all_wa, all_wj, weights, my_solver, opti, sp, cost);
-factor=5;
-[all_x_out_dist, all_y_out_dist, all_Pobj_out_dist, all_qobj_out_dist, all_robj_out_dist, all_costs_out_dist, all_times_s_out_dist]=solveProblemForDifferentGamma(factor*all_wv, factor*all_wa, factor*all_wj, weights, my_solver, opti, sp, cost);
+
+a=1.0; b=4.5;
+all_wv=[a + (b-a).*rand(N_outside,1)]'; 
+all_wa=[a + (b-a).*rand(N_outside,1)]'; 
+all_wj=[a + (b-a).*rand(N_outside,1)]';
+%%
+[all_x_out_dist, all_y_out_dist, all_Pobj_out_dist, all_qobj_out_dist, all_robj_out_dist, all_costs_out_dist, all_times_s_out_dist]=solveProblemForDifferentGamma(all_wv, all_wa, all_wj, weights, my_solver, opti, sp, cost);
 
 %%%%%%Plotting
 num_sol=numel(all_y);

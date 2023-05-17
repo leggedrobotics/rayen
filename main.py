@@ -79,8 +79,7 @@ def onePassOverDataset(model, params, sdag, my_type, cs):
 
 	cost_computer=CostComputer(cs)
 
-	device_id = params['device']
-	device = torch.device('cuda:{}'.format(device_id) if device_id >= 0 else 'cpu')
+	device = torch.device(params['device'])
 	model = model.to(device)
 	cost_computer = cost_computer.to(device)
 
@@ -177,7 +176,7 @@ def onePassOverDataset(model, params, sdag, my_type, cs):
 
 
 def train_model(model, params, sdag, tensorboard_writer, cs):
-	model = model.to(torch.device('cuda:{}'.format(params['device']) if params['device'] >= 0 else 'cpu'))
+	model = model.to(torch.device(params['device']))
 	optimizer = torch.optim.Adam(model.parameters(),lr=params['learning_rate'])
 
 	metrics_all_epochs = {'train_loss': [], 'val_loss': []}
@@ -265,7 +264,7 @@ def main(params):
 
 	###################
 
-	sdag=SplittedDatasetAndGenerator(my_dataset, percent_train=0.8, percent_val=0.1, batch_size=params['batch_size'])
+	sdag=SplittedDatasetAndGenerator(my_dataset, percent_train=0.4096, percent_val=0.136, batch_size=params['batch_size'])
 	sdag_out_dist=SplittedDatasetAndGenerator(my_dataset_out_dist, percent_train=0.0, percent_val=0.0, batch_size=params['batch_size'])
 
 	if(params['method']=='DC3'):
@@ -328,6 +327,12 @@ def main(params):
 	if(params['test']==True):
 		# model.load_state_dict(torch.load(path_policy)) #We don't use this one because of the reason above
 		model = torch.load(path_policy) #See # https://pytorch.org/tutorials/beginner/saving_loading_models.html#save-load-entire-model
+		
+		utils.printInBoldGreen("Warming up GPU for a better estimate of the computation time...")
+		x_dummy=torch.Tensor(3000, my_dataset.getNumelX(), 1).uniform_(-5.0, 5.0) #Just run some dummy operations on the GPU to warm it up
+		x_dummy=x_dummy.to(torch.device(params['device']))
+		_ = model(x_dummy)
+
 		utils.printInBoldGreen("Testing model inside dist...")
 		testing_metrics_in_dist = onePassOverDataset(model, params, sdag, 'test', cs)
 		utils.printInBoldGreen("Testing model outside dist...")
@@ -377,12 +382,12 @@ if __name__ == '__main__':
 	utils.printInBoldGreen("\n\n\n==========================================")
 
 	parser = argparse.ArgumentParser()
-	parser.add_argument('--method', type=str, default='DC3') #walker_2, walker_1, Bar, UU, PP, UP, DC3
-	parser.add_argument('--dimension_dataset', type=int, default=3)
+	parser.add_argument('--method', type=str, default='Bar') #walker_2, walker_1, Bar, UU, PP, UP, DC3
+	parser.add_argument('--dimension_dataset', type=int, default=2)
 	parser.add_argument('--use_supervised', type=str2bool, default=False)
 	parser.add_argument('--weight_soft_cost', type=float, default=0.0)
-	parser.add_argument('--device', type=int, default=0)
-	parser.add_argument('--num_epochs', type=int, default=1000)
+	parser.add_argument('--device', type=str, default='cuda:0')
+	parser.add_argument('--num_epochs', type=int, default=3000)
 	parser.add_argument('--batch_size', type=int, default=256)
 	parser.add_argument('--verbosity', type=int, default=1)
 	parser.add_argument('--learning_rate', type=float, default=1e-4)
