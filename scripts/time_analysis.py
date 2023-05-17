@@ -6,11 +6,13 @@ import pandas as pd
 import sys
 import os
 
+
 sys.path.insert(1, os.path.join(sys.path[0], '..'))  #See first comment of this answer: https://stackoverflow.com/a/11158224
 
 import utils
 from constraint_layer import ConstraintLayer
 import constraints
+from examples_sets import getExample
 
 path="./results/"
 if not os.path.exists(path):
@@ -27,6 +29,7 @@ def getTime_sMethod(cs, num_samples):
 
 	numel_output_mapper=my_layer.getDimAfterMap()
 	x_batched=torch.Tensor(num_samples, numel_output_mapper, 1).uniform_(-1.0, 1.0)
+	x_batched.to(torch.device('cuda:0'))
 	print("Calling method...")
 	
 	cuda_timer=utils.CudaTimer()
@@ -40,6 +43,12 @@ def getTime_sMethod(cs, num_samples):
 
 # all_k = [1, 10, 100, 1000, 10000]
 
+############################################ WARM UP THE GPU (for more accurate computation time)
+my_layer=ConstraintLayer(getExample(12), method="walker_1", create_map=False)
+x_dummy=torch.Tensor(300, my_layer.getDimAfterMap(), 1).uniform_(-5.0, 5.0)
+_ = my_layer(x_dummy)
+
+#######################################################
 
 num_samples=2000
 
