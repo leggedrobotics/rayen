@@ -111,8 +111,8 @@ class ConstraintLayer(torch.nn.Module):
 				self.register_buffer("all_phi", all_phi)
 
 		if(self.method=='Bar'):
-			print(f"A_p={cs.A_p}")
-			print(f"b_p={cs.b_p}")
+			# print(f"A_p={cs.A_p}")
+			# print(f"b_p={cs.b_p}")
 			print("Computing vertices and rays...")
 			V, R = utils.H_to_V(cs.A_p, cs.b_p);
 			self.register_buffer("V", torch.Tensor(V))
