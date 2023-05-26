@@ -264,7 +264,7 @@ def main(params):
 
 	###################
 
-	sdag=SplittedDatasetAndGenerator(my_dataset, percent_train=0.4096, percent_val=0.136, batch_size=params['batch_size'])
+	sdag=SplittedDatasetAndGenerator(my_dataset, percent_train=0.5045, percent_val=0.2, batch_size=params['batch_size'])
 	sdag_out_dist=SplittedDatasetAndGenerator(my_dataset_out_dist, percent_train=0.0, percent_val=0.0, batch_size=params['batch_size'])
 
 	if(params['method']=='DC3'):
@@ -329,7 +329,7 @@ def main(params):
 		model = torch.load(path_policy) #See # https://pytorch.org/tutorials/beginner/saving_loading_models.html#save-load-entire-model
 		
 		utils.printInBoldGreen("Warming up GPU for a better estimate of the computation time...")
-		x_dummy=torch.Tensor(3000, my_dataset.getNumelX(), 1).uniform_(-5.0, 5.0) #Just run some dummy operations on the GPU to warm it up
+		x_dummy=torch.Tensor(500, my_dataset.getNumelX(), 1).uniform_(-5.0, 5.0) #Just run some dummy operations on the GPU to warm it up
 		x_dummy=x_dummy.to(torch.device(params['device']))
 		_ = model(x_dummy)
 
@@ -387,7 +387,7 @@ if __name__ == '__main__':
 	parser.add_argument('--use_supervised', type=str2bool, default=False)
 	parser.add_argument('--weight_soft_cost', type=float, default=0.0)
 	parser.add_argument('--device', type=str, default='cuda:0')
-	parser.add_argument('--num_epochs', type=int, default=3000)
+	parser.add_argument('--num_epochs', type=int, default=2000)
 	parser.add_argument('--batch_size', type=int, default=256)
 	parser.add_argument('--verbosity', type=int, default=1)
 	parser.add_argument('--learning_rate', type=float, default=1e-4)
@@ -395,10 +395,10 @@ if __name__ == '__main__':
 	parser.add_argument('--test', type=str2bool, default=True)
 	#Parameters specific to DC3
 	parser.add_argument('--DC3_lr', type=float, default=1e-5)            #Sometimes the DC3 inner gradient correction does not converge if this lr is high 
-	parser.add_argument('--DC3_eps_converge', type=float, default=1e-6)
+	parser.add_argument('--DC3_eps_converge', type=float, default=4e-7)
 	parser.add_argument('--DC3_momentum', type=float, default=0.5)
 	parser.add_argument('--DC3_max_steps_training', type=int, default=10)
-	parser.add_argument('--DC3_max_steps_testing', type=int, default=200) #float("inf")
+	parser.add_argument('--DC3_max_steps_testing', type=int, default=500) #float("inf")
 
 
 	args = parser.parse_args()
