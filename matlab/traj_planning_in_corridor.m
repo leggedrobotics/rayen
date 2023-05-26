@@ -9,7 +9,7 @@
 close all; clc;clear;
 doSetup();
 
-dimension=3;
+dimension=2;
 
 %%%So that random is repeatable
 
@@ -17,8 +17,10 @@ dimension=3;
 
 t0=0.0;
 
+N_inside=12;
+N_outside=8;
+
 if(dimension==2)
-    rng('default');
     rng(3);
     P=3*[0.5 1.0 2.5 3.5 5.5 6.8 7.5 10.5 12.5 14.5;
          2.0 1.0 1 0 4 4 0 0 4 4];
@@ -26,11 +28,8 @@ if(dimension==2)
     num_of_seg_per_region=1; 
     samples_per_step=5;
     use_quadratic=false;    
-    N_inside=13;
-    N_outside=10;
     tf=25.0;
 else
-    rng('default');
     rng(1);
     P=3*[0 1 2 3 4 3 0;
        0 1 1 2 4 4 4;
@@ -38,10 +37,7 @@ else
     radius=4*1.3;
     num_of_seg_per_region=2; 
     samples_per_step=3;
-    N=10;
     use_quadratic=true;
-    N_inside=13;
-    N_outside=10;
     tf=15.0;
 end
 
@@ -238,6 +234,8 @@ end
 opti.solver(my_solver,opts); %{"ipopt.hessian_approximation":"limited-memory"} 
 
 
+
+rng('shuffle')
 
 a=0.5; b=0.9;
 all_wv=[a + (b-a).*rand(N_inside,1)]'; 
