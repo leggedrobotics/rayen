@@ -29,6 +29,9 @@ tmp/sum(tmp) %This is for latex
 figure; hold on;  legend;
 num_color=1;
 for i=sort(unique(lin.r_A1)','descend')
+    if(i==1 || i==3000)%|| r_M==200
+        continue
+    end
     indexes=(lin.r_A1==i);
     plot(lin.k(indexes), 1e3*lin.Time(indexes),'-o','DisplayName',['$r=',num2str(i),'$'], 'LineWidth',linewidth, 'MarkerFaceColor',default_colors(num_color,:),'MarkerEdgeColor',default_colors(num_color,:))
     xlabel('$k$'); ylabel('Time (ms)')
@@ -57,7 +60,7 @@ export_fig time_qp.png -m2.5
 %SOC CONSTRAINTS
 % tiledlayout(2,2); 
 figure; hold on;
-for mu=sort(unique(soc.mu)','descend')
+for mu=sort(unique(soc.mu)','ascend')
     if(mu==1 || mu==200 || mu==400 )%|| r_M==200
         continue
     end
