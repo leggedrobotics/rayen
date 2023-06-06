@@ -1,3 +1,6 @@
+**/*.asv
+**/*.lyx~
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -127,6 +130,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+.asv
 
 # Spyder project settings
 .spyderproject
