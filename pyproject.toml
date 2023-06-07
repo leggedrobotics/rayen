@@ -17,13 +17,13 @@ classifiers = [
     "License :: OSI Approved :: BSD License",
     "Operating System :: OS Independent",
 ]
-license = "BSD-3-Clause"
 dependencies = [
   "cryptography",
   "click>=7, <9, != 8.0.0",
   "python-dateutil==2.8.*",
   "numpy~=1.21.4",
 ]
+license = {file = "LICENSE"}
 
 [project.urls]
 "Homepage" = "https://github.com/leggedrobotics/rayen"
