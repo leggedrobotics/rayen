@@ -67,7 +67,7 @@ Method | Linear | Quadratic | SOC | LMI
 **Bar** | :heavy_check_mark: |  :x: | :x: | :x:
 **RAYEN** | :heavy_check_mark: |  :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:
 
-where :heavy_check_mark: denotes supported by the algorithm, :x: denotes not supported by the algorithm, and :heavy_check_mark: denotes supported by the algorithm but not implemented yet.
+where :heavy_check_mark: denotes supported by the algorithm, :x: denotes not supported by the algorithm, and :white_check_mark: denotes supported by the algorithm but not implemented yet.
 
 # More examples
 
