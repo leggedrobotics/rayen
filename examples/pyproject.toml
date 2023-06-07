@@ -18,6 +18,12 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 license = "BSD-3-Clause"
+dependencies = [
+  "cryptography",
+  "click>=7, <9, != 8.0.0",
+  "python-dateutil==2.8.*",
+  "numpy~=1.21.4",
+]
 
 [project.urls]
 "Homepage" = "https://github.com/leggedrobotics/rayen"
