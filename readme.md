@@ -27,3 +27,17 @@ For Gurobi to work in python [used in utils.py], you also need to do this (insid
 ```
 python -m pip install gurobipy
 ```
+
+
+To install this package:
+```bash
+git clone https://github.com/leggedrobotics/rayen.git
+cd rayen
+pip install -e .
+```
+
+If you wanna run the examples, you need to 
+
+```bash
+pip install examples/requirement_examples.txt
+```
