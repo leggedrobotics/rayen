@@ -27,9 +27,9 @@ qcs = [constraints.convexQuadraticConstraint(P, q, r)]
 cs = constraints.convexConstraints(lc=lc, qcs=qcs, socs=[], sdpc=None)
 
 model = torch.nn.Sequential(torch.nn.Flatten(), torch.nn.Linear(3, 64), 
-					        torch.nn.ReLU(),    torch.nn.Linear(64, 64),
-					        torch.nn.ReLU(),    torch.nn.Linear(64, 64),
-					   		constraint_module.ConstraintModule(cs, input_dim=64, create_map=True)) 
+		            torch.nn.ReLU(),    torch.nn.Linear(64, 64),
+		            torch.nn.ReLU(),    torch.nn.Linear(64, 64),
+			    constraint_module.ConstraintModule(cs, input_dim=64, create_map=True)) 
 
 x_batched = torch.Tensor(500, 3, 1).uniform_(-1.0, 1.0)
 y_batched = model(x_batched)
