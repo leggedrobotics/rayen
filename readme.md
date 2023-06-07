@@ -60,12 +60,14 @@ You can choose the method used. These are the methods (please see the paper for 
 
 Method | Linear | Quadratic | SOC | LMI
 :------------ | :-------------: | :-------------: | :-------------: | :-------------: 
-**UU** | :heavy_check_mark: |  :white_check_mark: | :heavy_check_mark: | :heavy_check_mark:
-**UP** | :heavy_check_mark: |  :white_check_mark: | :heavy_check_mark: | :heavy_check_mark:
-**PP** | :heavy_check_mark: |  :white_check_mark: | :heavy_check_mark: | :heavy_check_mark:
+**UU** | :heavy_check_mark: |  :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:
+**UP** | :heavy_check_mark: |  :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:
+**PP** | :heavy_check_mark: |  :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:
 **DC3** | :heavy_check_mark: |  :heavy_check_mark: | :white_check_mark: | :white_check_mark:
 **Bar** | :heavy_check_mark: |  :x: | :x: | :x:
 **RAYEN** | :heavy_check_mark: |  :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:
+
+where :heavy_check_mark: denotes supported by the algorithm, :x: denotes not supported by the algorithm, and :heavy_check_mark: denotes supported by the algorithm but not implemented yet.
 
 # More examples
 
