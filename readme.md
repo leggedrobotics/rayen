@@ -63,11 +63,11 @@ Method | Linear | Quadratic | SOC | LMI
 **UU** | :heavy_check_mark: |  :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:
 **UP** | :heavy_check_mark: |  :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:
 **PP** | :heavy_check_mark: |  :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:
-**DC3** | :heavy_check_mark: |  :heavy_check_mark: | :white_check_mark: | :white_check_mark:
+**DC3** | :heavy_check_mark: |  :heavy_check_mark: | :large_orange_diamond: | :large_orange_diamond:
 **Bar** | :heavy_check_mark: |  :x: | :x: | :x:
 **RAYEN** | :heavy_check_mark: |  :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:
 
-where :heavy_check_mark: denotes supported by the algorithm, :x: denotes not supported by the algorithm, and :white_check_mark: denotes supported by the algorithm but not implemented yet.
+where :heavy_check_mark: denotes supported by the algorithm, :x: denotes not supported by the algorithm, and :large_orange_diamond: denotes supported by the algorithm but not implemented yet.
 
 # More examples
 
