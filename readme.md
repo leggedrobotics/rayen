@@ -71,9 +71,7 @@ where :heavy_check_mark: denotes supported by the algorithm, :x: denotes not sup
 
 $$\boldsymbol{A}_{1}\boldsymbol{y}\le\boldsymbol{b}_{1}$$
 
-$$\boldsymbol{A}$$
-
-$$\mathbf{A}$$
+$$\boldsymbol{A}_{1}$$
 
 $$ x = {-b \pm \sqrt{b^2-4ac} \over 2a} $$
 
