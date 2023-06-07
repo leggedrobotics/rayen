@@ -55,6 +55,13 @@ y_batched = model(x_batched)
 # loss.backward() # Backpropagate
 ```
 
+You can choose the method used. These are the methods (please see the paper for details):
+
+
+Function | Linear | Quadratic | SOC | LMI
+:------------ | :-------------| :-------------| :-------------| :-------------
+UU | :heavy_check_mark: |  :white_check_mark: | :heavy_check_mark: | :heavy_check_mark:
+
 # More examples
 
 There are more complex examples in the `examples` folder. If you want to run these examples: 
