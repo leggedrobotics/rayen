@@ -3,10 +3,15 @@
 ![](./rayen.png)
 
 # Installation
+
+```bash
+pip install rayen
+```
+
+If you want to do an editable install, you can do:
 ```bash
 git clone https://github.com/leggedrobotics/rayen.git
-cd rayen
-pip install -e .
+cd rayen && pip install -e .
 ```
 
 # Usage
