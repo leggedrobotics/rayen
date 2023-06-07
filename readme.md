@@ -69,7 +69,7 @@ Method | Linear | Quadratic | SOC | LMI
 
 where :heavy_check_mark: denotes supported by the algorithm, :x: denotes not supported by the algorithm, and :large_orange_diamond: denotes supported by the algorithm but not implemented yet.
 
-$\boldsymbol{A}_{1}\boldsymbol{y}\le\boldsymbol{b}_{1}$
+$$\boldsymbol{A}_{1}\boldsymbol{y}\le\boldsymbol{b}_{1}$$
 
 # More examples
 
