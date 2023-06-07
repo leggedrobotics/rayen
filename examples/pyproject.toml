@@ -1,0 +1,23 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+
+[project]
+name = "rayen"
+version = "0.0.1"
+authors = [
+  { name="Jesus Tordesillas", email="jtordesillas@ethz.ch" },
+]
+description = "Imposition of Hard Convex Constraints on Neural Networks"
+readme = "README.md"
+requires-python = ">=3.7"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/leggedrobotics/rayen"
+"Bug Tracker" = "https://github.com/leggedrobotics/rayen/issues"
