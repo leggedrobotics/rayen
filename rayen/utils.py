@@ -1,7 +1,6 @@
 import cdd
 import numpy as np
 import torch
-import matplotlib.pyplot as plt
 from colorama import Fore, Back, Style
 import torch.nn as nn
 
