@@ -11,96 +11,15 @@ doSetup();
 
 dimension=2;
 
+
+ [allA, allb, allV, p0, pf, t0,tf,deg_pos, num_seg, num_of_seg_per_region, use_quadratic]=getCorridorAndParamsSpline(dimension)
+
 %%%So that random is repeatable
 
 %%%%%%%%%%%%
 
-t0=0.0;
-
 N_inside=12;
 N_outside=8;
-
-if(dimension==2)
-    rng(3);
-    P=3*[0.5 1.0 2.5 3.5 5.5 6.8 7.5 10.5 12.5 14.5;
-         2.0 1.0 1 0 4 4 0 0 4 4];
-    radius=4.0;
-    num_of_seg_per_region=1; 
-    samples_per_step=5;
-    use_quadratic=false;    
-    tf=25.0;
-else
-    rng(1);
-    P=3*[0 1 2 3 4 3 0;
-       0 1 1 2 4 4 4;
-       0 1 1 1 4 1 0];
-    radius=4*1.3;
-    num_of_seg_per_region=2; 
-    samples_per_step=3;
-    use_quadratic=true;
-    tf=15.0;
-end
-
-allA={};
-allb={};
-allV={};
-
-steps=2;
-
-for i=1:(size(P,2)-1)
-    if(dimension==3)
-        [A, b, V]=getABVerticesgivenP1P2(P(:,i),P(:,i+1), 1.0, 1.0, 2);
-    else
-        [A, b, V]=getAbVerticesPolyhedronAroundP1P2(P(:,i),P(:,i+1), steps, samples_per_step, radius);
-    end
-%     
-    allA{end+1}=A;
-    allb{end+1}=b;
-    allV{end+1}=V;
-end
-
-p0=mean(allV{1},2); %  0.8*P(:,1) + 0.2*P(:,2);
-pf=mean(allV{end},2); %0.2*P(:,end-1) + 0.8*P(:,end);
-
-figure;
-hold on;
-alpha=0.2;
-
-for i=1:size(allA,2)
-    plotregion(-allA{i},- allb{i}, [], [],'r',alpha)
-end
-
-% plotPolyhedron(P,'r')
-camlight
-lighting phong
-
-if(dimension==2)
-    delta=4.0;
-    xlim([min(P(1,:))-delta,max(P(1,:))+delta]);
-    ylim([min(P(2,:))-delta,max(P(2,:))+delta]);
-else
-    delta=4.0;
-    xlim([min(P(1,:))-delta,max(P(1,:))+delta]);
-    ylim([min(P(2,:))-delta,max(P(2,:))+delta]);
-    zlim([min(P(3,:))-delta,max(P(3,:))+delta]);
-    view(-71,40)
-    xlabel('x')
-    ylabel('y')
-    zlabel('z')
-end
-
-if(dimension==2)
-    scatter(p0(1),p0(2),'filled','g')
-    scatter(pf(1),pf(2),'filled','r')
-end
-
-if(dimension==3)
-    zlim([min(P(3,:))-delta,max(P(3,:))+delta]);
-    plotSphere(p0,0.2,'g')
-    plotSphere(pf,0.2,'r')
-end
-
-
 
 
 %%
@@ -120,9 +39,7 @@ opti = casadi.Opti('conic');%'conic' I think you need to use 'conic' for gurobi
 else
  opti = casadi.Opti();
 end
-deg_pos=3; %Note that I'm including the jerk cost. If I use deg_pos=2, then the jerk cost will always be zero
 dim_pos=dimension;
-num_seg =num_of_seg_per_region*num_of_regions;
 sp=MyClampedUniformSpline(t0,tf,deg_pos, dim_pos, num_seg, opti);
 
 guess=[p0(1)*ones(1,3) linspace(p0(1), pf(1), sp.num_cpoints-6) pf(1)*ones(1,3) 
