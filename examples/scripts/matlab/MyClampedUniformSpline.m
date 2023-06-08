@@ -557,7 +557,7 @@ classdef MyClampedUniformSpline < handle
                 interv=obj.timeSpanOfInterval(j);           
                 u=(t-min(interv))/(max(interv)-min(interv));
                 pos=obj.evalDerivativeU(0,u,j);
-                fplot(pos(1),pos(2),interv, 'LineWidth', linewidth);
+                fplot(pos(1),pos(2),interv, 'LineWidth', linewidth, 'MeshDensity', 2);
             end           
             axis equal;% view([45,45])
         end

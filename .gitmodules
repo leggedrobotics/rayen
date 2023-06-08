@@ -1,6 +1,6 @@
 [submodule "minvo"]
-	path = examples/submodules/minvo
+	path = examples/scripts/matlab/submodules/minvo
 	url = https://github.com/mit-acl/minvo
 [submodule "export_fig"]
-	path = examples/submodules/export_fig
+	path = examples/scripts/matlab/submodules/export_fig
 	url = https://github.com/altmany/export_fig

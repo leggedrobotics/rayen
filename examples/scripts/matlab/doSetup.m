@@ -5,8 +5,8 @@ function doSetup()
     set(0,'defaultfigurecolor',[1 1 1])
     
     import casadi.*
-    addpath(genpath('./../submodules/minvo/'))
-    addpath(genpath('./../submodules/export_fig/'))
+    addpath(genpath('./submodules/minvo/'))
+    addpath(genpath('./submodules/export_fig/'))
     addpath(genpath('./utils'))
 
 end
