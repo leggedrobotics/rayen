@@ -9,19 +9,15 @@
 close all; clc;clear;
 doSetup();
 
-dimension=2;
+dimension=3;
 
 
- [allA, allb, allV, p0, pf, t0,tf,deg_pos, num_seg, num_of_seg_per_region, use_quadratic]=getCorridorAndParamsSpline(dimension)
+[allA, allb, allV, p0, t0,tf,deg_pos, num_seg, num_of_seg_per_region, use_quadratic]=getCorridorAndParamsSpline(dimension)
 
-%%%So that random is repeatable
-
-%%%%%%%%%%%%
-
-N_inside=12;
-N_outside=8;
-
-
+% 
+% 
+% 
+% scatter(points(1,:),points(2,:))
 %%
 
 
@@ -42,35 +38,41 @@ end
 dim_pos=dimension;
 sp=MyClampedUniformSpline(t0,tf,deg_pos, dim_pos, num_seg, opti);
 
-guess=[p0(1)*ones(1,3) linspace(p0(1), pf(1), sp.num_cpoints-6) pf(1)*ones(1,3) 
-       p0(2)*ones(1,3) linspace(p0(2), pf(2), sp.num_cpoints-6) pf(1)*ones(1,3)]
-
-if(dimension==3)
-    guess=[guess; p0(3)*ones(1,3) linspace(p0(3), pf(3), sp.num_cpoints-6) pf(1)*ones(1,3) ]
-end
-
-opti.set_initial(sp.getCPsAsMatrix,guess);
-
-v0=zeros(dimension,1); a0=zeros(dimension,1);
-vf=zeros(dimension,1); af=zeros(dimension,1);
+% guess=[p0(1)*ones(1,3) linspace(p0(1), pf(1), sp.num_cpoints-6) pf(1)*ones(1,3) 
+%        p0(2)*ones(1,3) linspace(p0(2), pf(2), sp.num_cpoints-6) pf(1)*ones(1,3)]
+% 
+% if(dimension==3)
+%     guess=[guess; p0(3)*ones(1,3) linspace(p0(3), pf(3), sp.num_cpoints-6) pf(1)*ones(1,3) ]
+% end
+% 
+% opti.set_initial(sp.getCPsAsMatrix,guess);
 
 v_max=4*ones(dimension,1);   a_max=6*ones(dimension,1);   j_max=50*ones(dimension,1);
 
+zero = zeros(dimension,1);
+
 linear_eq_const={};
-%Initial conditions
-linear_eq_const=[linear_eq_const   {sp.getPosT(t0)== p0}];
-linear_eq_const=[linear_eq_const   {sp.getVelT(t0)== v0}];
-linear_eq_const=[linear_eq_const   {sp.getAccelT(t0)== a0}];
 
-%Final conditions
-% opti.subject_to( sp.getPosT(tf)== pf);
-linear_eq_const=[linear_eq_const   {sp.getVelT(tf)==vf}];
-linear_eq_const=[linear_eq_const   {sp.getAccelT(tf)==af}];
+%%%Initial and final conditions
+
+%Position
+linear_eq_const=[linear_eq_const   {sp.getPosT(t0) == p0}];
+
+%Velocity 
+linear_eq_const=[linear_eq_const   {sp.getVelT(t0) == zero}];
+linear_eq_const=[linear_eq_const   {sp.getVelT(tf) == zero}];
+
+%Accel
+if(deg_pos>=3)
+    linear_eq_const=[linear_eq_const   {sp.getAccelT(t0) == zero}];
+    linear_eq_const=[linear_eq_const   {sp.getAccelT(tf) == zero}];
+end
 
 
+%%%Dynamic limits and final conditions
 dyn_lim_const={};
-dyn_lim_const=[dyn_lim_const sp.getMaxVelConstraints(basis, v_max, use_quadratic)];      %Max vel constraints (position)
-dyn_lim_const=[dyn_lim_const sp.getMaxAccelConstraints(basis, a_max, use_quadratic)];    %Max accel constraints (position)
+dyn_lim_const=[dyn_lim_const sp.getMaxVelConstraints(basis, v_max, use_quadratic)];          %Max vel constraints (position)
+dyn_lim_const=[dyn_lim_const sp.getMaxAccelConstraints(basis, a_max, use_quadratic)];        %Max accel constraints (position)
 if(deg_pos>=3)
     dyn_lim_const=[dyn_lim_const sp.getMaxJerkConstraints(basis, j_max, use_quadratic)];     %Max jerk constraints (position)
 end
@@ -125,13 +127,14 @@ num_quadratic_const=countNumOfConstraints(quadratic_const);
 
 %%
 
+weights=opti.parameter(3,1);
+pf=opti.parameter(dimension,1);
+
 %%%%%%%%%%%%%%%%%% COST
 vel_cost=sp.getVelCost();
 accel_cost=sp.getAccelCost();
 jerk_cost=sp.getControlCost();
 final_pos_cost=(sp.getPosT(tf)- pf)'*(sp.getPosT(tf)- pf);
-
-weights=opti.parameter(3,1);
 
 cost=simplify(weights(1)*vel_cost + weights(2)*accel_cost +  weights(3)*jerk_cost + final_pos_cost);
 opti.minimize(cost)
@@ -154,20 +157,18 @@ opti.solver(my_solver,opts); %{"ipopt.hessian_approximation":"limited-memory"}
 
 rng('shuffle')
 
-a=0.5; b=0.9;
-all_wv=[a + (b-a).*rand(N_inside,1)]'; 
-all_wa=[a + (b-a).*rand(N_inside,1)]'; 
-all_wj=[a + (b-a).*rand(N_inside,1)]'; 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Generate samples inside the distribution
+N_inside=1728;
+N_outside=512;
 
-[all_x, all_y, all_Pobj, all_qobj, all_robj, all_costs, all_times_s]=solveProblemForDifferentGamma(all_wv, all_wa, all_wj, weights, my_solver, opti, sp, cost);
+% N_inside=5;
+% N_outside=5;
 
-a=1.0; b=4.5;
-all_wv=[a + (b-a).*rand(N_outside,1)]'; 
-all_wa=[a + (b-a).*rand(N_outside,1)]'; 
-all_wj=[a + (b-a).*rand(N_outside,1)]';
-%%
-[all_x_out_dist, all_y_out_dist, all_Pobj_out_dist, all_qobj_out_dist, all_robj_out_dist, all_costs_out_dist, all_times_s_out_dist]=solveProblemForDifferentGamma(all_wv, all_wa, all_wj, weights, my_solver, opti, sp, cost);
+all_gammas=randInInterval(0.0,1.0,[3, N_inside]);
+all_pf=cprnd(N_inside,allA{end},allb{end})';
+
+[all_x, all_y, all_Pobj, all_qobj, all_robj, all_costs, all_times_s]=solveProblemForDifferentGamma(all_gammas, all_pf, weights, pf, my_solver, opti, sp, cost);
+all_gammas=randInInterval(1.0,2.0,[3, N_outside]);
+[all_x_out_dist, all_y_out_dist, all_Pobj_out_dist, all_qobj_out_dist, all_robj_out_dist, all_costs_out_dist, all_times_s_out_dist]=solveProblemForDifferentGamma(all_gammas, all_pf, weights, pf, my_solver, opti, sp, cost);
 
 %%%%%%Plotting
 num_sol=numel(all_y);
@@ -201,16 +202,11 @@ sp.updateCPsWithSolution(sol.value(sp.getCPsAsMatrix()));
 
 %%
 
-
-% fplot3(Pcurve(1,:),Pcurve(2,:),Pcurve(3,:),[0,1]); axis equal;
-
-% ylim([-4,4]);zlim([-4,4]);
-
 figure(1);
 xlabel('x (m)'); ylabel('y (m)');
 if(dimension==2)
     sp.plotPos2D(6)
-    plot(P(1,:),P(2,:),'--','LineWidth',2)
+%     plot(P(1,:),P(2,:),'--','LineWidth',2)
 else
     sp.plotPos3D(6)
     zlabel('z (m)');
@@ -218,21 +214,13 @@ else
     % plot3(P(1,:),P(2,:),P(3,:),'--','LineWidth',2)
 end
 
+axis equal
 
-
- axis equal
-
- 
 
 % sp.plotPosVelAccelJerk(v_max,a_max,j_max)
 %%
-% close all;
-% figure; hold on;
-% p1=[0;0;0];
-% p2=[1;1;1];
 
-
-function [all_x, all_y, all_Pobj, all_qobj, all_robj, all_costs, all_times_s]=solveProblemForDifferentGamma(all_wv, all_wa, all_wj, weights, my_solver, opti, sp, cost)
+function [all_x, all_y, all_Pobj, all_qobj, all_robj, all_costs, all_times_s]=solveProblemForDifferentGamma(all_gammas, all_pf, weights, pf, my_solver, opti, sp, cost)
     all_x={};
     all_y={};
     all_Pobj={};
@@ -240,31 +228,44 @@ function [all_x, all_y, all_Pobj, all_qobj, all_robj, all_costs, all_times_s]=so
     all_robj={};
     all_costs={};
     all_times_s={};
-    i=0
-    total_iterations=numel(all_wv)*numel(all_wa)*numel(all_wj);
-    for wv=all_wv
-        for wa=all_wa
-            for wj=all_wj
-                i=i+1;
-                i/total_iterations
-                weights_value=[wv;wa;wj];
-                opti.set_value(weights,weights_value);
-                display("Going to solve")
-                sol = opti.solve();
-                display("Solved")
-                checkSolverSucceeded(sol, my_solver)
-                control_points=sol.value(sp.getCPsAsVector());
-                all_x{end+1}=weights_value;
-                all_y{end+1}=control_points(:);
-                cost_substituted=casadi.substitute(cost,weights,weights_value);
-                [P,q,r]=getPandqandrOfQuadraticExpressionCasadi(cost_substituted, sp.getCPsAsVector());
-                all_Pobj{end+1}=P;   
-                all_qobj{end+1}=q;
-                all_robj{end+1}=r;
-                all_costs{end+1}=sol.value(cost);
-                all_times_s{end+1}=opti.stats().t_wall_solver; %This is the time the solver takes to solve the problem, see (for Gurobi) https://github.com/casadi/casadi/blob/e5d6977d621e3b7a0cd0b2e24cdd2b73a6c3a8fe/casadi/interfaces/gurobi/gurobi_interface.cpp#L447
-            end
-        end
+    num_gammas=size(all_gammas,2);
+    for i=1:num_gammas
+        i/num_gammas
+        weights_value=all_gammas(:,i)
+        pf_value=all_pf(:,i)
+        opti.set_value(weights,weights_value);
+        opti.set_value(pf,pf_value);
+        display("Going to solve")
+        sol = opti.solve();
+        display("Solved")
+        checkSolverSucceeded(sol, my_solver)
+        control_points=sol.value(sp.getCPsAsVector());
+        all_x{end+1}=[weights_value; pf_value];
+        all_y{end+1}=control_points(:);
+        cost_substituted=cost;
+        cost_substituted=casadi.substitute(cost_substituted,weights,weights_value);
+        cost_substituted=casadi.substitute(cost_substituted,pf,pf_value);
+        [P,q,r]=getPandqandrOfQuadraticExpressionCasadi(cost_substituted, sp.getCPsAsVector());
+        all_Pobj{end+1}=P;   
+        all_qobj{end+1}=q;
+        all_robj{end+1}=r;
+        all_costs{end+1}=sol.value(cost);
+        all_times_s{end+1}=opti.stats().t_wall_solver; %This is the time the solver takes to solve the problem, see (for Gurobi) https://github.com/casadi/casadi/blob/e5d6977d621e3b7a0cd0b2e24cdd2b73a6c3a8fe/casadi/interfaces/gurobi/gurobi_interface.cpp#L447
+
+       %%%% If you want to plot this specific trajectory
+%         opti_tmp=opti.copy;
+%         sp_novale=MyClampedUniformSpline(sp.t0,sp.tf,sp.p, sp.dim, sp.num_seg, opti_tmp);
+%         sp_novale.updateCPsWithSolution(sol.value(sp.getCPsAsMatrix()));
+%         xlabel('x (m)'); ylabel('y (m)');
+%         if(sp.dim==2)
+%             sp_novale.plotPos2D(2)
+%         else
+%             sp_novale.plotPos3D(2)
+%             zlabel('z (m)');
+%             view(48,38);
+%         end
+        %%%%%%%%%%%%%%%%%%%%%%%%
+            
     end
 end
 

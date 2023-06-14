@@ -24,6 +24,9 @@ results3d = df[df['method'].str.startswith('dataset3d')]
 results2d=results2d.set_index('method')
 results3d=results3d.set_index('method')
 
+print(results2d)
+print(results3d)
+
 
 results2d["[In dist] loss"]/=(results2d.loc["dataset2d_Optimization"].at["[In dist] loss"]) #Normalize the cost
 results2d["[Out dist] loss"]/=(results2d.loc["dataset2d_Optimization"].at["[Out dist] loss"]) #Normalize the cost

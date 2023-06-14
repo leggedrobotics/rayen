@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-import utils
 import numpy as np
 import scipy
 import cvxpy as cp
@@ -8,6 +7,10 @@ import math
 from cvxpylayers.torch import CvxpyLayer
 import random
 import copy
+
+import fixpath #Following this example: https://github.com/tartley/colorama/blob/master/demos/demo01.py
+from rayen import utils
+
 
 
 class CostComputer(nn.Module): #Using nn.Module to be able to use register_buffer (and hence to be able to have the to() method)
@@ -31,7 +34,7 @@ class CostComputer(nn.Module): #Using nn.Module to be able to use register_buffe
 		# and https://discuss.pytorch.org/t/keeping-constant-value-in-module-on-correct-device/10129
 		self.register_buffer("A_p", torch.Tensor(cs.A_p))
 		self.register_buffer("b_p", torch.Tensor(cs.b_p))
-		self.register_buffer("y1", torch.Tensor(cs.y1))
+		self.register_buffer("yp", torch.Tensor(cs.yp))
 		self.register_buffer("NA_E", torch.Tensor(cs.NA_E))
 		self.register_buffer("z0", torch.Tensor(cs.z0))
 
@@ -50,12 +53,12 @@ class CostComputer(nn.Module): #Using nn.Module to be able to use register_buffe
 			self.register_buffer("b2", torch.Tensor(cs.lc.b2))
 
 	def getyFromz(self, z):
-		y=self.NA_E@z + self.y1
+		y=self.NA_E@z + self.yp
 		return y
 
 	#This function below assumes that y is in the plane spanned by the columns of NA_E!!
 	# def getzFromy(self, y):
-	# 	z=self.NA_E.T@(y - self.y1)
+	# 	z=self.NA_E.T@(y - self.yp)
 	# 	return z
 
 	def getSumSoftCostAllSamples(self, y):

@@ -26,6 +26,7 @@ class ConstraintModule(torch.nn.Module):
 			assert args_DC3 is not None
 			self.args_DC3=args_DC3
 
+		self.cs=cs
 		self.k=cs.k #Dimension of the ambient space
 		self.n=cs.n #Dimension of the embedded space
 
@@ -62,23 +63,29 @@ class ConstraintModule(torch.nn.Module):
 		self.register_buffer("all_F", torch.Tensor(all_F))
 		self.register_buffer("A_p", torch.Tensor(cs.A_p))
 		self.register_buffer("b_p", torch.Tensor(cs.b_p))
-		self.register_buffer("y1", torch.Tensor(cs.y1))
+		self.register_buffer("yp", torch.Tensor(cs.yp))
 		self.register_buffer("NA_E", torch.Tensor(cs.NA_E))
 		self.register_buffer("z0", torch.Tensor(cs.z0))
 		self.register_buffer("y0", torch.Tensor(cs.y0))
 
 		if(self.method=='PP' or self.method=='UP'):
 			#Section 8.1.1 of https://web.stanford.edu/~boyd/cvxbook/bv_cvxbook.pdf
-			self.z_projected = cp.Variable((cs.n,1))         #projected point
-			self.z_to_be_projected = cp.Parameter((cs.n,1))  #original point
-			constraints= cs.getConstraintsInSubspaceCvxpy(self.z_projected)
-			objective = cp.Minimize(cp.sum_squares(self.z_projected - self.z_to_be_projected))
+			self.z_projected = cp.Variable((self.n,1))         #projected point
+			self.z_to_be_projected = cp.Parameter((self.n,1))  #original point
+			constraints= self.cs.getConstraintsInSubspaceCvxpy(self.z_projected)
+
+			#First option. Sometimes it does not work ("Solver ecos returned status Infeasible" or "Solver SCS returned status Infeasible")
+			# objective = cp.Minimize(cp.sum_squares(self.z_projected - self.z_to_be_projected))
+
+			#Second option. This one is preferred because of this: http://cvxr.com/cvx/doc/advanced.html#eliminating-quadratic-forms
+			objective = cp.Minimize(cp.norm(self.z_projected - self.z_to_be_projected))
+
 			self.prob_projection = cp.Problem(objective, constraints)
 
 			assert self.prob_projection.is_dpp()
 			self.proj_layer = CvxpyLayer(self.prob_projection, parameters=[self.z_to_be_projected], variables=[self.z_projected])
 
-			if(cs.has_sdp_constraints):
+			if(self.cs.has_sdp_constraints):
 				self.solver_projection='SCS' #slower, less accurate, supports SDP constraints
 			else:
 				self.solver_projection='ECOS' #fast, accurate,  does not support SDP constraints
@@ -436,9 +443,9 @@ class ConstraintModule(torch.nn.Module):
 				# --> This issue: https://github.com/pytorch/pytorch/issues/101075
 				# --> Backward is not implemented for B!=I, see: https://github.com/pytorch/pytorch/blob/d54fcd571af48685b0699f6ac1e31b6871d0d768/torch/_lobpcg.py#L329 
 
-				## Sixth option: Use https://github.com/rfeinman/Torch-ARPACK with LTmSL. The problem is that backward() is not implemented yet 
+				## Option 6: Use https://github.com/rfeinman/Torch-ARPACK with LTmSL. The problem is that backward() is not implemented yet 
 
-				## Seventh option: Use https://github.com/buwantaiji/DominantSparseEigenAD. But it does not have support for batched matrices, see https://github.com/buwantaiji/DominantSparseEigenAD/issues/1
+				## Option 7: Use https://github.com/buwantaiji/DominantSparseEigenAD. But it does not have support for batched matrices, see https://github.com/buwantaiji/DominantSparseEigenAD/issues/1
 
 				kappa_positive_i = torch.relu( largest_eigenvalue )
 
@@ -484,7 +491,7 @@ class ConstraintModule(torch.nn.Module):
 
 	def project(self, q):
 		#If you use ECOS, you can set solver_args={'eps': 1e-6} (or smaller) for better solutions, see https://github.com/cvxpy/cvxpy/issues/880#issuecomment-557278620
-		z, = self.proj_layer(q, solver_args={'solve_method':self.solver_projection})
+		z, = self.proj_layer(q, solver_args={'solve_method':self.solver_projection, "max_iters": 10000})
 		return z
 
 	def forwardForPP(self, q):
@@ -507,11 +514,11 @@ class ConstraintModule(torch.nn.Module):
 		return self.getyFromz(self.z0)
 
 	def getyFromz(self, z):
-		y=self.NA_E@z + self.y1
+		y=self.NA_E@z + self.yp
 		return y
 
 	def getzFromy(self, y):
-		z=self.NA_E.T@(y - self.y1)
+		z=self.NA_E.T@(y - self.yp)
 		return z
 
 	def forward(self, x):

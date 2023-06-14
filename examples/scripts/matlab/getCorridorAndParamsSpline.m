@@ -1,15 +1,15 @@
-function [allA, allb, allV, p0, pf, t0,tf,deg_pos, num_seg, num_of_seg_per_region, use_quadratic]=getCorridorAndParamsSpline(dimension)
+function [allA, allb, allV, p0, t0,tf,deg_pos, num_seg, num_of_seg_per_region, use_quadratic]=getCorridorAndParamsSpline(dimension)
 
     if(dimension==2)
-        rng('default'); rng(3); %So that random is repeatable
-        P=3*[0.5 1.0 2.5 3.5 5.5 6.8 7.5 10.5 12.5 14.5;
-             2.0 1.0 1 0 4 4 0 0 4 4];
+        rng('default'); rng(6); %So that random is repeatable
+        P=3*[0 5.5 7.5 10.5 12.5;
+             0   4   0   0    4 ];
         radius=4.0;
-        num_of_seg_per_region=1; 
+        num_of_seg_per_region=2; 
         samples_per_step=5;
         use_quadratic=false;    
-        tf=25.0;
-        deg_pos=3; %Note that I'm including the jerk cost. If I use deg_pos=2, then the jerk cost will always be zero
+        tf=35.0;
+        deg_pos=2; %Note that I'm including the jerk cost. If I use deg_pos=2, then the jerk cost will always be zero
     else
         rng('default'); rng(1); %So that random is repeatable
         P=3*[0 1 2 3 4 3 0;
@@ -25,8 +25,6 @@ function [allA, allb, allV, p0, pf, t0,tf,deg_pos, num_seg, num_of_seg_per_regio
 
     t0=0.0;
     
-    
-
     allA={};
     allb={};
     allV={};
@@ -49,7 +47,7 @@ function [allA, allb, allV, p0, pf, t0,tf,deg_pos, num_seg, num_of_seg_per_regio
     num_seg =num_of_seg_per_region*num_of_regions;
     
     p0=mean(allV{1},2); %  0.8*P(:,1) + 0.2*P(:,2);
-    pf=mean(allV{end},2); %0.2*P(:,end-1) + 0.8*P(:,end);
+%     pf=mean(allV{end},2); %0.2*P(:,end-1) + 0.8*P(:,end);
     
     figure;
     hold on;
@@ -80,13 +78,13 @@ function [allA, allb, allV, p0, pf, t0,tf,deg_pos, num_seg, num_of_seg_per_regio
     
     if(dimension==2)
         scatter(p0(1),p0(2),'filled','g')
-        scatter(pf(1),pf(2),'filled','r')
+%         scatter(pf(1),pf(2),'filled','r')
     end
     
     if(dimension==3)
         zlim([min(P(3,:))-delta,max(P(3,:))+delta]);
         plotSphere(p0,0.2,'g')
-        plotSphere(pf,0.2,'r')
+%         plotSphere(pf,0.2,'r')
     end
 
 end

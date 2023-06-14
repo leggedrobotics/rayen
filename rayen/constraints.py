@@ -359,9 +359,9 @@ class ConvexConstraints():
 			################################################
 			NA_E=scipy.linalg.null_space(A_E);
 			# n=NA_E.shape[1] #dimension of the subspace
-			y1=np.linalg.pinv(A_E)@b_E
+			yp=np.linalg.pinv(A_E)@b_E
 			A_p=A_I@NA_E;
-			b_p=b_I-A_I@y1
+			b_p=b_I-A_I@yp
 					
 
 			# print(f"A_p=\n{A_p}")
@@ -382,7 +382,7 @@ class ConvexConstraints():
 		else:
 			self.n=self.k
 			NA_E=np.eye(self.n);
-			y1=np.zeros((self.n,1));
+			yp=np.zeros((self.n,1));
 			A_p=np.zeros((1,self.n)) # 0z<=1
 			b_p=np.ones((1,1))
 
@@ -400,8 +400,10 @@ class ConvexConstraints():
 
 		self.A_p=A_p	
 		self.b_p=b_p	
-		self.y1=y1	
+		self.yp=yp	
 		self.NA_E=NA_E	
+
+		assert self.n==(self.k-np.linalg.matrix_rank(self.A_E))
 
 		#############Obtain a strictly feasible point z0
 		###################################################
@@ -410,9 +412,7 @@ class ConvexConstraints():
 			epsilon=cp.Variable()
 			z0 = cp.Variable((self.n,1))
 
-			print("Getting constraints cvxpy")
 			constraints=self.getConstraintsInSubspaceCvxpy(z0, epsilon)
-			print("Obtained")
 
 			constraints.append(epsilon>=0)
 			constraints.append(epsilon<=0.5) #This constraint is needed for the case where the set is unbounded. Any positive value is valid
@@ -428,11 +428,11 @@ class ConvexConstraints():
 									  #TODO: change hand-coded tolerance
 
 			self.z0 = z0.value
-			self.y0 = self.NA_E@self.z0 + self.y1	
+			self.y0 = self.NA_E@self.z0 + self.yp	
 
 		else:
 			self.y0 = y0
-			self.z0 = self.NA_E.T@(self.y0-self.y1)
+			self.z0 = self.NA_E.T@(self.y0-self.yp)
 
 		assert np.allclose(NA_E.T@NA_E, np.eye(NA_E.shape[1])) #By definition, N'*N=I
 
@@ -499,7 +499,7 @@ class ConvexConstraints():
 
 		constraints = [self.A_p@z - self.b_p <= -epsilon*np.ones((self.A_p.shape[0],1))]
 
-		y=self.NA_E@z + self.y1
+		y=self.NA_E@z + self.yp
 
 		constraints+=self.getNonLinearConstraintsCvxpy(y, epsilon)
 

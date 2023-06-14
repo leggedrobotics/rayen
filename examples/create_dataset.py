@@ -6,9 +6,10 @@ import numpy as np
 import cvxpy as cp
 import matplotlib.pyplot as plt
 import scipy.io
-import utils
 import time
-import constraints
+
+import fixpath #Following this example: https://github.com/tartley/colorama/blob/master/demos/demo01.py
+from rayen import constraints, utils
 
 # create custom dataset class
 class CustomDataset(Dataset):
@@ -106,9 +107,44 @@ def createProjectionDataset(num_samples, cs, bbox_half_side):
 
 	return my_dataset
 
-def getCorridorDatasetsAndConstraints(dimension):
+def getCorridorConstraints(dimension):
+	mat = scipy.io.loadmat('./scripts/matlab/corridor_dim'+str(dimension)+'.mat')
 
-	mat = scipy.io.loadmat('./matlab/corridor_dim'+str(dimension)+'.mat')
+	A1=mat['A1'];
+	b1=mat['b1'];
+
+	A2=mat['A2'];
+	b2=mat['b2'];
+
+	if(len(mat["all_P"])>0):
+		all_P=list(mat["all_P"][0])
+		all_q=list(mat["all_q"][0])
+		all_r=list(mat["all_r"][0])
+	else:
+		all_P=[]
+		all_q=[]
+		all_r=[]
+
+	assert A1.ndim==2
+	assert b1.ndim==2
+
+	assert A2.ndim==2
+	assert b2.ndim==2
+
+	lc=constraints.LinearConstraint(A1=A1, b1=b1, A2=A2, b2=b2);
+
+	qcs=[];
+	for i in range(len(all_P)):
+		qc=constraints.ConvexQuadraticConstraint(P=all_P[i], q=all_q[i], r=all_r[i]);
+		qcs.append(qc)
+
+	cs=constraints.ConvexConstraints(lc=lc, qcs=qcs, socs=[], sdpc=None)
+
+	return cs
+
+def getCorridorDatasets(dimension):
+
+	mat = scipy.io.loadmat('./scripts/matlab/corridor_dim'+str(dimension)+'.mat')
 
 	all_x=list(mat["all_x"][0])
 	all_y=list(mat["all_y"][0])
@@ -136,59 +172,19 @@ def getCorridorDatasetsAndConstraints(dimension):
 	# A1=polyhedron['A1'][0,0];
 	# b1=polyhedron['b1'][0,0];
 
-	A1=mat['A1'];
-	b1=mat['b1'];
 
-	A2=mat['A2'];
-	b2=mat['b2'];
-
-	if(len(mat["all_P"])>0):
-		all_P=list(mat["all_P"][0])
-		all_q=list(mat["all_q"][0])
-		all_r=list(mat["all_r"][0])
-	else:
-		all_P=[]
-		all_q=[]
-		all_r=[]
-
-
-	# print(f"Shape of A1={A1.shape}")
-	# print(f"Shape of b1={b1.shape}")
-
-	# # print(len(all_P))
-	# # print(len(all_q))
-	# # print(len(all_r))
-
-	# print(all_P[0].shape)
-	# print(all_q[0].shape)
-	# print(all_r[0].shape)
-	# exit()
-
-
-	assert A1.ndim==2
-	assert b1.ndim==2
-
-	assert A2.ndim==2
-	assert b2.ndim==2
 
 	assert all_y[0].shape[1]==1
 	assert all_x[0].shape[1]==1
 	assert all_x_out_dist[0].shape[1]==1
 	assert all_y_out_dist[0].shape[1]==1
 
-	lc=constraints.LinearConstraint(A1=A1, b1=b1, A2=A2, b2=b2);
 
-	qcs=[];
-	for i in range(len(all_P)):
-		qc=constraints.convexQuadraticConstraint(P=all_P[i], q=all_q[i], r=all_r[i]);
-		qcs.append(qc)
-
-	cs=constraints.convexConstraints(lc=lc, qcs=qcs, socs=[], sdpc=None)
 	my_dataset = CustomDataset(all_x, all_y, all_Pobj, all_qobj, all_robj, all_times_s, all_costs)
 	my_dataset_out_dist = CustomDataset(all_x_out_dist, all_y_out_dist, all_Pobj_out_dist, all_qobj_out_dist, all_robj_out_dist, all_times_s_out_dist, all_costs_out_dist)
 
 
-	return my_dataset, my_dataset_out_dist, cs
+	return my_dataset, my_dataset_out_dist
 
 
 
