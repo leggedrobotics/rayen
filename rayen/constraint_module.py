@@ -491,7 +491,7 @@ class ConstraintModule(torch.nn.Module):
 
 	def project(self, q):
 		#If you use ECOS, you can set solver_args={'eps': 1e-6} (or smaller) for better solutions, see https://github.com/cvxpy/cvxpy/issues/880#issuecomment-557278620
-		z, = self.proj_layer(q, solver_args={'solve_method':self.solver_projection, "max_iters": 10000})
+		z, = self.proj_layer(q, solver_args={'solve_method':self.solver_projection}) # "max_iters": 10000
 		return z
 
 	def forwardForPP(self, q):

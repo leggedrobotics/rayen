@@ -9,10 +9,9 @@ import os
 
 sys.path.insert(1, os.path.join(sys.path[0], '..'))  #See first comment of this answer: https://stackoverflow.com/a/11158224
 
-import utils
-from constraint_layer import ConstraintLayer
-import constraints
 from examples_sets import getExample
+import fixpath #Following this example: https://github.com/tartley/colorama/blob/master/demos/demo01.py
+from rayen import constraints, constraint_module, utils
 
 path="./results/"
 if not os.path.exists(path):
@@ -22,7 +21,7 @@ torch.set_default_dtype(torch.float64)
 
 def getTime_sMethod(cs, num_samples):
 	print("Calling constructor for the layer...")
-	my_layer=ConstraintLayer(cs, method="RAYEN", create_map=False)
+	my_layer=constraint_module.ConstraintModule(cs, method="RAYEN", create_map=False)
 	print("Called")
 
 	
@@ -44,7 +43,7 @@ def getTime_sMethod(cs, num_samples):
 # all_k = [1, 10, 100, 1000, 10000]
 
 ############################################ WARM UP THE GPU (for more accurate computation time)
-my_layer=ConstraintLayer(getExample(12), method="RAYEN", create_map=False)
+my_layer=constraint_module.ConstraintModule(getExample(12), method="RAYEN", create_map=False)
 x_dummy=torch.Tensor(300, my_layer.getDimAfterMap(), 1).uniform_(-5.0, 5.0)
 _ = my_layer(x_dummy)
 
@@ -65,7 +64,7 @@ for r_A1 in all_r_A1:
 		b1=np.random.uniform(low= 0.1, high=1.0, size=(r_A1,1)) #In this way, y=0 is always a feasible solution
 
 		lc=constraints.LinearConstraint(A1=A1, b1=b1, A2=None, b2=None);
-		cs=constraints.convexConstraints(lc=lc, qcs=[], socs=[], sdpc=None, y0=np.zeros((k,1)), do_preprocessing_linear=False)
+		cs=constraints.ConvexConstraints(lc=lc, qcs=[], socs=[], sdpc=None, y0=np.zeros((k,1)), do_preprocessing_linear=False)
 		total_s=getTime_sMethod(cs, num_samples)
 		times_lin.append({'k': k,'r_A1': r_A1,'Time': total_s})
 
@@ -91,7 +90,7 @@ for eta in all_eta:
 			P=tmp@tmp.T #To make sure it's a (symmetric) PSD matrix
 			q=np.random.uniform(low=-1.0, high=1.0, size=(k,1))
 			r=np.random.uniform(low=-1.0, high=0.0, size=(1,1))
-			qc=constraints.convexQuadraticConstraint(P=P, q=q, r=r, do_checks_P=False);
+			qc=constraints.ConvexQuadraticConstraint(P=P, q=q, r=r, do_checks_P=False);
 			return qc
 
 		print("Creating random constraints")
@@ -100,7 +99,7 @@ for eta in all_eta:
 
 		assert len(qcs)==eta
 		
-		cs=constraints.convexConstraints(lc=None, qcs=qcs, socs=[], sdpc=None, y0=np.zeros((k,1)))
+		cs=constraints.ConvexConstraints(lc=None, qcs=qcs, socs=[], sdpc=None, y0=np.zeros((k,1)))
 		total_s=getTime_sMethod(cs, num_samples)
 		times_qp.append({'k': k,'eta': eta,'Time': total_s})
 
@@ -136,7 +135,7 @@ for r_M in all_r_M:
 				socs.append(constraints.SOCConstraint(Mscd[0], Mscd[1], Mscd[2], Mscd[3]))
 
 			print("Creating cs")
-			cs=constraints.convexConstraints(lc=None, qcs=[], socs=socs, sdpc=None, y0=np.zeros((k,1)))
+			cs=constraints.ConvexConstraints(lc=None, qcs=[], socs=socs, sdpc=None, y0=np.zeros((k,1)))
 			print("Created")
 
 			total_s=getTime_sMethod(cs, num_samples)
@@ -176,7 +175,7 @@ for r_F in all_r_F:
 		print("Created sdpc")
 
 		print("Creating cs")
-		cs=constraints.convexConstraints(lc=None, qcs=[], socs=[], sdpc=sdpc, y0=np.zeros((k,1)))
+		cs=constraints.ConvexConstraints(lc=None, qcs=[], socs=[], sdpc=sdpc, y0=np.zeros((k,1)))
 		print("Created")
 
 		total_s=getTime_sMethod(cs, num_samples)

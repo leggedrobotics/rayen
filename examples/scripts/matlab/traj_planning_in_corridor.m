@@ -92,7 +92,13 @@ for j=1:(sp.num_seg)
      Q=sp.getCPs_XX_Pos_ofInterval(basis, j);%Get the control points of the interval
     
     %%%%%To force the interval allocation:
-    ip=ceil(j/num_of_seg_per_region); %ip is the index of the polyhedron
+%     if(j==1)
+%         ip=1;  %ip is the index of the polyhedron
+%     else
+%         ip=ceil((j+1)/num_of_seg_per_region); 
+%     end
+    ip=ceil((j)/num_of_seg_per_region); 
+    [j, ip]
     
     for kk=1:size(Q,2)
             linear_ineq_const=[linear_ineq_const {allA{ip}*Q{kk}<=allb{ip}}];   %Each segment must be in each corridor

@@ -2,8 +2,10 @@ function [allA, allb, allV, p0, t0,tf,deg_pos, num_seg, num_of_seg_per_region, u
 
     if(dimension==2)
         rng('default'); rng(6); %So that random is repeatable
-        P=3*[0 5.5 7.5 10.5 12.5;
-             0   4   0   0    4 ];
+%         P=3*[0 5.5 7.5 10.5 12.5;
+%              0   4   0   0    4 ];
+         P=3*[0 5.5 7.5  12.5;
+             0   4   0     4 ];
         radius=4.0;
         num_of_seg_per_region=2; 
         samples_per_step=5;
@@ -11,7 +13,7 @@ function [allA, allb, allV, p0, t0,tf,deg_pos, num_seg, num_of_seg_per_region, u
         tf=35.0;
         deg_pos=2; %Note that I'm including the jerk cost. If I use deg_pos=2, then the jerk cost will always be zero
     else
-        rng('default'); rng(1); %So that random is repeatable
+        rng('default'); rng(2); %So that random is repeatable
         P=3*[0 1 2 3 4 3 0;
            0 1 1 2 4 4 4;
            0 1 1 1 4 1 0];
@@ -21,6 +23,7 @@ function [allA, allb, allV, p0, t0,tf,deg_pos, num_seg, num_of_seg_per_region, u
         use_quadratic=true;
         tf=15.0;
         deg_pos=3; %Note that I'm including the jerk cost. If I use deg_pos=2, then the jerk cost will always be zero
+        p0=[0.5;0];
     end
 
     t0=0.0;
@@ -44,17 +47,23 @@ function [allA, allb, allV, p0, t0,tf,deg_pos, num_seg, num_of_seg_per_region, u
     end
 
     num_of_regions=size(allA,2);
-    num_seg =num_of_seg_per_region*num_of_regions;
+    num_seg =num_of_seg_per_region*num_of_regions; %First region has only 1 segment
     
-    p0=mean(allV{1},2); %  0.8*P(:,1) + 0.2*P(:,2);
+     %  0.8*P(:,1) + 0.2*P(:,2);
 %     pf=mean(allV{end},2); %0.2*P(:,end-1) + 0.8*P(:,end);
-    
+
+    if(dimension==2)
+        p0=[5.0;1];
+    else
+        p0=mean(allV{1},2);
+    end
+
     figure;
     hold on;
     alpha=0.2;
     
     for i=1:size(allA,2)
-        plotregion(-allA{i},- allb{i}, [], [],'r',alpha)
+        plotregion(-allA{i},- allb{i}, [], [],'g',alpha)
     end
     
     % plotPolyhedron(P,'r')
@@ -77,13 +86,13 @@ function [allA, allb, allV, p0, t0,tf,deg_pos, num_seg, num_of_seg_per_region, u
     end
     
     if(dimension==2)
-        scatter(p0(1),p0(2),'filled','g')
+        scatter(p0(1),p0(2),'filled','b')
 %         scatter(pf(1),pf(2),'filled','r')
     end
     
     if(dimension==3)
         zlim([min(P(3,:))-delta,max(P(3,:))+delta]);
-        plotSphere(p0,0.2,'g')
+        plotSphere(p0,0.2,'b')
 %         plotSphere(pf,0.2,'r')
     end
 

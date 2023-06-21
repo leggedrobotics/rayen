@@ -115,13 +115,13 @@ def onePassOverDataset(model, params, sdag, my_type):
 		sum_all_violations_optimization=0.0
 
 
-	num_samples_dataset=len(generator.dataset);
-
 	cuda_timer=utils.CudaTimer()
 
 	all_x=[]
 	all_y=[]
 	all_y_predicted=[]
+
+	num_nan_samples= 0
 
 	with torch.set_grad_enabled(enable_grad):
 		for x, y, Pobj, qobj, robj, opt_time_s, cost in generator: #For each of the batches	
@@ -133,6 +133,20 @@ def onePassOverDataset(model, params, sdag, my_type):
 			cuda_timer.start()
 			y_predicted = model(x)
 			sum_time_s += cuda_timer.endAndGetTimeSeconds()
+
+			#Remove samples that generated nans (happens sometimes in DC3)
+			is_nan=torch.squeeze(torch.any(y_predicted.isnan(),dim=1)).cpu();
+			num_nan_samples += torch.sum(is_nan==True).item()
+			x = x[~is_nan,:,:]
+			y = y[~is_nan,:,:]
+			Pobj = Pobj[~is_nan,:,:]
+			qobj = qobj[~is_nan,:,:]
+			robj = robj[~is_nan,:,:]
+			opt_time_s = opt_time_s[~is_nan,:,:]
+			cost = cost[~is_nan,:,:]
+			y_predicted = y_predicted[~is_nan,:,:]
+
+
 			loss=cost_computer.getSumLossAllSamples(params, y, y_predicted, Pobj, qobj, robj, isTesting=(my_type=='test'))
 			# print(f"Loss={loss.item()}")
 			sum_all_losses +=  loss.item();
@@ -172,6 +186,8 @@ def onePassOverDataset(model, params, sdag, my_type):
 				#########################################################
 
 
+	num_samples_dataset=len(generator.dataset) - num_nan_samples;
+
 	#############################
 
 	results={};
@@ -186,6 +202,7 @@ def onePassOverDataset(model, params, sdag, my_type):
 		results["all_x"]=    all_x
 		results["all_y"]=    all_y
 		results["all_y_predicted"]=    all_y_predicted
+		results["percentage_converged"]=    100*(1-num_nan_samples/len(generator.dataset))
 
 	#############################
 
@@ -295,7 +312,7 @@ def main(params):
 
 	sleep_time=random.randint(0,20)
 	print(f"Sleeping for {sleep_time} s")
-	# time.sleep(sleep_time) #Without this, you get the errors CUBLAS_STATUS_NOT_INITIALIZED or CUDA out of memory when running several training processes in parallel
+	time.sleep(sleep_time) #Without this, you get the errors CUBLAS_STATUS_NOT_INITIALIZED or CUDA out of memory when running several training processes in parallel
 	waitGPU.wait(utilization=50, memory_ratio=0.5, interval=random.randint(1, 20), available_memory=2000) #This is to avoid errors like "CUDA error: CUBLAS_STATUS_NOT_INITIALIZED" when launching many trainings in parallel
 	print("Done waiting for GPU")
   
@@ -355,15 +372,17 @@ def main(params):
 
 		num_trainable_params=sum(	p.numel() for p in model.parameters() if p.requires_grad)
 
-		d = {'method': 				 [name_file,                         'dataset'+str(params['dimension_dataset'])+'d_'+'Optimization'],
-			 'num_trainable_params': [num_trainable_params,         	  0], 
-			'[In dist] loss':        [testing_results_in_dist['loss'],      	  testing_results_in_dist['optimization_loss']      ], 
-			'[In dist] violation':   [testing_results_in_dist['violation'], 	  testing_results_in_dist['optimization_violation'] ],
-			'[In dist] time_us':     [1e6*testing_results_in_dist['time_s'],     1e6*testing_results_in_dist['optimization_time_s'] ],
+		d = {'method': 				              [name_file,                                       'dataset'+str(params['dimension_dataset'])+'d_'+'Optimization'],
+			 'num_trainable_params':              [num_trainable_params,         	                0], 
+			'[In dist] loss':                     [testing_results_in_dist['loss'],      	        testing_results_in_dist['optimization_loss']      ], 
+			'[In dist] violation':                [testing_results_in_dist['violation'], 	        testing_results_in_dist['optimization_violation'] ],
+			'[In dist] percentage_converged':     [testing_results_in_dist['percentage_converged'], 100 ],
+			'[In dist] time_us':                  [1e6*testing_results_in_dist['time_s'],           1e6*testing_results_in_dist['optimization_time_s'] ],
 			#
-			'[Out dist] loss':        [testing_results_out_dist['loss'],      	  testing_results_out_dist['optimization_loss']      ], 
-			'[Out dist] violation':   [testing_results_out_dist['violation'], 	  testing_results_out_dist['optimization_violation'] ],
-			'[Out dist] time_us':     [1e6*testing_results_out_dist['time_s'],     1e6*testing_results_out_dist['optimization_time_s'] ]}
+			'[Out dist] loss':                    [testing_results_out_dist['loss'],      	  testing_results_out_dist['optimization_loss']      ], 
+			'[Out dist] violation':               [testing_results_out_dist['violation'], 	  testing_results_out_dist['optimization_violation'] ],
+			'[Out dist] percentage_converged':    [testing_results_out_dist['percentage_converged'], 100 ],
+			'[Out dist] time_us':                 [1e6*testing_results_out_dist['time_s'],     1e6*testing_results_out_dist['optimization_time_s'] ]}
 
 
 		df = pd.DataFrame(data=d)

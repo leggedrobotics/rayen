@@ -15,19 +15,19 @@ windows:
       - python main.py --method UU          --dimension_dataset 2  --weight_soft_cost 10    --test False  && if [[ $(tmux list-panes | wc -l) -eq 1 ]]; then tmux kill-session; else exit; fi
       - python main.py --method UU          --dimension_dataset 2  --weight_soft_cost 100   --test False  && if [[ $(tmux list-panes | wc -l) -eq 1 ]]; then tmux kill-session; else exit; fi
       - python main.py --method UU          --dimension_dataset 2  --weight_soft_cost 1000  --test False  && if [[ $(tmux list-panes | wc -l) -eq 1 ]]; then tmux kill-session; else exit; fi
-      - python main.py --method UU          --dimension_dataset 2  --weight_soft_cost 10000 --test False  && if [[ $(tmux list-panes | wc -l) -eq 1 ]]; then tmux kill-session; else exit; fi
+      - python main.py --method UU          --dimension_dataset 2  --weight_soft_cost 5000  --test False  && if [[ $(tmux list-panes | wc -l) -eq 1 ]]; then tmux kill-session; else exit; fi
  
       - python main.py --method UP          --dimension_dataset 2  --weight_soft_cost 0     --test False  && if [[ $(tmux list-panes | wc -l) -eq 1 ]]; then tmux kill-session; else exit; fi
       - python main.py --method UP          --dimension_dataset 2  --weight_soft_cost 10    --test False  && if [[ $(tmux list-panes | wc -l) -eq 1 ]]; then tmux kill-session; else exit; fi
       - python main.py --method UP          --dimension_dataset 2  --weight_soft_cost 100   --test False  && if [[ $(tmux list-panes | wc -l) -eq 1 ]]; then tmux kill-session; else exit; fi
       - python main.py --method UP          --dimension_dataset 2  --weight_soft_cost 1000  --test False  && if [[ $(tmux list-panes | wc -l) -eq 1 ]]; then tmux kill-session; else exit; fi
-      - python main.py --method UP          --dimension_dataset 2  --weight_soft_cost 10000 --test False  && if [[ $(tmux list-panes | wc -l) -eq 1 ]]; then tmux kill-session; else exit; fi
+      - python main.py --method UP          --dimension_dataset 2  --weight_soft_cost 5000  --test False  && if [[ $(tmux list-panes | wc -l) -eq 1 ]]; then tmux kill-session; else exit; fi
  
       - python main.py --method DC3         --dimension_dataset 2  --weight_soft_cost 0     --test False  && if [[ $(tmux list-panes | wc -l) -eq 1 ]]; then tmux kill-session; else exit; fi
       - python main.py --method DC3         --dimension_dataset 2  --weight_soft_cost 10    --test False  && if [[ $(tmux list-panes | wc -l) -eq 1 ]]; then tmux kill-session; else exit; fi
       - python main.py --method DC3         --dimension_dataset 2  --weight_soft_cost 100   --test False  && if [[ $(tmux list-panes | wc -l) -eq 1 ]]; then tmux kill-session; else exit; fi
       - python main.py --method DC3         --dimension_dataset 2  --weight_soft_cost 1000  --test False  && if [[ $(tmux list-panes | wc -l) -eq 1 ]]; then tmux kill-session; else exit; fi
-      - python main.py --method DC3         --dimension_dataset 2  --weight_soft_cost 10000 --test False  && if [[ $(tmux list-panes | wc -l) -eq 1 ]]; then tmux kill-session; else exit; fi
+      - python main.py --method DC3         --dimension_dataset 2  --weight_soft_cost 5000  --test False  && if [[ $(tmux list-panes | wc -l) -eq 1 ]]; then tmux kill-session; else exit; fi
  
       - python main.py --method PP          --dimension_dataset 2  --weight_soft_cost 0    --test False  && if [[ $(tmux list-panes | wc -l) -eq 1 ]]; then tmux kill-session; else exit; fi
  
@@ -42,18 +42,18 @@ windows:
       - python main.py --method UU          --dimension_dataset 3  --weight_soft_cost 10    --test False  && if [[ $(tmux list-panes | wc -l) -eq 1 ]]; then tmux kill-session; else exit; fi
       - python main.py --method UU          --dimension_dataset 3  --weight_soft_cost 100   --test False  && if [[ $(tmux list-panes | wc -l) -eq 1 ]]; then tmux kill-session; else exit; fi
       - python main.py --method UU          --dimension_dataset 3  --weight_soft_cost 1000  --test False  && if [[ $(tmux list-panes | wc -l) -eq 1 ]]; then tmux kill-session; else exit; fi
-      - python main.py --method UU          --dimension_dataset 3  --weight_soft_cost 10000 --test False  && if [[ $(tmux list-panes | wc -l) -eq 1 ]]; then tmux kill-session; else exit; fi
+      - python main.py --method UU          --dimension_dataset 3  --weight_soft_cost 5000  --test False  && if [[ $(tmux list-panes | wc -l) -eq 1 ]]; then tmux kill-session; else exit; fi
  
       - python main.py --method UP          --dimension_dataset 3  --weight_soft_cost 0     --test False  && if [[ $(tmux list-panes | wc -l) -eq 1 ]]; then tmux kill-session; else exit; fi
       - python main.py --method UP          --dimension_dataset 3  --weight_soft_cost 10    --test False  && if [[ $(tmux list-panes | wc -l) -eq 1 ]]; then tmux kill-session; else exit; fi
       - python main.py --method UP          --dimension_dataset 3  --weight_soft_cost 100   --test False  && if [[ $(tmux list-panes | wc -l) -eq 1 ]]; then tmux kill-session; else exit; fi
       - python main.py --method UP          --dimension_dataset 3  --weight_soft_cost 1000  --test False  && if [[ $(tmux list-panes | wc -l) -eq 1 ]]; then tmux kill-session; else exit; fi
-      - python main.py --method UP          --dimension_dataset 3  --weight_soft_cost 10000 --test False  && if [[ $(tmux list-panes | wc -l) -eq 1 ]]; then tmux kill-session; else exit; fi
+      - python main.py --method UP          --dimension_dataset 3  --weight_soft_cost 5000  --test False  && if [[ $(tmux list-panes | wc -l) -eq 1 ]]; then tmux kill-session; else exit; fi
  
       - python main.py --method DC3         --dimension_dataset 3  --weight_soft_cost 0     --test False  && if [[ $(tmux list-panes | wc -l) -eq 1 ]]; then tmux kill-session; else exit; fi
       - python main.py --method DC3         --dimension_dataset 3  --weight_soft_cost 10    --test False  && if [[ $(tmux list-panes | wc -l) -eq 1 ]]; then tmux kill-session; else exit; fi
       - python main.py --method DC3         --dimension_dataset 3  --weight_soft_cost 100   --test False  && if [[ $(tmux list-panes | wc -l) -eq 1 ]]; then tmux kill-session; else exit; fi
       - python main.py --method DC3         --dimension_dataset 3  --weight_soft_cost 1000  --test False  && if [[ $(tmux list-panes | wc -l) -eq 1 ]]; then tmux kill-session; else exit; fi
-      - python main.py --method DC3         --dimension_dataset 3  --weight_soft_cost 10000 --test False  && if [[ $(tmux list-panes | wc -l) -eq 1 ]]; then tmux kill-session; else exit; fi
+      - python main.py --method DC3         --dimension_dataset 3  --weight_soft_cost 5000  --test False  && if [[ $(tmux list-panes | wc -l) -eq 1 ]]; then tmux kill-session; else exit; fi
  
       - python main.py --method PP          --dimension_dataset 3  --weight_soft_cost 0     --test False  && if [[ $(tmux list-panes | wc -l) -eq 1 ]]; then tmux kill-session; else exit; fi

@@ -524,7 +524,7 @@ classdef MyClampedUniformSpline < handle
             end        
         end
 
-        function plotPos3D(obj, linewidth)
+        function plotPos3D(obj, linewidth, color)
 %             figure; 
             hold on;
             syms t real
@@ -532,7 +532,11 @@ classdef MyClampedUniformSpline < handle
                 interv=obj.timeSpanOfInterval(j);           
                 u=(t-min(interv))/(max(interv)-min(interv));
                 pos=obj.evalDerivativeU(0,u,j);
-                fplot3(pos(1),pos(2),pos(3),interv, 'LineWidth', linewidth);
+                if ~exist('color','var')
+                    fplot3(pos(1),pos(2),pos(3),interv, 'LineWidth', linewidth);
+                else
+                    fplot3(pos(1),pos(2),pos(3),interv, 'LineWidth', linewidth, 'Color', color);
+                end
             end           
             axis equal; view([45,45])
         end
@@ -549,7 +553,7 @@ classdef MyClampedUniformSpline < handle
             axis equal; view([45,45])
         end
         
-        function plotPos2D(obj, linewidth)
+        function plotPos2D(obj, linewidth, color)
             %figure; 
             hold on;
             syms t real
@@ -557,7 +561,12 @@ classdef MyClampedUniformSpline < handle
                 interv=obj.timeSpanOfInterval(j);           
                 u=(t-min(interv))/(max(interv)-min(interv));
                 pos=obj.evalDerivativeU(0,u,j);
-                fplot(pos(1),pos(2),interv, 'LineWidth', linewidth, 'MeshDensity', 2);
+                 if ~exist('color','var')
+                     fplot(pos(1),pos(2),interv, 'LineWidth', linewidth, 'MeshDensity', 2);
+                 else
+                     fplot(pos(1),pos(2),interv, 'LineWidth', linewidth, 'MeshDensity', 2, 'Color', color);
+                 end
+                
             end           
             axis equal;% view([45,45])
         end
