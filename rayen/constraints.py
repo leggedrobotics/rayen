@@ -128,7 +128,7 @@ class SOCConstraint():
 		return [cp.norm(self.M@y + self.s) - self.c.T@y - self.d <= -epsilon]
 
 
-class SDPConstraint():
+class LMIConstraint():
 	#Constraint is y0 F0 + y1 F1 + ... + ykm1 Fkm1 + Fk >=0
 	def __init__(self, all_F):
 		for F in all_F:
@@ -143,14 +143,14 @@ class SDPConstraint():
 		return (len(self.all_F)-1)
 
 	def asCvxpy(self, y, epsilon=0.0):
-		sdp_left_hand_side=0;
+		lmi_left_hand_side=0;
 		k=self.dim()
 		tmp=self.all_F[0].shape[0]
 		for i in range(k):
-			sdp_left_hand_side += y[i,0]*self.all_F[i]
-		sdp_left_hand_side += self.all_F[k]
+			lmi_left_hand_side += y[i,0]*self.all_F[i]
+		lmi_left_hand_side += self.all_F[k]
 
-		return [sdp_left_hand_side  >>  epsilon*np.eye(tmp)]
+		return [lmi_left_hand_side  >>  epsilon*np.eye(tmp)]
 
 ######################################
 
@@ -160,7 +160,7 @@ class ConvexConstraints():
 	# If it's provided, this code does not check whether or not that point is in the relative interior of the set. It's the user's responsibility to do that 
 
 	# do_preprocessing_linear can be set to True ONLY when the user knows beforehand that affine_hull{y:A1y<=b1} = R^k  . Again, it's the user's responsibility to ensure that that is actually the case 
-	def __init__(self, lc=None, qcs=[], socs=[], sdpc=None, y0=None, do_preprocessing_linear=True):
+	def __init__(self, lc=None, qcs=[], socs=[], lmic=None, y0=None, do_preprocessing_linear=True):
 
 		if(lc is not None):
 			self.has_linear_eq_constraints=lc.hasEqConstraints();
@@ -174,15 +174,15 @@ class ConvexConstraints():
 
 		self.has_quadratic_constraints=(len(qcs)>0)
 		self.has_soc_constraints=(len(socs)>0)
-		self.has_sdp_constraints=(sdpc is not None)
+		self.has_lmi_constraints=(lmic is not None)
 
 		self.lc=lc
 		self.qcs=qcs
 		self.socs=socs
-		self.sdpc=sdpc
+		self.lmic=lmic
 
 
-		assert (self.has_quadratic_constraints or self.has_linear_constraints or self.has_soc_constraints or self.has_sdp_constraints), "There are no constraints!"
+		assert (self.has_quadratic_constraints or self.has_linear_constraints or self.has_soc_constraints or self.has_lmi_constraints), "There are no constraints!"
 
 
 		#Check that the dimensions of all the constraints are the same
@@ -193,8 +193,8 @@ class ConvexConstraints():
 			all_dim.append(qc.dim())
 		for soc in socs:
 			all_dim.append(soc.dim())
-		if(self.has_sdp_constraints):
-			all_dim.append(sdpc.dim())
+		if(self.has_lmi_constraints):
+			all_dim.append(lmic.dim())
 
 		assert utils.all_equal(all_dim)
 		#####################################3
@@ -204,9 +204,9 @@ class ConvexConstraints():
 		##################### CHOOSE SOLVER
 		###################################################
 		installed_solvers=cp.installed_solvers();
-		if ('GUROBI' in installed_solvers) and self.has_sdp_constraints==False:
+		if ('GUROBI' in installed_solvers) and self.has_lmi_constraints==False:
 			self.solver='GUROBI' #You need to do `python -m pip install gurobipy`
-		elif ('ECOS' in installed_solvers) and self.has_sdp_constraints==False:
+		elif ('ECOS' in installed_solvers) and self.has_lmi_constraints==False:
 			self.solver='ECOS'
 		elif ('SCS' in installed_solvers):
 			self.solver='SCS'
@@ -478,8 +478,8 @@ class ConvexConstraints():
 			all_c=[np.zeros((self.k, 1))]                 
 			all_d=[np.ones((1, 1))]                    # 0<=1 (i.e., no constraint)
 
-		if(self.has_sdp_constraints):
-			all_F=self.sdpc.all_F
+		if(self.has_lmi_constraints):
+			all_F=self.lmic.all_F
 		else:
 			all_F=[]
 			for i in range(self.k):
@@ -516,8 +516,8 @@ class ConvexConstraints():
 		for soc in self.socs:   
 			constraints += soc.asCvxpy(y, epsilon) 
 
-		if(self.has_sdp_constraints):
-			constraints += self.sdpc.asCvxpy(y, epsilon) 	
+		if(self.has_lmi_constraints):
+			constraints += self.lmic.asCvxpy(y, epsilon) 	
 
 		return constraints	
 

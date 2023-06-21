@@ -25,7 +25,7 @@ fig.suptitle(method, fontsize=10)
 
 tmp=getExample(index_example)
 
-constraint=constraints.ConvexConstraints(lc=tmp.lc, qcs=tmp.qcs, socs=tmp.socs, sdpc=tmp.sdpc, y0=np.array([[0.5], [0.0], [0.8]]))
+constraint=constraints.ConvexConstraints(lc=tmp.lc, qcs=tmp.qcs, socs=tmp.socs, lmic=tmp.lmic, y0=np.array([[0.5], [0.0], [0.8]]))
 
 ax = fig.add_subplot(1,1,1, projection="3d")
 

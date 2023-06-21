@@ -19,7 +19,7 @@ class ConstraintModule(torch.nn.Module):
 		if(self.method=='Bar' and cs.has_quadratic_constraints):
 			raise Exception(f"Method {self.method} cannot be used with quadratic constraints")
 
-		if(self.method=='DC3' and (cs.has_soc_constraints or cs.has_sdp_constraints)):
+		if(self.method=='DC3' and (cs.has_soc_constraints or cs.has_lmi_constraints)):
 			raise NotImplementedError
 
 		if(self.method=='DC3'):
@@ -35,11 +35,11 @@ class ConstraintModule(torch.nn.Module):
 		all_P, all_q, all_r = utils.getAllPqrFromQcs(cs.qcs)
 		all_M, all_s, all_c, all_d= utils.getAllMscdFromQcs(cs.socs)
 
-		if(cs.has_sdp_constraints):
-			all_F=copy.deepcopy(cs.sdpc.all_F)
+		if(cs.has_lmi_constraints):
+			all_F=copy.deepcopy(cs.lmic.all_F)
 			H=all_F[-1]
-			for i in range(cs.sdpc.dim()):
-				H += cs.y0[i,0]*cs.sdpc.all_F[i]
+			for i in range(cs.lmic.dim()):
+				H += cs.y0[i,0]*cs.lmic.all_F[i]
 			Hinv=np.linalg.inv(H)
 			mHinv=-Hinv;
 			L=np.linalg.cholesky(Hinv) # Hinv = L @ L^T 
@@ -85,10 +85,10 @@ class ConstraintModule(torch.nn.Module):
 			assert self.prob_projection.is_dpp()
 			self.proj_layer = CvxpyLayer(self.prob_projection, parameters=[self.z_to_be_projected], variables=[self.z_projected])
 
-			if(self.cs.has_sdp_constraints):
-				self.solver_projection='SCS' #slower, less accurate, supports SDP constraints
+			if(self.cs.has_lmi_constraints):
+				self.solver_projection='SCS' #slower, less accurate, supports LMI constraints
 			else:
-				self.solver_projection='ECOS' #fast, accurate,  does not support SDP constraints
+				self.solver_projection='ECOS' #fast, accurate, does not support LMI constraints
 
 
 		if(self.method=='RAYEN' or self.method=='RAYEN_old'):
@@ -401,7 +401,7 @@ class ConstraintModule(torch.nn.Module):
 				assert torch.all(kappa_positive_i >= 0) #If not, then either the feasible set is infeasible (note that z0 is inside the feasible set)
 				all_kappas_positives = torch.cat((all_kappas_positives, kappa_positive_i), dim=1)
 
-			if(len(self.all_F)>0): #If there are SDP constraints:
+			if(len(self.all_F)>0): #If there are LMI constraints:
 
 				############# OBTAIN S
 				# First option (much slower)

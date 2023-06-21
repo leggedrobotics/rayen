@@ -138,7 +138,7 @@ def getCorridorConstraints(dimension):
 		qc=constraints.ConvexQuadraticConstraint(P=all_P[i], q=all_q[i], r=all_r[i]);
 		qcs.append(qc)
 
-	cs=constraints.ConvexConstraints(lc=lc, qcs=qcs, socs=[], sdpc=None)
+	cs=constraints.ConvexConstraints(lc=lc, qcs=qcs, socs=[], lmic=None)
 
 	return cs
 

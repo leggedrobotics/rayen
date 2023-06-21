@@ -19,6 +19,8 @@ from rayen import constraints, constraint_module, utils
 methods=['RAYEN_old', 'RAYEN', 'Bar', 'UU', 'PP', 'UP', 'DC3']
 index_examples_to_run=list(range(15))
 ###############
+methods=['PP']
+index_examples_to_run=[6]
 
 num_of_examples=len(index_examples_to_run)
 rows=math.ceil(math.sqrt(num_of_examples))
@@ -35,10 +37,10 @@ for method in methods:
 
 		constraint=getExample(index_example)
 
-		if(method=='Bar' and (constraint.has_quadratic_constraints or constraint.has_soc_constraints or constraint.has_sdp_constraints)):
+		if(method=='Bar' and (constraint.has_quadratic_constraints or constraint.has_soc_constraints or constraint.has_lmi_constraints)):
 			continue
 
-		if(method=='DC3' and (constraint.has_soc_constraints or constraint.has_sdp_constraints)):
+		if(method=='DC3' and (constraint.has_soc_constraints or constraint.has_lmi_constraints)):
 			continue
 
 		# fig = plt.figure()

@@ -13,7 +13,7 @@ addpath(genpath('./utils'))
 lin=readtable('./results/times_lin.csv');
 qp=readtable('./results/times_qp.csv');
 soc=readtable('./results/times_soc.csv');
-sdp=readtable('./results/times_sdp.csv');
+lmi=readtable('./results/times_lmi.csv');
 
 default_colors = colororder(); 
 
@@ -82,19 +82,19 @@ sgtitle('\textbf{SOC Constraints}', 'Interpreter','latex')
 set(gcf, 'Position', position_soc); 
 export_fig time_soc.png -m2.5
 
-% %SDP CONSTRAINTS
+% %LMI CONSTRAINTS
 num_color=1;
 figure; hold on; legend;
-for i=sort(unique(sdp.r_F)','descend')
-    indexes=(sdp.r_F==i);
-    plot(sdp.k(indexes), 1e3*sdp.Time(indexes),'-o','DisplayName',['$r=',num2str(i),'$'], 'LineWidth',linewidth, 'MarkerFaceColor',default_colors(num_color,:),'MarkerEdgeColor',default_colors(num_color,:))
+for i=sort(unique(lmi.r_F)','descend')
+    indexes=(lmi.r_F==i);
+    plot(lmi.k(indexes), 1e3*lmi.Time(indexes),'-o','DisplayName',['$r=',num2str(i),'$'], 'LineWidth',linewidth, 'MarkerFaceColor',default_colors(num_color,:),'MarkerEdgeColor',default_colors(num_color,:))
     xlabel('$k$'); ylabel('Time (ms)')
-    title("\textbf{SDP Constraints}")
+    title("\textbf{LMI Constraints}")
     legend('Location','northwest')
     num_color=num_color+1;
 end
 set(gcf, 'Position', position); 
-export_fig time_sdp.png -m2.5
+export_fig time_lmi.png -m2.5
 
 
 

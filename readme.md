@@ -39,7 +39,7 @@ qcs = [constraints.ConvexQuadraticConstraint(P, q, r)]
 #Add SOC and LMI (SDP) constraints here if needed
 # ...
 
-cs = constraints.ConvexConstraints(lc=lc, qcs=qcs, socs=[], sdpc=None)
+cs = constraints.ConvexConstraints(lc=lc, qcs=qcs, socs=[], lmic=None)
 
 model = torch.nn.Sequential(torch.nn.Flatten(), torch.nn.Linear(3, 64), 
 			    torch.nn.ReLU(),    torch.nn.Linear(64, 64),

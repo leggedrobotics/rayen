@@ -42,7 +42,7 @@ class CostComputer(nn.Module): #Using nn.Module to be able to use register_buffe
 		self.has_linear_eq_constraints=cs.has_linear_eq_constraints
 		self.has_quadratic_constraints=cs.has_quadratic_constraints
 		self.has_soc_constraints=cs.has_soc_constraints
-		self.has_sdp_constraints=cs.has_sdp_constraints
+		self.has_lmi_constraints=cs.has_lmi_constraints
 
 		if self.has_linear_ineq_constraints:
 			self.register_buffer("A1", torch.Tensor(cs.lc.A1))
@@ -91,7 +91,7 @@ class CostComputer(nn.Module): #Using nn.Module to be able to use register_buffe
 
 				all_inequalities=torch.cat((all_inequalities, lhs), dim=1)
 
-		if(self.has_sdp_constraints):
+		if(self.has_lmi_constraints):
 			raise NotImplementedError 
 
 		soft_cost = torch.sum(torch.square(torch.nn.functional.relu(all_inequalities)))
@@ -123,7 +123,7 @@ class CostComputer(nn.Module): #Using nn.Module to be able to use register_buffe
 		else:
 			loss += self.getSumObjCostAllSamples(y_predicted, Pobj, qobj, robj)
 
-		if (isTesting==False and params['weight_soft_cost']>0): #I need the term params['weight_soft_cost']>0 because the soft cost is not implemented for sdp constraints yet
+		if (isTesting==False and params['weight_soft_cost']>0): #I need the term params['weight_soft_cost']>0 because the soft cost is not implemented for LMI constraints yet
 			loss += params['weight_soft_cost']*self.getSumSoftCostAllSamples(y_predicted)
 
 		# loss=params['use_supervised']*self.getSumSupervisedCostAllSamples(y, y_predicted) + \

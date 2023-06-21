@@ -15,7 +15,7 @@ b1=np.array([[0.0],
 
 lc=utils.LinearConstraint(A1, b1, None, None)
 
-cs=utils.convexConstraints(lc=lc, qcs=[], socs=[], sdpc=None)
+cs=utils.convexConstraints(lc=lc, qcs=[], socs=[], lmic=None)
 
 constraint_layer=ConstraintLayer(cs, input_dim=2, method='UU', create_map=False) 
 

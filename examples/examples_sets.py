@@ -69,7 +69,7 @@ def getPSDCone3DConstraint():
 	F3=np.array([[0.0, 0.0],
 				 [0.0, 0.0]])
 
-	return constraints.SDPConstraint([F0, F1, F2, F3])
+	return constraints.LMIConstraint([F0, F1, F2, F3])
 
 def getNoneLinearConstraints():
 	return None, None, None, None
@@ -84,7 +84,7 @@ def getExample(example):
 	lc=None
 	qcs=[]
 	socs=[]
-	sdpc=None
+	lmic=None
 
 	if example==0: #A 2D polygon embeded in 3D
 		A1, b1=getCube()
@@ -162,7 +162,7 @@ def getExample(example):
 		socs.append(getSOC3DConstraint())
 
 	elif example==12: #The PSD cone in 3D
-		sdpc = getPSDCone3DConstraint()
+		lmic = getPSDCone3DConstraint()
 
 	elif example==13: #Many of them
 		A1=np.array([[-1.0,-1.0,-1.0]])
@@ -173,7 +173,7 @@ def getExample(example):
 							  [0.0,0.0,1.0]])
 		qcs.append(getEllipsoidConstraint(E_ellipsoid, np.zeros((3,1))))
 		socs.append(getSOC3DConstraint())
-		sdpc = getPSDCone3DConstraint()
+		lmic = getPSDCone3DConstraint()
 
 	elif example==14: #Many of them
 		A1=np.array([[-1.0,-1.0,-1.0],
@@ -186,10 +186,10 @@ def getExample(example):
 		qcs.append(getEllipsoidConstraint(E_ellipsoid, np.zeros((3,1))))
 		# qcs.append(getParaboloid3DConstraint())
 		# socs.append(getSOC3DConstraint())
-		# sdpc = getPSDCone3DConstraint()
+		# lmic = getPSDCone3DConstraint()
 
 	else:
 		raise Exception("Not implemented yet")
 
 
-	return constraints.ConvexConstraints(lc=lc, qcs=qcs, socs=socs, sdpc=sdpc)
+	return constraints.ConvexConstraints(lc=lc, qcs=qcs, socs=socs, lmic=lmic)

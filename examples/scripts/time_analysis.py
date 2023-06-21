@@ -64,7 +64,7 @@ for r_A1 in all_r_A1:
 		b1=np.random.uniform(low= 0.1, high=1.0, size=(r_A1,1)) #In this way, y=0 is always a feasible solution
 
 		lc=constraints.LinearConstraint(A1=A1, b1=b1, A2=None, b2=None);
-		cs=constraints.ConvexConstraints(lc=lc, qcs=[], socs=[], sdpc=None, y0=np.zeros((k,1)), do_preprocessing_linear=False)
+		cs=constraints.ConvexConstraints(lc=lc, qcs=[], socs=[], lmic=None, y0=np.zeros((k,1)), do_preprocessing_linear=False)
 		total_s=getTime_sMethod(cs, num_samples)
 		times_lin.append({'k': k,'r_A1': r_A1,'Time': total_s})
 
@@ -99,7 +99,7 @@ for eta in all_eta:
 
 		assert len(qcs)==eta
 		
-		cs=constraints.ConvexConstraints(lc=None, qcs=qcs, socs=[], sdpc=None, y0=np.zeros((k,1)))
+		cs=constraints.ConvexConstraints(lc=None, qcs=qcs, socs=[], lmic=None, y0=np.zeros((k,1)))
 		total_s=getTime_sMethod(cs, num_samples)
 		times_qp.append({'k': k,'eta': eta,'Time': total_s})
 
@@ -135,7 +135,7 @@ for r_M in all_r_M:
 				socs.append(constraints.SOCConstraint(Mscd[0], Mscd[1], Mscd[2], Mscd[3]))
 
 			print("Creating cs")
-			cs=constraints.ConvexConstraints(lc=None, qcs=[], socs=socs, sdpc=None, y0=np.zeros((k,1)))
+			cs=constraints.ConvexConstraints(lc=None, qcs=[], socs=socs, lmic=None, y0=np.zeros((k,1)))
 			print("Created")
 
 			total_s=getTime_sMethod(cs, num_samples)
@@ -149,8 +149,8 @@ times_soc.to_csv(path+"times_soc.csv",index=False)
 print(times_soc)
 
 
-########################################### SDP CONSTRAINTS
-times_sdp = []
+########################################### LMI CONSTRAINTS
+times_lmi = []
 all_r_F = [10, 100, 200, 300]
 all_k = [100, 500, 1000, 2000, 5000, 7000, 10000]
 
@@ -170,20 +170,20 @@ for r_F in all_r_F:
 		all_F.append(F_k)
 		print("Created")
 
-		print("Creating sdpc")
-		sdpc=constraints.SDPConstraint(all_F)
-		print("Created sdpc")
+		print("Creating lmic")
+		lmic=constraints.LMIConstraint(all_F)
+		print("Created lmic")
 
 		print("Creating cs")
-		cs=constraints.ConvexConstraints(lc=None, qcs=[], socs=[], sdpc=sdpc, y0=np.zeros((k,1)))
+		cs=constraints.ConvexConstraints(lc=None, qcs=[], socs=[], lmic=lmic, y0=np.zeros((k,1)))
 		print("Created")
 
 		total_s=getTime_sMethod(cs, num_samples)
 
-		times_sdp.append({'k': k,'r_F': r_F,'Time': total_s})
+		times_lmi.append({'k': k,'r_F': r_F,'Time': total_s})
 
-times_sdp=pd.DataFrame(times_sdp)
-# utils.savepickle(times_sdp, path+"times_sdp.pkl")
-times_sdp.to_csv(path+"times_sdp.csv",index=False)
+times_lmi=pd.DataFrame(times_lmi)
+# utils.savepickle(times_lmi, path+"times_lmi.pkl")
+times_lmi.to_csv(path+"times_lmi.csv",index=False)
 
-print(times_sdp)
+print(times_lmi)
