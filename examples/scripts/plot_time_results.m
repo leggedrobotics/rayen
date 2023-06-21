@@ -5,10 +5,7 @@ set(0,'defaulttextInterpreter','latex');
 set(groot, 'defaultAxesTickLabelInterpreter','latex'); set(groot, 'defaultLegendInterpreter','latex');
 set(0,'defaultfigurecolor',[1 1 1])
 
-addpath(genpath('./../submodules/minvo/'))
-addpath(genpath('./../submodules/export_fig/'))
-addpath(genpath('./utils'))
-
+addpath(genpath('./matlab/'))
 
 lin=readtable('./results/times_lin.csv');
 qp=readtable('./results/times_qp.csv');
@@ -89,7 +86,7 @@ for i=sort(unique(lmi.r_F)','descend')
     indexes=(lmi.r_F==i);
     plot(lmi.k(indexes), 1e3*lmi.Time(indexes),'-o','DisplayName',['$r=',num2str(i),'$'], 'LineWidth',linewidth, 'MarkerFaceColor',default_colors(num_color,:),'MarkerEdgeColor',default_colors(num_color,:))
     xlabel('$k$'); ylabel('Time (ms)')
-    title("\textbf{LMI Constraints}")
+    title("\textbf{LMI Constraint}")
     legend('Location','northwest')
     num_color=num_color+1;
 end
