@@ -74,11 +74,11 @@ class ConstraintModule(torch.nn.Module):
 			self.z_to_be_projected = cp.Parameter((self.n,1))  #original point
 			constraints= self.cs.getConstraintsInSubspaceCvxpy(self.z_projected)
 
-			#First option. Sometimes it does not work ("Solver ecos returned status Infeasible" or "Solver SCS returned status Infeasible")
-			# objective = cp.Minimize(cp.sum_squares(self.z_projected - self.z_to_be_projected))
+			#First option.
+			objective = cp.Minimize(cp.sum_squares(self.z_projected - self.z_to_be_projected))
 
-			#Second option. This one is preferred because of this: http://cvxr.com/cvx/doc/advanced.html#eliminating-quadratic-forms
-			objective = cp.Minimize(cp.norm(self.z_projected - self.z_to_be_projected))
+			#Second option. Sometimes this may be preferred because of this: http://cvxr.com/cvx/doc/advanced.html#eliminating-quadratic-forms This may solve cases of ("Solver ecos returned status Infeasible" or "Solver SCS returned status Infeasible")
+			# objective = cp.Minimize(cp.norm(self.z_projected - self.z_to_be_projected))
 
 			self.prob_projection = cp.Problem(objective, constraints)
 
