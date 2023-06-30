@@ -15,6 +15,14 @@ my_table=readtable('./results/merged.csv');
 hasMatch = ~cellfun('isempty', regexp(my_table.method, 'RAYEN_old', 'once')) ;
 my_table(hasMatch, :)=[];
 
+%Change the name Optimization with Gurobi
+hasMatch = find(~cellfun('isempty', regexp(my_table.method, 'dataset2d_Optimization', 'once')),1) ;
+my_table(hasMatch, 1).method={'dataset2d_Gurobi'};
+
+hasMatch = find(~cellfun('isempty', regexp(my_table.method, 'dataset3d_Optimization', 'once')),1) ;
+my_table(hasMatch, 1).method={'dataset3d_Gurobi'};
+
+
 
 hasMatch = ~cellfun('isempty', regexp(my_table.method, 'dataset2d', 'once')) ;
 results2d=my_table(hasMatch, :);
