@@ -1,6 +1,6 @@
 function doSetup()
 
-    set(0,'DefaultFigureWindowStyle','docked') %'normal' 'docked'
+    set(0,'DefaultFigureWindowStyle','normal') %'normal' 'docked'
     set(0,'defaulttextInterpreter','latex');  set(groot, 'defaultAxesTickLabelInterpreter','latex'); set(groot, 'defaultLegendInterpreter','latex');
     set(0,'defaultfigurecolor',[1 1 1])
     
