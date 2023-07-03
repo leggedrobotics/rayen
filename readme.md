@@ -2,7 +2,7 @@
 
 Paper: Coming soon
 
-This framework allows you to impose convex constraints on the output or latent variable of a Neural Network. examples
+This framework allows you to impose convex constraints on the output or latent variable of a Neural Network.
 ![](./imgs/rayen.png)
 
 ![](./imgs/rayen_equations.png)
@@ -23,7 +23,7 @@ cd rayen && pip install -e .
 
 # Usage
 
-A minimal example (with only linear and quadratic constraints) is as follows:
+A minimal example is as follows:
 
 ```python
 import torch
@@ -36,15 +36,15 @@ b1 = np.array([[1.0], [1.0], [1.0], [0], [0], [0]])
 A2 = np.array([[1.0, 1.0, 1.0]]);
 b2 = np.array([[1.0]]);
 lc=constraints.LinearConstraint(A1, b1, A2, b2) #Set lc to None if there are no linear constraints
-												#Set A1 and b1 to None if there are no linear inequality constraints
-												#Set A2 and b2 to None if there are no linear equality constraints
+						#Set A1 and b1 to None if there are no linear inequality constraints
+						#Set A2 and b2 to None if there are no linear equality constraints
 
 #Quadratic constraints
 P = np.array([[3.125,0.0,0.0], [0.0,3.125,0.0], [0.0,0.0,3.125]])
 q = np.array([[0.0],[0.0],[0.0]])
 r = np.array([[-1.0]])
 qcs = [constraints.ConvexQuadraticConstraint(P, q, r)] #Set qcs to [] if there are no quadratic constraints
-													   #More quadratic constraints can be appended to this list
+                                                       #More quadratic constraints can be appended to this list
 
 #SOC constraint
 M=np.array([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0],[0.0, 0.0, 0.0]])
@@ -52,7 +52,7 @@ s=np.array([[0.0],[0.0],[0.0]])
 c=np.array([[0.0],[0.0],[1.0]])
 d=np.array([[0.0]])
 socs = [constraints.SOCConstraint(M, s, c, d)] #Set socs to [] if there are no SOC constraints
-											   #More SOC constraints can be appended to this list
+                                               #More SOC constraints can be appended to this list
 
 #LMI constraints (semidefinite constraints)
 F0=np.array([[1.0, 0.0],[0.0, 0.0]])
@@ -65,9 +65,9 @@ lmic=constraints.LMIConstraint([F0, F1, F2, F3]) #Set lmic to None if there are 
 
 cs = constraints.ConvexConstraints(lc=lc, qcs=qcs, socs=socs, lmic=lmic)
 
-model = torch.nn.Sequential(torch.nn.Flatten(), torch.nn.Linear(3, 64), 
-					        torch.nn.ReLU(),    torch.nn.Linear(64, 64),
-					   		constraint_module.ConstraintModule(cs, input_dim=64, create_map=True)) 
+model = torch.nn.Sequential(torch.nn.Flatten(), torch.nn.Linear(3, 64),
+                            torch.nn.ReLU(),    torch.nn.Linear(64, 64),
+			    constraint_module.ConstraintModule(cs, input_dim=64, create_map=True)) 
 
 x_batched = torch.Tensor(500, 3, 1).uniform_(-1.0, 1.0)
 y_batched = model(x_batched)
@@ -78,7 +78,7 @@ y_batched = model(x_batched)
 # loss.backward() # Backpropagate
 ```
 
-These are the methods implememted in this repo (please see the paper for details):
+These are the methods implemented in this repo (please see the paper for details):
 
 
 Method | Linear | Quadratic | SOC | LMI
