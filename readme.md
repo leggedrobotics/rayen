@@ -1,6 +1,13 @@
 # RAYEN: Imposition of Hard Convex Constraints on Neural Networks #
 
-![](./rayen.png)
+Paper: Coming soon
+
+This framework allows you to impose convex constraints on the output or latent variable of a Neural Network. examples
+![](./imgs/rayen.png)
+
+![](./imgs/rayen_equations.png)
+
+
 
 # Installation
 
@@ -23,28 +30,44 @@ import torch
 import numpy as np
 from rayen import constraints, constraint_module
 
-#Linear constraints: A 3D Cube and a plane in 3D
-A1 = np.array([ [1.0, 0, 0], [0, 1.0, 0], [0, 0, 1.0], [-1.0, 0, 0], [0, -1.0, 0], [0, 0, -1.0]]);
+#Linear constraints
+A1 = np.array([[1.0, 0, 0], [0, 1.0, 0], [0, 0, 1.0], [-1.0, 0, 0], [0, -1.0, 0], [0, 0, -1.0]]);
 b1 = np.array([[1.0], [1.0], [1.0], [0], [0], [0]])
 A2 = np.array([[1.0, 1.0, 1.0]]);
 b2 = np.array([[1.0]]);
-lc=constraints.LinearConstraint(A1, b1, A2, b2)
+lc=constraints.LinearConstraint(A1, b1, A2, b2) #Set lc to None if there are no linear constraints
+												#Set A1 and b1 to None if there are no linear inequality constraints
+												#Set A2 and b2 to None if there are no linear equality constraints
 
-#Quadratic constraints: A Sphere 
-P = np.array([[3.125 , 0.0   , 0.0  ], [0.0   , 3.125, 0.0   ], [0.0   , 0.   , 3.125]])
+#Quadratic constraints
+P = np.array([[3.125,0.0,0.0], [0.0,3.125,0.0], [0.0,0.0,3.125]])
 q = np.array([[0.0],[0.0],[0.0]])
 r = np.array([[-1.0]])
-qcs = [constraints.ConvexQuadraticConstraint(P, q, r)]
+qcs = [constraints.ConvexQuadraticConstraint(P, q, r)] #Set qcs to [] if there are no quadratic constraints
+													   #More quadratic constraints can be appended to this list
 
-#Add SOC and LMI (SDP) constraints here if needed
-# ...
+#SOC constraint
+M=np.array([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0],[0.0, 0.0, 0.0]])
+s=np.array([[0.0],[0.0],[0.0]])
+c=np.array([[0.0],[0.0],[1.0]])
+d=np.array([[0.0]])
+socs = [constraints.SOCConstraint(M, s, c, d)] #Set socs to [] if there are no SOC constraints
+											   #More SOC constraints can be appended to this list
 
-cs = constraints.ConvexConstraints(lc=lc, qcs=qcs, socs=[], lmic=None)
+#LMI constraints (semidefinite constraints)
+F0=np.array([[1.0, 0.0],[0.0, 0.0]])
+F1=np.array([[0.0, 1.0],[1.0, 0.0]])
+F2=np.array([[0.0, 0.0],[0.0, 1.0]])
+F3=np.array([[0.0, 0.0],[0.0, 0.0]])
+lmic=constraints.LMIConstraint([F0, F1, F2, F3]) #Set lmic to None if there are no LMI constraints
+
+#----
+
+cs = constraints.ConvexConstraints(lc=lc, qcs=qcs, socs=socs, lmic=lmic)
 
 model = torch.nn.Sequential(torch.nn.Flatten(), torch.nn.Linear(3, 64), 
-			    torch.nn.ReLU(),    torch.nn.Linear(64, 64),
-			    torch.nn.ReLU(),    torch.nn.Linear(64, 64),
-			    constraint_module.ConstraintModule(cs, input_dim=64, create_map=True)) 
+					        torch.nn.ReLU(),    torch.nn.Linear(64, 64),
+					   		constraint_module.ConstraintModule(cs, input_dim=64, create_map=True)) 
 
 x_batched = torch.Tensor(500, 3, 1).uniform_(-1.0, 1.0)
 y_batched = model(x_batched)
@@ -55,21 +78,21 @@ y_batched = model(x_batched)
 # loss.backward() # Backpropagate
 ```
 
-You can choose the method used. These are the methods (please see the paper for details):
+These are the methods implememted in this repo (please see the paper for details):
 
 
 Method | Linear | Quadratic | SOC | LMI
 :------------ | :-------------: | :-------------: | :-------------: | :-------------: 
-**UU** | :heavy_check_mark: |  :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:
-**UP** | :heavy_check_mark: |  :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:
-**PP** | :heavy_check_mark: |  :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:
-**DC3** | :heavy_check_mark: |  :heavy_check_mark: | :large_orange_diamond: | :large_orange_diamond:
-**Bar** | :heavy_check_mark: |  :x: | :x: | :x:
-**RAYEN** | :heavy_check_mark: |  :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:
+**UU** | :white_check_mark: |  :white_check_mark: | :white_check_mark: | :white_check_mark:
+**UP** | :white_check_mark: |  :white_check_mark: | :white_check_mark: | :white_check_mark:
+**PP** | :white_check_mark: |  :white_check_mark: | :white_check_mark: | :white_check_mark:
+**DC3** | :white_check_mark: |  :white_check_mark: | :large_orange_diamond: | :large_orange_diamond:
+**Bar** | :white_check_mark: |  :x: | :x: | :x:
+**RAYEN** | :white_check_mark: |  :white_check_mark: | :white_check_mark: | :white_check_mark:
 
-where :heavy_check_mark: denotes supported by the algorithm and implemented in the code, :x: denotes not supported by the algorithm, and :large_orange_diamond: denotes supported by the algorithm but not implemented yet.
+where :white_check_mark: denotes supported by the algorithm and implemented in the code, :x: denotes not supported by the algorithm, and :large_orange_diamond: denotes supported by the algorithm but not implemented yet. 
 
-![](./rayen_equations.png)
+You can choose the method to use setting the argument `method` when creating the layer. 
 
 # More examples
 
@@ -84,12 +107,15 @@ git submodule init && git submodule update --init --recursive
 pip install examples/requirement_examples.txt
 ```
 
+These are the most important files in the `examples` folder:
+* **`test_layer.py`**: This file imposes many different constraints using all the methods shown above. It will create plots similar to the one shown at the beginning of this repo 
+* **`time_analysis.py`**: This file obtains the computation time of RAYEN when applied to many different constraints. 
+* **`run.h`**: This file will train the networks for all the algorithms used in the paper, and then evaluate them using the testing sets. Depending on the computer to use, this can take ~1 day to run. The datasets that this file uses are stored in the files `corridor_dim2.mat` (Optimization 1 of the paper, which is for a 2D scenario) and `corridor_dim3.mat` (Optimization 2 of the paper, which is for a 3D scenario). These files were generated running the file `traj_planning_in_corridor.m`. This Matlab files requires Casadi (and its interface with Gurobi) to be installed. You can do this using the instructions below
+
 Some of these examples use (or can use) [Gurobi Optimizer](https://www.gurobi.com/products/gurobi-optimizer/). Once installed (following the instructions in the previous link) you can test the installation typing `gurobi.sh` in the terminal. You will also need this package:
 ```
 pip install gurobipy
 ```
-
-To generate the data used in the examples (the files `corridor_dim2.mat` and `corridor_dim3.mat`, you need to run the Matlab file `traj_planning_in_corridor.m`. This file requires Casadi (its interface with Gurobi) to be installed. You can do this using the instructions below:
 
 <details>
   <summary> <b>Casadi installation instructions (optional dependency)</b></summary>
