@@ -300,6 +300,7 @@ class ConvexConstraints():
 					if(self.solver=='GUROBI'):
 						result = prob.solve(verbose=False, solver=self.solver, reoptimize=True)
 					else:
+						TOL=1e-5;
 						result = prob.solve(verbose=False, solver=self.solver)                # When using Gurobi, we need the reoptimize parameter because if not the solver cannot distinguish between infeasible or unbounded. This is the error you get:
 																							  #   The problem is either infeasible or unbounded, but the solver
 																							  #   cannot tell which. Disable any solver-specific presolve methods
@@ -318,7 +319,7 @@ class ConvexConstraints():
 					if(prob.status != 'optimal' and prob.status!='unbounded' and prob.status!='optimal_inaccurate'):
 						raise Exception(f"prob.status={prob.status}")
 
-					assert obj_value<TOL#The objective should be negative
+					assert obj_value<TOL, f"The objective should be negative. It's {obj_value} right now"
 
 					if (obj_value>-TOL): #if the objective value is zero (I tried to go far from the constraint, but I couldn't)
 						E.append(i)
