@@ -81,16 +81,18 @@ y_batched = model(x_batched)
 These are the methods implememted in this repo (please see the paper for details):
 
 
+
+
 Method | Linear | Quadratic | SOC | LMI
 :------------ | :-------------: | :-------------: | :-------------: | :-------------: 
-**UU** | :white_check_mark: |  :white_check_mark: | :white_check_mark: | :white_check_mark:
-**UP** | :white_check_mark: |  :white_check_mark: | :white_check_mark: | :white_check_mark:
-**PP** | :white_check_mark: |  :white_check_mark: | :white_check_mark: | :white_check_mark:
-**DC3** | :white_check_mark: |  :white_check_mark: | :large_orange_diamond: | :large_orange_diamond:
-**Bar** | :white_check_mark: |  :x: | :x: | :x:
-**RAYEN** | :white_check_mark: |  :white_check_mark: | :white_check_mark: | :white_check_mark:
+**UU** |    <img src='./imgs/green-tick.png' width='25'>    |     <img src='./imgs/green-tick.png' width='25'>    |    <img src='./imgs/green-tick.png' width='25'>    |    <img src='./imgs/green-tick.png' width='25'>   
+**UP** |    <img src='./imgs/green-tick.png' width='25'>    |     <img src='./imgs/green-tick.png' width='25'>    |    <img src='./imgs/green-tick.png' width='25'>    |    <img src='./imgs/green-tick.png' width='25'>   
+**PP** |    <img src='./imgs/green-tick.png' width='25'>    |     <img src='./imgs/green-tick.png' width='25'>    |    <img src='./imgs/green-tick.png' width='25'>    |    <img src='./imgs/green-tick.png' width='25'>   
+**DC3** |    <img src='./imgs/green-tick.png' width='25'>    |     <img src='./imgs/green-tick.png' width='25'>    |  <img src='./imgs/diamond.svg' width='25'> |  <img src='./imgs/diamond.svg' width='25'>
+**Bar** |    <img src='./imgs/green-tick.png' width='25'>    |  <img src='./imgs/red_cross.svg' width='20'> | <img src='./imgs/red_cross.svg' width='20'> | <img src='./imgs/red_cross.svg' width='20'>
+**RAYEN** |  <img src='./imgs/green-tick.png' width='25'> |     <img src='./imgs/green-tick.png' width='25'>    |    <img src='./imgs/green-tick.png' width='25'>    |    <img src='./imgs/green-tick.png' width='25'>   
 
-where :white_check_mark: denotes supported by the algorithm and implemented in the code, :x: denotes not supported by the algorithm, and :large_orange_diamond: denotes supported by the algorithm but not implemented yet. 
+where    <img src='./imgs/green-tick.png' width='20'>    denotes supported by the algorithm and implemented in the code, <img src='./imgs/red_cross.svg' width='15'> denotes not supported by the algorithm, and  <img src='./imgs/diamond.svg' width='20'> denotes supported by the algorithm but not implemented yet. 
 
 You can choose the method to use setting the argument `method` when creating the layer. 
 
