@@ -36,8 +36,8 @@ b1 = np.array([[1.0], [1.0], [1.0], [0], [0], [0]])
 A2 = np.array([[1.0, 1.0, 1.0]]);
 b2 = np.array([[1.0]]);
 lc=constraints.LinearConstraint(A1, b1, A2, b2) #Set lc to None if there are no linear constraints
-						#Set A1 and b1 to None if there are no linear inequality constraints
-						#Set A2 and b2 to None if there are no linear equality constraints
+                                                #Set A1 and b1 to None if there are no linear inequality constraints
+                                                #Set A2 and b2 to None if there are no linear equality constraints
 
 #Quadratic constraints
 P = np.array([[3.125,0.0,0.0], [0.0,3.125,0.0], [0.0,0.0,3.125]])
@@ -67,7 +67,7 @@ cs = constraints.ConvexConstraints(lc=lc, qcs=qcs, socs=socs, lmic=lmic)
 
 model = torch.nn.Sequential(torch.nn.Flatten(), torch.nn.Linear(3, 64),
                             torch.nn.ReLU(),    torch.nn.Linear(64, 64),
-			    constraint_module.ConstraintModule(cs, input_dim=64, create_map=True)) 
+                            constraint_module.ConstraintModule(cs, input_dim=64, create_map=True)) 
 
 x_batched = torch.Tensor(500, 3, 1).uniform_(-1.0, 1.0)
 y_batched = model(x_batched)
