@@ -23,7 +23,7 @@ class ConstraintModule(torch.nn.Module):
 			raise NotImplementedError
 
 		if(self.method=='DC3'):
-			assert args_DC3 is not None
+			utils.verify(args_DC3 is not None)
 			self.args_DC3=args_DC3
 
 		self.cs=cs
@@ -33,7 +33,7 @@ class ConstraintModule(torch.nn.Module):
 		D=cs.A_p/((cs.b_p-cs.A_p@cs.z0)@np.ones((1,cs.n)))
 			
 		all_P, all_q, all_r = utils.getAllPqrFromQcs(cs.qcs)
-		all_M, all_s, all_c, all_d= utils.getAllMscdFromQcs(cs.socs)
+		all_M, all_s, all_c, all_d= utils.getAllMscdFromSocs(cs.socs)
 
 		if(cs.has_lmi_constraints):
 			all_F=copy.deepcopy(cs.lmic.all_F)
@@ -117,8 +117,6 @@ class ConstraintModule(torch.nn.Module):
 				self.register_buffer("all_phi", all_phi)
 
 		if(self.method=='Bar'):
-			# print(f"A_p={cs.A_p}")
-			# print(f"b_p={cs.b_p}")
 			print("Computing vertices and rays...")
 			V, R = utils.H_to_V(cs.A_p, cs.b_p);
 			self.register_buffer("V", torch.Tensor(V))
@@ -126,8 +124,7 @@ class ConstraintModule(torch.nn.Module):
 			self.num_vertices=self.V.shape[1];
 			self.num_rays=self.R.shape[1];
 			assert (self.num_vertices+self.num_rays)>0
-			print(f"vertices={self.V}")
-			print(f"rays={self.R}")
+			print(f"Found {self.num_vertices} vertices and {self.num_rays} rays")
 
 		if(self.method=='DC3'):
 
@@ -203,17 +200,17 @@ class ConstraintModule(torch.nn.Module):
 				r_effective=qo.T@A2oi@b2 + 0.5*b2.T@A2oi.T@Po@A2oi@b2 + r
 
 				###### QUICK CHECK
-				tmp=random.randint(1, 100) #number of elements in the batch
-				yp=torch.rand(tmp, len(self.partial_vars), 1) 
+				# tmp=random.randint(1, 100) #number of elements in the batch
+				# yp=torch.rand(tmp, len(self.partial_vars), 1) 
 
-				y = torch.zeros((tmp, self.k, 1))
-				y[:, self.partial_vars, :] = yp
-				y[:, self.other_vars, :] = self.obtainyoFromypDC3(yp)
+				# y = torch.zeros((tmp, self.k, 1))
+				# y[:, self.partial_vars, :] = yp
+				# y[:, self.other_vars, :] = self.obtainyoFromypDC3(yp)
 
-				using_effective=utils.quadExpression(yp, P_effective, q_effective, r_effective)
-				using_original=utils.quadExpression(y, P, q, r)
+				# using_effective=utils.quadExpression(yp, P_effective, q_effective, r_effective)
+				# using_original=utils.quadExpression(y, P, q, r)
 
-				assert torch.allclose(using_effective, using_original, atol=1e-05) 
+				# assert torch.allclose(using_effective, using_original, atol=1e-05) 
 
 				###################
 
@@ -255,7 +252,7 @@ class ConstraintModule(torch.nn.Module):
 			raise NotImplementedError
 
 		if(create_map):
-			assert input_dim is not None, "input_dim needs to be provided"
+			utils.verify(input_dim is not None, "input_dim needs to be provided")
 			self.mapper=nn.Linear(input_dim, self.dim_after_map);
 		else:
 			self.mapper=nn.Sequential(); #Mapper does nothing
@@ -322,18 +319,13 @@ class ConstraintModule(torch.nn.Module):
 			################################################
 			################################################
 
-			# print(f"step_index={step_index}, Violation={violation}")
-
 			converged_ineq = (violation < self.args_DC3['eps_converge'])
 			max_iter_reached = (step_index >= max_steps)
 
 			if(max_iter_reached):
-				# utils.printInBoldRed("Max iter reached")
 				break
 
 			if(converged_ineq):
-				# utils.printInBoldRed("Converged ineq reached")
-
 				break
 
 		return y_new
@@ -380,7 +372,7 @@ class ConstraintModule(torch.nn.Module):
 				# assert torch.allclose(kappa_positive_i,kappa_positive_i_first_way, atol=1e-06), f"{torch.max(torch.abs(kappa_positive_i-kappa_positive_i_first_way))}"
 
 
-				assert torch.all(kappa_positive_i >= 0), f"Smallest element is {kappa_positive_i}" #If not, then either the feasible set is infeasible (note that z0 is inside the feasible set)
+				assert torch.all(kappa_positive_i >= 0), f"Smallest element is {kappa_positive_i}" #If not, then Z may not be feasible (note that z0 is in the interior of Z)
 				all_kappas_positives = torch.cat((all_kappas_positives, kappa_positive_i), dim=1)
 
 			for i in range(self.all_M.shape[0]): #for each of the SOC constraints
@@ -417,7 +409,6 @@ class ConstraintModule(torch.nn.Module):
 				############# COMPUTE THE EIGENVALUES
 
 				## Option 1: (compute whole spectrum of the matrix, using the non-symmetric matrix self.mHinv@S)
-				# print(f"Computing eigenvalues")
 				# eigenvalues = torch.unsqueeze(torch.linalg.eigvals(self.mHinv@S),2) #Note that mHinv@M is not symmetric but always have real eigenvalues
 				# assert (torch.all(torch.isreal(eigenvalues)))
 				# largest_eigenvalue = torch.max(eigenvalues.real, dim=1, keepdim=True).values 

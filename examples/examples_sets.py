@@ -192,4 +192,4 @@ def getExample(example):
 		raise Exception("Not implemented yet")
 
 
-	return constraints.ConvexConstraints(lc=lc, qcs=qcs, socs=socs, lmic=lmic)
+	return constraints.ConvexConstraints(lc=lc, qcs=qcs, socs=socs, lmic=lmic, print_debug_info=False)

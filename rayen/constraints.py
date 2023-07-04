@@ -17,22 +17,22 @@ class LinearConstraint():
 		self.A2 = A2
 		self.b2 = b2
 
-		assert self.hasEqConstraints() or self.hasIneqConstraints()
+		utils.verify(self.hasEqConstraints() or self.hasIneqConstraints())
 
 		if (self.hasIneqConstraints()):
-			assert A1.ndim == 2, f"A1.shape={A1.shape}"
-			assert b1.ndim == 2, f"b1.shape={b1.shape}"
-			assert b1.shape[1] ==1
-			assert A1.shape[0] == b1.shape[0]
+			utils.verify(A1.ndim == 2)
+			utils.verify(b1.ndim == 2)
+			utils.verify(b1.shape[1] ==1)
+			utils.verify(A1.shape[0] == b1.shape[0])
 
 		if (self.hasEqConstraints()):
-			assert A2.ndim == 2, f"A2.shape={A2.shape}"
-			assert b2.ndim == 2, f"b2.shape={b2.shape}"
-			assert b2.shape[1] ==1
-			assert A2.shape[0] == b2.shape[0]
+			utils.verify(A2.ndim == 2)
+			utils.verify(b2.ndim == 2)
+			utils.verify(b2.shape[1] ==1)
+			utils.verify(A2.shape[0] == b2.shape[0])
 
 		if (self.hasIneqConstraints() and self.hasEqConstraints()):
-			assert A1.shape[1] == A2.shape[1]
+			utils.verify(A1.shape[1] == A2.shape[1])
 
 	def hasEqConstraints(self):
 		return (self.A2 is not None and self.b2 is not None)
@@ -72,8 +72,7 @@ class ConvexQuadraticConstraint():
 
 			######## Check that the matrix is PSD up to a tolerance
 			tol=1e-7
-			if(smallest_eigenvalue<-tol):
-				assert False, f"Matrix P is not PSD, smallest eigenvalue is {smallest_eigenvalue}"
+			utils.verify(smallest_eigenvalue>-tol, f"Matrix P is not PSD, smallest eigenvalue is {smallest_eigenvalue}")
 			#########################
 
 			#Note: All the code assummes that P is a PSD matrix. This is specially important when:
@@ -84,8 +83,6 @@ class ConvexQuadraticConstraint():
 			if( (-tol)<=smallest_eigenvalue<0  ):
 				#Correction due to numerical errors
 				
-				# utils.printInBoldGreen(f"Correcting with smallest_eigenvalue={smallest_eigenvalue}")
-
 				##Option 1
 				self.P = self.P +np.abs(smallest_eigenvalue)*np.eye(self.P.shape[0]) 
 
@@ -109,12 +106,12 @@ class SOCConstraint():
 		utils.checkMatrixisNotZero(M);
 		utils.checkMatrixisNotZero(c);
 
-		assert M.shape[1]==c.shape[0]
-		assert M.shape[0]==s.shape[0]
-		assert s.shape[1]==1
-		assert c.shape[1]==1
-		assert d.shape[0]==1
-		assert d.shape[1]==1
+		utils.verify(M.shape[1]==c.shape[0])
+		utils.verify(M.shape[0]==s.shape[0])
+		utils.verify(s.shape[1]==1)
+		utils.verify(c.shape[1]==1)
+		utils.verify(d.shape[0]==1)
+		utils.verify(d.shape[1]==1)
 
 		self.M = M
 		self.s = s
@@ -135,7 +132,7 @@ class LMIConstraint():
 			utils.checkMatrixisSymmetric(F);
 		
 		for F_i in all_F:
-			assert F_i.shape==all_F[0].shape
+			utils.verify(F_i.shape==all_F[0].shape)
 
 		self.all_F=all_F
 
@@ -160,7 +157,7 @@ class ConvexConstraints():
 	# If it's provided, this code does not check whether or not that point is in the relative interior of the set. It's the user's responsibility to do that 
 
 	# do_preprocessing_linear can be set to True ONLY when the user knows beforehand that affine_hull{y:A1y<=b1} = R^k  . Again, it's the user's responsibility to ensure that that is actually the case 
-	def __init__(self, lc=None, qcs=[], socs=[], lmic=None, y0=None, do_preprocessing_linear=True):
+	def __init__(self, lc=None, qcs=[], socs=[], lmic=None, y0=None, do_preprocessing_linear=True, print_debug_info=False):
 
 		if(lc is not None):
 			self.has_linear_eq_constraints=lc.hasEqConstraints();
@@ -182,7 +179,7 @@ class ConvexConstraints():
 		self.lmic=lmic
 
 
-		assert (self.has_quadratic_constraints or self.has_linear_constraints or self.has_soc_constraints or self.has_lmi_constraints), "There are no constraints!"
+		utils.verify((self.has_quadratic_constraints or self.has_linear_constraints or self.has_soc_constraints or self.has_lmi_constraints), "There are no constraints!")
 
 
 		#Check that the dimensions of all the constraints are the same
@@ -196,7 +193,7 @@ class ConvexConstraints():
 		if(self.has_lmi_constraints):
 			all_dim.append(lmic.dim())
 
-		assert utils.all_equal(all_dim)
+		utils.verify(utils.all_equal(all_dim))
 		#####################################3
 
 		self.k=all_dim[0]
@@ -246,7 +243,9 @@ class ConvexConstraints():
 				#Add the equality constraints as inequality constraints
 				A=np.concatenate((self.lc.A2,-self.lc.A2), axis=0);
 				b=np.concatenate((self.lc.b2,-self.lc.b2), axis=0);
-			utils.printInBoldGreen(f"A is {A.shape} and b is {b.shape}")
+
+			if(print_debug_info):
+				utils.printInBoldGreen(f"A is {A.shape} and b is {b.shape}")
 			########################################
 
 			if(do_preprocessing_linear):
@@ -258,11 +257,11 @@ class ConvexConstraints():
 					################################################
 					#Eq 1.5 of https://www.research-collection.ethz.ch/bitstream/handle/20.500.11850/167108/1/thesisFinal_MaySzedlak.pdf
 					#See also https://mathoverflow.net/a/69667
-					utils.printInBoldBlue("Removing redundant constraints...")
+					if(print_debug_info):
+						utils.printInBoldBlue("Removing redundant constraints...")
 					indexes_const_removed=[]
 					reversed_indexes=list(reversed(range(A.shape[0])));
 					for i in tqdm(reversed_indexes):
-						# print(i)
 						all_rows_but_i=[x for x in range(A.shape[0]) if x != i]
 						objective = cp.Maximize(A[i,:]@z)
 						constraints=[A[all_rows_but_i,:]@z<=b[all_rows_but_i,:],   A[i,:]@z<=(b[i,0]+1)]
@@ -272,14 +271,13 @@ class ConvexConstraints():
 							raise Exception("Value is not optimal")
 
 						if ((objective.value-b[i,0])<=TOL):
-							# print(f"Deleting constraint {i}")
 							indexes_const_removed.append(i)
 							A = np.delete(A, (i), axis=0)
 							b = np.delete(b, (i), axis=0)
 
-					# printInBoldBlue(f"Removed constraints {indexes_const_removed}")
-					utils.printInBoldBlue(f"Removed {len(indexes_const_removed)} constraints ")
-					utils.printInBoldGreen(f"A is {A.shape} and b is {b.shape}")
+					if(print_debug_info):
+						utils.printInBoldBlue(f"Removed {len(indexes_const_removed)} constraints ")
+						utils.printInBoldGreen(f"A is {A.shape} and b is {b.shape}")
 					################################################
 
 
@@ -291,7 +289,8 @@ class ConvexConstraints():
 
 				E=[] #contains the indexes of the constraints in the equality set
 
-				utils.printInBoldBlue("Finding Affine Hull and projecting...")
+				if(print_debug_info):
+					utils.printInBoldBlue("Finding Affine Hull and projecting...")
 
 				for i in tqdm(range(A.shape[0])):
 					objective = cp.Minimize(A[i,:]@z-b[i,0]) #I try to go far from the constraint, into the feasible set
@@ -319,7 +318,7 @@ class ConvexConstraints():
 					if(prob.status != 'optimal' and prob.status!='unbounded' and prob.status!='optimal_inaccurate'):
 						raise Exception(f"prob.status={prob.status}")
 
-					assert obj_value<TOL, f"The objective should be negative. It's {obj_value} right now"
+					utils.verify(obj_value<TOL, f"The objective should be negative. It's {obj_value} right now")
 
 					if (obj_value>-TOL): #if the objective value is zero (I tried to go far from the constraint, but I couldn't)
 						E.append(i)
@@ -334,7 +333,8 @@ class ConvexConstraints():
 					start=0
 				E=list(range(start, A.shape[0]))
 
-			utils.printInBoldGreen(f"E={E}")
+			if(print_debug_info):
+				utils.printInBoldGreen(f"E={E}")
 
 			I=[i for i in range(A.shape[0]) if i not in E];
 
@@ -365,18 +365,13 @@ class ConvexConstraints():
 			b_p=b_I-A_I@yp
 					
 
-			# print(f"A_p=\n{A_p}")
-			# print(f"b_p=\n{b_p}")
+			utils.verify(A_p.ndim == 2, f"A_p.shape={A_p.shape}")
+			utils.verify(b_p.ndim == 2, f"b_p.shape={b_p.shape}")
+			utils.verify(b_p.shape[1] ==1)
+			utils.verify(A_p.shape[0] == b_p.shape[0])
 
-			assert A_p.ndim == 2, f"A_p.shape={A_p.shape}"
-			assert b_p.ndim == 2, f"b_p.shape={b_p.shape}"
-			assert b_p.shape[1] ==1
-			assert A_p.shape[0] == b_p.shape[0]
-
-			# print(f"A=\n{A}")
-			# print(f"b=\n{b}")
-
-			utils.printInBoldGreen(f"A_p is {A_p.shape} and b_p is {b_p.shape}")
+			if(print_debug_info):
+				utils.printInBoldGreen(f"A_p is {A_p.shape} and b_p is {b_p.shape}")
 
 			self.n=A_p.shape[1] #dimension of the linear subspace
 
@@ -404,7 +399,7 @@ class ConvexConstraints():
 		self.yp=yp	
 		self.NA_E=NA_E	
 
-		assert self.n==(self.k-np.linalg.matrix_rank(self.A_E))
+		utils.verify(self.n==(self.k-np.linalg.matrix_rank(self.A_E)))
 
 		#############Obtain a strictly feasible point z0
 		###################################################
@@ -425,8 +420,8 @@ class ConvexConstraints():
 			if(prob.status != 'optimal' and prob.status!='optimal_inaccurate'):
 				raise Exception(f"Value is not optimal, prob_status={prob.status}")
 
-			assert epsilon.value>1e-8 #If not, there are no strictly feasible points in the subspace
-									  #TODO: change hand-coded tolerance
+			utils.verify(epsilon.value>1e-8) #If not, there are no strictly feasible points in the subspace
+									  		 #TODO: change hand-coded tolerance
 
 			self.z0 = z0.value
 			self.y0 = self.NA_E@self.z0 + self.yp	
@@ -435,7 +430,7 @@ class ConvexConstraints():
 			self.y0 = y0
 			self.z0 = self.NA_E.T@(self.y0-self.yp)
 
-		assert np.allclose(NA_E.T@NA_E, np.eye(NA_E.shape[1])) #By definition, N'*N=I
+		utils.verify(np.allclose(NA_E.T@NA_E, np.eye(NA_E.shape[1]))) #By definition, N'*N=I
 
 		###################### SET UP PROBLEM FOR PROJECTION
 		###################################################
@@ -472,7 +467,7 @@ class ConvexConstraints():
 			all_r=[-np.ones((1, 1))]                    # -1<=0 (i.e., no constraint)
 
 		if self.has_soc_constraints:
-			all_M, all_s, all_c, all_d = utils.getAllMscdFromQcs(self.socs)
+			all_M, all_s, all_c, all_d = utils.getAllMscdFromSocs(self.socs)
 		else:
 			all_M=[np.zeros((self.k, self.k))]
 			all_s=[np.zeros((self.k, 1))]
@@ -537,7 +532,6 @@ class ConvexConstraints():
 	#######################################3
 
 	def project(self, y_to_be_projected):
-		assert y_to_be_projected.shape==self.y_to_be_projected.shape
 
 		self.y_to_be_projected.value=y_to_be_projected;
 		obj_value = self.prob_projection.solve(verbose=False, solver=self.solver);
@@ -555,6 +549,6 @@ class ConvexConstraints():
 
 		_, violation = self.project(y_to_be_projected)
 
-		assert violation>=0  #violation is nonnegative by definition
+		# assert violation>=0  #violation is nonnegative by definition
 
 		return violation;

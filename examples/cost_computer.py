@@ -24,7 +24,7 @@ class CostComputer(nn.Module): #Using nn.Module to be able to use register_buffe
 			self.register_buffer("all_r", torch.Tensor(np.array(all_r)))
 
 		if(cs.has_soc_constraints):
-			all_M, all_s, all_c, all_d = utils.getAllMscdFromQcs(cs.socs)
+			all_M, all_s, all_c, all_d = utils.getAllMscdFromSocs(cs.socs)
 			self.register_buffer("all_M", torch.Tensor(np.array(all_M)))
 			self.register_buffer("all_s", torch.Tensor(np.array(all_s)))
 			self.register_buffer("all_c", torch.Tensor(np.array(all_c)))

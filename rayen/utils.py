@@ -14,6 +14,10 @@ def printInBoldWhite(data_string):
 	print(Style.BRIGHT+Fore.WHITE+data_string+Style.RESET_ALL)
 
 
+def verify(condition, message="Condition not satisfied"):
+	if(condition==False):
+		raise RuntimeError(message)
+
 def getAllPqrFromQcs(qcs):
 		all_P=[]
 		all_q=[]
@@ -24,7 +28,7 @@ def getAllPqrFromQcs(qcs):
 			all_r.append(qc.r)	
 		return all_P, all_q, all_r
 
-def getAllMscdFromQcs(socs):
+def getAllMscdFromSocs(socs):
 		all_M=[]
 		all_s=[]
 		all_c=[]
@@ -106,21 +110,21 @@ def isZero(A):
 	return (not np.any(A))
 
 def checkMatrixisNotZero(A):
-	assert (not isZero(A))
+	verify(not isZero(A))
 
 def checkMatrixisSymmetric(A):
-	assert A.shape[0]==A.shape[1]
-	assert np.allclose(A, A.T)
+	verify(A.shape[0]==A.shape[1])
+	verify(np.allclose(A, A.T))
 
 def checkMatrixisPsd(A, tol=0.0):
 	checkMatrixisSymmetric(A)
 	eigenvalues=np.linalg.eigvals(A);
-	assert np.all(eigenvalues >= -tol), f"Matrix is not PSD, min eigenvalue is {np.amin(eigenvalues)}"
+	verify(np.all(eigenvalues >= -tol), f"Matrix is not PSD, min eigenvalue is {np.amin(eigenvalues)}")
 
 def checkMatrixisPd(A):
 	checkMatrixisSymmetric(A)
 	eigenvalues=np.linalg.eigvals(A);
-	assert np.all(eigenvalues > 0.0), f"Matrix is not PD, min eigenvalue is {np.amin(eigenvalues)}"
+	verify(np.all(eigenvalues > 0.0), f"Matrix is not PD, min eigenvalue is {np.amin(eigenvalues)}")
 
 def isMatrixSingular(A):
 	return (np.linalg.matrix_rank(A) < self.E.shape[0])
@@ -223,11 +227,6 @@ def quadExpression(y, P, q, r):
 	q = q.to(y.device)
 	r = r.to(y.device)
 
-	# print(f"P.shape={P.shape}")
-	# print(f"q.shape={q.shape}")
-	# print(f"r.shape={r.shape}")
-	# print(f"y.shape={y.shape}")
-
 	if (q.ndim==2):
 		qT=q.T
 	else: #q is a batch
@@ -328,12 +327,11 @@ def H_to_V(A, b):
 	if(V.size==0):
 		V=np.array([[]])#Simply add a dimension, so that both V and R are 2D matrices
 
-	printInBoldRed(f"Found {V.shape[1]} vertices and {R.shape[1]} rays")
-
 	#Each column of V is a vertex
 	#Each column of R is a ray
 
 	return V, R
+
 
 
 
