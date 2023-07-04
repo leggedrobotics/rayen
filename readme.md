@@ -11,11 +11,19 @@ This framework allows you to impose convex constraints on the output or latent v
 
 # Installation
 
+First make sure that you have pip up-to-date:
+```bash
+pip install --upgrade pip
+```
+
+Then, you simply need to do:
+
+
 ```bash
 pip install rayen
 ```
 
-If you want to do an editable install, you can do:
+If you want to do an editable install, you can also do:
 ```bash
 git clone https://github.com/leggedrobotics/rayen.git
 cd rayen && pip install -e .
