@@ -1,3 +1,8 @@
+% --------------------------------------------------------------------------
+% Jesus Tordesillas Torres, Robotic Systems Lab, ETH Zürich 
+% See LICENSE file for the license information
+% -------------------------------------------------------------------------- 
+
 %Quadratic expression is (1/2)*x'*P*x + q'*x + r
 function [P, q, r] = getPandqandrOfQuadraticExpressionCasadi(my_expression, x)
 

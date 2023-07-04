@@ -1,3 +1,9 @@
+% --------------------------------------------------------------------------
+% Jesus Tordesillas Torres, Robotic Systems Lab, ETH Zürich 
+% See LICENSE file for the license information
+% -------------------------------------------------------------------------- 
+
+
 function [allA, allb, allV, p0, t0,tf,deg_pos, num_seg, num_of_seg_per_region, use_quadratic]=getCorridorAndParamsSpline(dimension)
 
     if(dimension==2)

@@ -1,3 +1,8 @@
+% --------------------------------------------------------------------------
+% Jesus Tordesillas Torres, Robotic Systems Lab, ETH Zürich 
+% See LICENSE file for the license information
+% -------------------------------------------------------------------------- 
+
 function result=uniformSampleInUnitBall(dim,num_points)
 %Method 20 of http://extremelearning.com.au/how-to-generate-uniformly-random-points-on-n-spheres-and-n-balls/
 

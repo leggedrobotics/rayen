@@ -1,3 +1,8 @@
+% --------------------------------------------------------------------------
+% Jesus Tordesillas Torres, Robotic Systems Lab, ETH Zürich 
+% See LICENSE file for the license information
+% -------------------------------------------------------------------------- 
+
 function doSetup()
 
     set(0,'DefaultFigureWindowStyle','normal') %'normal' 'docked'

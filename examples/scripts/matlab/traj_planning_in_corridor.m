@@ -1,3 +1,8 @@
+% --------------------------------------------------------------------------
+% Jesus Tordesillas Torres, Robotic Systems Lab, ETH Zürich 
+% See LICENSE file for the license information
+% -------------------------------------------------------------------------- 
+
 %This file solves the traj planning problem of generating a smooth
 %trajectory passing through several 3d polytopes. 
 

@@ -1,3 +1,8 @@
+% --------------------------------------------------------------------------
+% Jesus Tordesillas Torres, Robotic Systems Lab, ETH Zürich 
+% See LICENSE file for the license information
+% -------------------------------------------------------------------------- 
+
 %If radius=0, This gives a polyhedron with 6 faces around the line p1-->p2
 %If radius>0, some extra points are taken around the vertices of the polyhedron
 %Region is {x such that A1*x<=b1}

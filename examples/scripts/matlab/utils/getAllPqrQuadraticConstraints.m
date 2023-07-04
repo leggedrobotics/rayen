@@ -1,3 +1,8 @@
+% --------------------------------------------------------------------------
+% Jesus Tordesillas Torres, Robotic Systems Lab, ETH Zürich 
+% See LICENSE file for the license information
+% -------------------------------------------------------------------------- 
+
 %opti_tmp is an optimization problem from Casadi
 %Feasible set is 0.5*x'P_i x + q'x + r <=0
 function [all_P, all_q, all_r]=getAllPqrQuadraticConstraints(opti_tmp)

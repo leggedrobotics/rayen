@@ -1,3 +1,8 @@
+# --------------------------------------------------------------------------
+# Jesus Tordesillas Torres, Robotic Systems Lab, ETH Zürich 
+# See LICENSE file for the license information
+# -------------------------------------------------------------------------- 
+
 import numpy as np
 # import sys, os
 # sys.path.insert(1, os.path.join(sys.path[0], '..'))  #See first comment of this answer: https://stackoverflow.com/a/11158224

@@ -1,3 +1,8 @@
+# --------------------------------------------------------------------------
+# Jesus Tordesillas Torres, Robotic Systems Lab, ETH Zürich 
+# See LICENSE file for the license information
+# -------------------------------------------------------------------------- 
+
 #It operates on numpy stuff 
 #polytope defined as Ax<=b
 def largestBallInPolytope(A,b, max_radius=None):

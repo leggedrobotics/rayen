@@ -1,3 +1,8 @@
+# --------------------------------------------------------------------------
+# Jesus Tordesillas Torres, Robotic Systems Lab, ETH Zürich 
+# See LICENSE file for the license information
+# -------------------------------------------------------------------------- 
+
 # Import libraries
 import torch
 from torch.utils.data import Dataset, DataLoader

@@ -1,3 +1,8 @@
+% --------------------------------------------------------------------------
+% Jesus Tordesillas Torres, Robotic Systems Lab, ETH Zürich 
+% See LICENSE file for the license information
+% -------------------------------------------------------------------------- 
+
 %Note that MX can only have numbers
 %See also https://groups.google.com/g/casadi-users/c/8df2GfqrAS4/m/BTNsnkhiAwAJ
 function result=convertMX2Matlab(A)

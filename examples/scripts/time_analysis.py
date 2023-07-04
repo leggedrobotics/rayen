@@ -1,3 +1,8 @@
+# --------------------------------------------------------------------------
+# Jesus Tordesillas Torres, Robotic Systems Lab, ETH Zürich 
+# See LICENSE file for the license information
+# -------------------------------------------------------------------------- 
+
 import numpy as np
 import torch
 import time

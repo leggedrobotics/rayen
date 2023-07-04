@@ -1,3 +1,8 @@
+% --------------------------------------------------------------------------
+% Jesus Tordesillas Torres, Robotic Systems Lab, ETH Zürich 
+% See LICENSE file for the license information
+% -------------------------------------------------------------------------- 
+
 addpath(genpath('./../submodules/minvo/'))
 addpath(genpath('./../submodules/export_fig/'))
 addpath(genpath('./utils'))

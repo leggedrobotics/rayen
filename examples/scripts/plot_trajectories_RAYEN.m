@@ -1,3 +1,9 @@
+% --------------------------------------------------------------------------
+% Jesus Tordesillas Torres, Robotic Systems Lab, ETH Zürich 
+% See LICENSE file for the license information
+% -------------------------------------------------------------------------- 
+
+
 close all; clc;clear;
 
 set(0,'DefaultFigureWindowStyle','normal') %'normal' 'docked'

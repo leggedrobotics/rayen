@@ -1,3 +1,8 @@
+% --------------------------------------------------------------------------
+% Jesus Tordesillas Torres, Robotic Systems Lab, ETH Zürich 
+% See LICENSE file for the license information
+% -------------------------------------------------------------------------- 
+
 %opti_tmp is an optimization problem from Casadi
 %Feasible set is A1x<=b1 \cap A2x=b2 
 function [A1,b1, A2, b2]=getAbLinearConstraints(opti_tmp)
