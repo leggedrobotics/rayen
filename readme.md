@@ -114,7 +114,7 @@ git clone https://github.com/leggedrobotics/rayen.git
 cd rayen
 git lfs install 
 git submodule init && git submodule update --init --recursive
-pip install examples/requirements_examples.txt
+pip install -r examples/requirements_examples.txt
 ```
 
 These are the most important files in the `examples` folder:
