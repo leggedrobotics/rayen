@@ -1,6 +1,12 @@
+#See https://packaging.python.org/en/latest/guides/publishing-package-distribution-releases-using-github-actions-ci-cd-workflows/
 name: Publish Python 🐍 distributions 📦 to PyPI
 
-on: push
+#See https://stackoverflow.com/questions/61891328/trigger-github-action-only-on-new-tags
+on:
+  push:
+    # Pattern matched against refs/tags
+    tags:        
+      - '**'           # Push events to every tag
 
 jobs:
   build-n-publish:
