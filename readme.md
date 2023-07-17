@@ -1,6 +1,6 @@
 # RAYEN: Imposition of Hard Convex Constraints on Neural Networks #
 
-Paper: Coming soon...
+Paper: Coming soon....
 
 This framework allows you to impose convex constraints on the output or latent variable of a Neural Network.
 ![](./imgs/rayen.png)
