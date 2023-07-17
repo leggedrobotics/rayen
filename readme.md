@@ -54,7 +54,7 @@ r = np.array([[-1.0]])
 qcs = [constraints.ConvexQuadraticConstraint(P, q, r)] #Set qcs to [] if there are no quadratic constraints
                                                        #More quadratic constraints can be appended to this list
 
-#SOC constraint
+#SOC constraints
 M=np.array([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0],[0.0, 0.0, 0.0]])
 s=np.array([[0.0],[0.0],[0.0]])
 c=np.array([[0.0],[0.0],[1.0]])
@@ -62,7 +62,7 @@ d=np.array([[0.0]])
 socs = [constraints.SOCConstraint(M, s, c, d)] #Set socs to [] if there are no SOC constraints
                                                #More SOC constraints can be appended to this list
 
-#LMI constraints (semidefinite constraints)
+#LMI constraint (semidefinite constraint)
 F0=np.array([[1.0, 0.0],[0.0, 0.0]])
 F1=np.array([[0.0, 1.0],[1.0, 0.0]])
 F2=np.array([[0.0, 0.0],[0.0, 1.0]])
