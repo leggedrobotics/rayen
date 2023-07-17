@@ -162,3 +162,17 @@ sudo make install
 
 ```
 </details>
+
+
+<details>
+  <summary> <b>Publishing to PyPI</b></summary>
+
+More info [here](https://packaging.python.org/en/latest/guides/publishing-package-distribution-releases-using-github-actions-ci-cd-workflows/)
+
+First change the `version` line in `pyproject.toml`  to X.X.X. Then do the following:
+```bash
+git add pyproject.toml && git commit -m "updated version" && git tag vX.X.X
+git push origin master vX.X.X
+
+```
+</details>
