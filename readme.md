@@ -18,6 +18,11 @@ pip install --upgrade pip
 
 Then, you simply need to do:
 
+```bash
+pip install rayen
+```
+
+If you want to do an editable install, you can also do:
 
 ```bash
 git clone https://github.com/leggedrobotics/rayen.git
