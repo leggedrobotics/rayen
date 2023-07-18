@@ -1,6 +1,6 @@
 # RAYEN: Imposition of Hard Convex Constraints on Neural Networks #
 
-Paper: Coming soon....
+Paper: [http://arxiv.org/abs/2307.08336](http://arxiv.org/abs/2307.08336)
 
 This framework allows you to impose convex constraints on the output or latent variable of a Neural Network.
 ![](./imgs/rayen.png)
@@ -19,11 +19,6 @@ pip install --upgrade pip
 Then, you simply need to do:
 
 
-```bash
-pip install rayen
-```
-
-If you want to do an editable install, you can also do:
 ```bash
 git clone https://github.com/leggedrobotics/rayen.git
 cd rayen && pip install -e .
@@ -120,7 +115,7 @@ pip install -r examples/requirements_examples.txt
 These are the most important files in the `examples` folder:
 * **`test_layer.py`**: This file imposes many different constraints using all the methods shown above. It will create plots similar to the one shown at the beginning of this repo 
 * **`time_analysis.py`**: This file obtains the computation time of RAYEN when applied to many different constraints. 
-* **`run.h`**: This file will train the networks for all the algorithms used in the paper, and then evaluate them using the testing sets. Depending on the computer to use, this can take ~1 day to run. The datasets that this file uses are stored in the files `corridor_dim2.mat` (Optimization 1 of the paper, which is for a 2D scenario) and `corridor_dim3.mat` (Optimization 2 of the paper, which is for a 3D scenario). These files were generated running the file `traj_planning_in_corridor.m`. This Matlab files requires Casadi (and its interface with Gurobi) to be installed. You can do this using the instructions below
+* **`run.sh`**: This file will train the networks for all the algorithms used in the paper, and then evaluate them using the testing sets. Depending on the computer to use, this can take ~1 day to run. The datasets that this file uses are stored in the files `corridor_dim2.mat` (Optimization 1 of the paper, which is for a 2D scenario) and `corridor_dim3.mat` (Optimization 2 of the paper, which is for a 3D scenario). These files were generated running the file `traj_planning_in_corridor.m`. These Matlab files requires Casadi (and its interface with Gurobi) to be installed. You can do this using the instructions below
 
 Some of these examples use (or can use) [Gurobi Optimizer](https://www.gurobi.com/products/gurobi-optimizer/). Once installed (following the instructions in the previous link) you can test the installation typing `gurobi.sh` in the terminal. You will also need this package:
 ```
