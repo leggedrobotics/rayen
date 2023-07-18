@@ -32,3 +32,6 @@ license = {file = "LICENSE"}
 [project.urls]
 "Homepage" = "https://github.com/leggedrobotics/rayen"
 "Bug Tracker" = "https://github.com/leggedrobotics/rayen/issues"
+
+[tool.setuptools]
+packages = ["rayen"]
