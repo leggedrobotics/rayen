@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rayen"
-version = "0.0.4"
+version = "0.0.5"
 authors = [
   { name="Jesus Tordesillas", email="jtordesillas@ethz.ch" },
 ]
@@ -32,6 +32,3 @@ license = {file = "LICENSE"}
 [project.urls]
 "Homepage" = "https://github.com/leggedrobotics/rayen"
 "Bug Tracker" = "https://github.com/leggedrobotics/rayen/issues"
-
-[tool.setuptools]
-py-modules = []
