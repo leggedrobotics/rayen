@@ -167,7 +167,7 @@ sudo make install
 <details>
   <summary> <b>Publishing to PyPI</b></summary>
 
-More info [here](https://packaging.python.org/en/latest/guides/publishing-package-distribution-releases-using-github-actions-ci-cd-workflows/)
+More info [here](https://packaging.python.org/en/latest/guides/publishing-package-distribution-releases-using-github-actions-ci-cd-workflows/). See also the file `python-publish.yml`
 
 First change the `version` line in `pyproject.toml`  to X.X.X. Then do the following:
 ```bash
