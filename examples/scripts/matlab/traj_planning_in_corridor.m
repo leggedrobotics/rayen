@@ -3,14 +3,6 @@
 % See LICENSE file for the license information
 % -------------------------------------------------------------------------- 
 
-%This file solves the traj planning problem of generating a smooth
-%trajectory passing through several 3d polytopes. 
-
-%Note that in some cases (depending on the geometry of the convex corridor), the Bezier basis can be better than the MINVO
-%basis (due to the fact that the Bezier basis includes the initial and
-%final points --> better job in the overlapping areas between several
-%polyhedra
-
 close all; clc;clear;
 doSetup();
 
