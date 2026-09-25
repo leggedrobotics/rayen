@@ -96,7 +96,7 @@ class ConstraintModule(torch.nn.Module):
 				self.solver_projection='ECOS' #fast, accurate, does not support LMI constraints
 
 
-		if(self.method=='RAYEN' or self.method=='RAYEN_old'):
+		if(self.method=='RAYEN' or self.method=='RAYEN_old' or self.method=='RAYEN_STE'):
 
 			if(cs.has_quadratic_constraints):
 				all_delta=[]
@@ -236,6 +236,9 @@ class ConstraintModule(torch.nn.Module):
 			self.dim_after_map=(self.n+1)
 		elif(self.method=='RAYEN'):
 			self.forwardForMethod=self.forwardForRAYEN
+			self.dim_after_map=self.n
+		elif(self.method=='RAYEN_STE'):
+			self.forwardForMethod=self.forwardForRAYEN_STE
 			self.dim_after_map=self.n
 		elif(self.method=='UU'):
 			self.forwardForMethod=self.forwardForUU
@@ -472,6 +475,17 @@ class ConstraintModule(torch.nn.Module):
 		norm_v=torch.linalg.vector_norm(v, dim=(1,2), keepdim=True)
 		alpha=torch.minimum( 1/kappa , norm_v )
 		return self.getyFromz(self.z0 + alpha*v_bar)
+
+	#Same forward pass as RAYEN, but the backward pass treats RAYEN as the identity map z=z0+v (straight-through estimator)
+	def forwardForRAYEN_STE(self, q):
+		v = q[:,  0:self.n,0:1]
+		v_bar=torch.nn.functional.normalize(v, dim=1)
+		kappa=self.computeKappa(v_bar)
+		norm_v=torch.linalg.vector_norm(v, dim=(1,2), keepdim=True)
+		alpha=torch.minimum( 1/kappa , norm_v )
+		z_unconstrained = self.z0 + v
+		z1 = self.z0 + alpha*v_bar
+		return self.getyFromz(z_unconstrained + (z1 - z_unconstrained).detach())
 
 	def forwardForUU(self, q):
 		return q
