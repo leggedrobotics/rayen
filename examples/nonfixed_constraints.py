@@ -9,6 +9,8 @@
 # Following Section 7.1, they are generated so that b1>0, r_i<0, and P_i=V_i'*V_i. Hence, y0=0 (i.e., z0=0) is always
 # a strictly feasible point, and the offline phase is not needed.
 # The network receives as input the constraints and a target point y_target, and it is trained to minimize ||y-y_target||^2
+# Run it with "python -O nonfixed_constraints.py". The -O flag removes the asserts (as when testing in scripts/run.sh), which would otherwise
+# add GPU synchronizations to the measured computation times. See https://docs.python.org/3/using/cmdline.html#cmdoption-O
 
 import time
 import numpy as np
@@ -22,6 +24,9 @@ from rayen import constraints, constraint_module, utils
 torch.set_default_dtype(torch.float64)
 torch.manual_seed(0)
 np.random.seed(0)
+
+if __debug__:
+	utils.printInBoldRed("Asserts are enabled. Run this script with 'python -O nonfixed_constraints.py' to obtain accurate computation times")
 
 k=3              #Dimension of y
 num_lin=6        #Number of linear inequality constraints (rows of A1)
@@ -85,6 +90,7 @@ x=getInputNetwork(A1, b1, P, q, r, y_target)
 
 with torch.no_grad():
 	updateConstraints(layer, A1, b1, P, q, r); model(x) #Warm up the GPU (for a better estimate of the computation time)
+	torch.cuda.synchronize() #Wait for the warm-up to finish, so that both measurements below start with the GPU idle
 
 	cuda_timer=utils.CudaTimer()
 	cuda_timer.start()
@@ -97,26 +103,35 @@ with torch.no_grad():
 
 loss_rayen=torch.sum(torch.square(y-y_target), dim=1).squeeze()
 
-#Violation of the constraints
-all_ineq=torch.cat((A1@y-b1, (0.5*y.unsqueeze(1).transpose(2,3)@P@y.unsqueeze(1) + q.transpose(2,3)@y.unsqueeze(1) + r).squeeze(3)), dim=1)
-max_violation=torch.max(torch.relu(all_ineq)).item()
+A1, b1, P, q, r, y_target, y = [tmp.cpu().numpy() for tmp in (A1, b1, P, q, r, y_target, y)]
+
+#Violation of the constraints, computed as in main.py (Section 6.1 of the paper): squared distance from the output of the network
+#to the closest point of the feasible set (i.e., to its projection onto the feasible set), averaged over all the samples
+violation=0.0
+for i in range(num_samples_test):
+	lc_i=constraints.LinearConstraint(A1=A1[i], b1=b1[i], A2=None, b2=None)
+	qcs_i=[constraints.ConvexQuadraticConstraint(P=P[i,j], q=q[i,j], r=r[i,j]) for j in range(num_quad)]
+	cs_i=constraints.ConvexConstraints(lc=lc_i, qcs=qcs_i, socs=[], lmic=None, y0=np.zeros((k,1)), do_preprocessing_linear=False)
+	violation+=cs_i.getViolation(y[i])/num_samples_test
 
 #Globally-optimal solution (projection of y_target onto the feasible set), obtained with a convex solver
-A1, b1, P, q, r, y_target = [tmp.cpu().numpy() for tmp in (A1, b1, P, q, r, y_target)]
 loss_opt=[]
-time_opt_s=0.0
+time_opt_s=0.0      #Solve time reported by Gurobi
+time_opt_wall_s=0.0 #Also includes the time CVXPY needs to build the problem
 for i in range(num_samples_test):
 	y_opt=cp.Variable((k,1))
 	cons=[A1[i]@y_opt<=b1[i]] + [0.5*cp.quad_form(y_opt, P[i,j]) + q[i,j].T@y_opt + r[i,j]<=0 for j in range(num_quad)]
 	prob=cp.Problem(cp.Minimize(cp.sum_squares(y_opt-y_target[i])), cons)
 	start=time.perf_counter()
 	prob.solve(solver=cp.GUROBI)
-	time_opt_s+=time.perf_counter()-start
+	time_opt_wall_s+=time.perf_counter()-start
+	time_opt_s+=prob.solver_stats.solve_time
 	loss_opt.append(prob.value)
 
 print("==========================================")
 print(f"Normalized loss (RAYEN):              {torch.mean(loss_rayen).item()/np.mean(loss_opt):.4f}")
-print(f"Max. violation (RAYEN):               {max_violation:.2e}")
+print(f"Violation (RAYEN):                    {violation:.2e}")
 print(f"Time update constraints (per sample): {1e6*time_update_s/num_samples_test:.3f} us")
 print(f"Time forward pass (per sample):       {1e6*time_forward_s/num_samples_test:.3f} us")
-print(f"Time convex solver (per sample):      {1e6*time_opt_s/num_samples_test:.1f} us")
+print(f"Solve time of Gurobi (per sample):    {1e6*time_opt_s/num_samples_test:.1f} us")
+print(f"Time CVXPY+Gurobi (per sample):       {1e6*time_opt_wall_s/num_samples_test:.1f} us")

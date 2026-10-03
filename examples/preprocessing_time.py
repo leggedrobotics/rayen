@@ -7,6 +7,7 @@
 # The time of each step of the offline phase is obtained by timing all the calls to cvxpy.Problem.solve(), and assigning each call
 # to the step of ConvexConstraints.__init__() it comes from.
 
+import sys
 import time
 import inspect
 import numpy as np
@@ -40,7 +41,7 @@ def getStep(lineno):
 stats={}
 original_solve=cp.Problem.solve
 def timedSolve(self, *args, **kwargs):
-	caller_line=inspect.stack()[1].lineno
+	caller_line=sys._getframe(1).f_lineno #Line of the caller. Note that inspect.stack()[1].lineno is much slower (it would add ~0.3 s to the measured times)
 	start=time.perf_counter()
 	result=original_solve(self, *args, **kwargs)
 	elapsed=time.perf_counter()-start
